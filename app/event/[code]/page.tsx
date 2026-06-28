@@ -77,7 +77,10 @@ export default function EventJoinPage() {
             <label className="flex flex-col gap-1">
               <span className="text-sm text-zinc-400">Station #</span>
               <select value={station} onChange={e => setStation(Number(e.target.value))} className="input">
-                {[1,2,3,4,5,6].map(n => <option key={n} value={n}>Station {n}</option>)}
+                {Array.from(
+                  { length: parseInt(event.class.match(/^\d+/)?.[0] ?? '1', 10) },
+                  (_, i) => i + 1
+                ).map(n => <option key={n} value={n}>Station {n}</option>)}
               </select>
             </label>
             <button
