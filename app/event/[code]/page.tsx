@@ -11,7 +11,6 @@ export default function EventJoinPage() {
 
   const [event, setEvent] = useState<Event | null>(null);
   const [opCall, setOpCall] = useState('');
-  const [station, setStation] = useState(1);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
 
@@ -26,8 +25,8 @@ export default function EventJoinPage() {
         // If already joined, go straight to log
         const saved = sessionStorage.getItem(`ezfd_op_${code}`);
         if (saved) {
-          const { call, stationNum } = JSON.parse(saved);
-          if (call) router.replace(`/event/${code}/log?op=${call}&station=${stationNum}`);
+          const { call } = JSON.parse(saved);
+          if (call) router.replace(`/event/${code}/log?op=${call}`);
         }
       });
   }, [code, router]);
@@ -36,8 +35,8 @@ export default function EventJoinPage() {
     e.preventDefault();
     const call = opCall.toUpperCase().trim();
     if (!call) return;
-    sessionStorage.setItem(`ezfd_op_${code}`, JSON.stringify({ call, stationNum: station }));
-    router.push(`/event/${code}/log?op=${call}&station=${station}`);
+    sessionStorage.setItem(`ezfd_op_${code}`, JSON.stringify({ call }));
+    router.push(`/event/${code}/log?op=${call}`);
   }
 
   if (loading) return <div className="flex min-h-screen items-center justify-center text-zinc-400">Loading...</div>;
@@ -73,15 +72,6 @@ export default function EventJoinPage() {
                 className="input font-mono text-lg tracking-widest"
                 autoFocus
               />
-            </label>
-            <label className="flex flex-col gap-1">
-              <span className="text-sm text-zinc-400">Station #</span>
-              <select value={station} onChange={e => setStation(Number(e.target.value))} className="input">
-                {Array.from(
-                  { length: parseInt(event.class.match(/^\d+/)?.[0] ?? '1', 10) },
-                  (_, i) => i + 1
-                ).map(n => <option key={n} value={n}>Station {n}</option>)}
-              </select>
             </label>
             <button
               type="submit"

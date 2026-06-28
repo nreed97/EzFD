@@ -108,6 +108,7 @@ export default function QSOForm({
             <button
               key={b}
               type="button"
+              tabIndex={-1}
               onClick={() => onBandChange(b)}
               className={`rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
                 band === b
@@ -126,6 +127,7 @@ export default function QSOForm({
               <button
                 key={b}
                 type="button"
+                tabIndex={-1}
                 onClick={() => onBandChange(b)}
                 className={`flex-1 rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
                   band === b
@@ -138,6 +140,7 @@ export default function QSOForm({
             ))}
             <button
               type="button"
+              tabIndex={-1}
               onClick={() => setShowExtra(false)}
               className="px-2 text-xs text-zinc-500 hover:text-zinc-300"
             >
@@ -163,6 +166,7 @@ export default function QSOForm({
             <button
               key={m}
               type="button"
+              tabIndex={-1}
               onClick={() => onModeChange(m)}
               className={`flex-1 py-2 text-sm font-bold transition-colors ${
                 mode === m

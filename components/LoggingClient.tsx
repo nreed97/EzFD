@@ -217,7 +217,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           )}
 
           <span className="text-xs text-zinc-500 font-mono hidden md:inline">
-            {operatorCall} · STN{stationNumber}
+            {operatorCall}
           </span>
 
           <button onClick={toggleNight}

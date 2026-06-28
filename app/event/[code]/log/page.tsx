@@ -7,10 +7,10 @@ export default async function LogPage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ op?: string; station?: string }>;
+  searchParams: Promise<{ op?: string }>;
 }) {
   const { code } = await params;
-  const { op, station } = await searchParams;
+  const { op } = await searchParams;
   const pool = getPool();
 
   const { rows: evRows } = await pool.query(
@@ -32,7 +32,7 @@ export default async function LogPage({
       event={evRows[0]}
       initialQSOs={qsos}
       operatorCall={op.toUpperCase()}
-      stationNumber={parseInt(station ?? '1', 10)}
+      stationNumber={1}
     />
   );
 }
