@@ -132,6 +132,7 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
             joinCode={event.join_code}
             initialBonuses={bonuses}
             baseScore={score.total_score}
+            onBonusesChange={setBonuses}
           />
 
           {score.sections.length > 0 && (

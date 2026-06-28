@@ -44,9 +44,10 @@ interface Props {
   joinCode: string;
   initialBonuses: Bonuses;
   baseScore: number;
+  onBonusesChange?: (b: Bonuses) => void;
 }
 
-export default function BonusTracker({ joinCode, initialBonuses, baseScore }: Props) {
+export default function BonusTracker({ joinCode, initialBonuses, baseScore, onBonusesChange }: Props) {
   const [bonuses, setBonuses] = useState<Bonuses>(initialBonuses);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
@@ -54,6 +55,7 @@ export default function BonusTracker({ joinCode, initialBonuses, baseScore }: Pr
 
   const save = useCallback(async (next: Bonuses) => {
     setSaving(true);
+    onBonusesChange?.(next);
     try {
       await fetch(`/api/events/${joinCode}/bonuses`, {
         method: 'PATCH',
@@ -63,7 +65,7 @@ export default function BonusTracker({ joinCode, initialBonuses, baseScore }: Pr
     } finally {
       setSaving(false);
     }
-  }, [joinCode]);
+  }, [joinCode, onBonusesChange]);
 
   function toggleBool(key: keyof Bonuses) {
     const next = { ...bonuses, [key]: !bonuses[key as keyof Bonuses] };
