@@ -11,7 +11,7 @@ const ENC_PATTERN = /^[0-9a-f]{24}:[0-9a-f]{32}:[0-9a-f]+$/;
 
 export function encryptField(text: string): string {
   const key = getKey();
-  if (!key) return text;
+  if (!key) throw new Error('EZFD_ENCRYPTION_KEY is not set — cannot store credentials securely');
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const enc = Buffer.concat([cipher.update(text, 'utf8'), cipher.final()]);

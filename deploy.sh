@@ -105,6 +105,27 @@ else
   prompt PG_PASS "PostgreSQL password (leave blank to auto-generate)" "$GENERATED_PW"
 fi
 
+# Encryption key — auto-generated on first run, preserved on updates
+EZFD_ENC_KEY=""
+if [[ -f "$APP_DIR/.env" ]]; then
+  EZFD_ENC_KEY="$(grep '^EZFD_ENCRYPTION_KEY=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- || true)"
+fi
+if [[ -z "$EZFD_ENC_KEY" ]]; then
+  EZFD_ENC_KEY="$(openssl rand -hex 32)"
+  info "Generated new EZFD_ENCRYPTION_KEY (stored in $APP_DIR/.env)"
+fi
+
+# Admin key — optional, preserved on updates, prompt to set on fresh install
+EZFD_ADMIN_KEY=""
+if [[ -f "$APP_DIR/.env" ]]; then
+  EZFD_ADMIN_KEY="$(grep '^EZFD_ADMIN_KEY=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- || true)"
+fi
+if [[ "$UPDATING" == "false" && -z "$EZFD_ADMIN_KEY" ]]; then
+  echo
+  echo -e "  ${BLUE}Tip:${NC} Setting an admin key prevents unauthorised event creation on public servers."
+  prompt EZFD_ADMIN_KEY "Admin key (leave blank to allow open event creation)" ""
+fi
+
 echo
 hr
 echo -e "${BOLD}Summary${NC}"
@@ -285,6 +306,8 @@ NODE_ENV=production
 PORT=3000
 HOSTNAME=127.0.0.1
 DATABASE_URL=postgresql://ezfd:${PG_PASS}@localhost/ezfd
+EZFD_ENCRYPTION_KEY=${EZFD_ENC_KEY}
+EZFD_ADMIN_KEY=${EZFD_ADMIN_KEY}
 EOF
 chmod 600   "$APP_DIR/.env"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
@@ -423,7 +446,11 @@ echo -e "  ${BOLD}URL:${NC}       $APP_URL"
 echo
 echo -e "  ${BOLD}DB password:${NC}"
 echo -e "    $PG_PASS"
-echo -e "  ${YELLOW}(also saved to $APP_DIR/.env — keep this file private)${NC}"
+if [[ -n "$EZFD_ADMIN_KEY" ]]; then
+echo -e "  ${BOLD}Admin key:${NC}"
+echo -e "    $EZFD_ADMIN_KEY"
+fi
+echo -e "  ${YELLOW}(secrets saved to $APP_DIR/.env — keep this file private)${NC}"
 echo
 echo -e "  ${BOLD}Useful commands:${NC}"
 echo -e "    Live logs:   journalctl -u ezfd -f"

@@ -31,7 +31,17 @@ export async function POST(request: Request) {
     join_code = generateJoinCode();
   }
 
-  const encryptedPassword = qrz_password ? encryptField(qrz_password) : null;
+  let encryptedPassword: string | null = null;
+  if (qrz_password) {
+    try {
+      encryptedPassword = encryptField(qrz_password);
+    } catch {
+      return NextResponse.json(
+        { error: 'Server encryption key not configured. Ask the server administrator to set EZFD_ENCRYPTION_KEY.' },
+        { status: 500 }
+      );
+    }
+  }
 
   const { rows } = await pool.query(
     `INSERT INTO events
