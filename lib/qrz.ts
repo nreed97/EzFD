@@ -1,5 +1,5 @@
 import { parseStringPromise } from 'xml2js';
-import { createServiceClient } from './supabase-server';
+import { getPool } from './db';
 import type { QRZLookup } from './types';
 
 const QRZ_BASE = 'https://xmldata.qrz.com/xml/current/';
@@ -17,13 +17,13 @@ async function fetchQRZSession(username: string, password: string): Promise<stri
 }
 
 export async function lookupCallsign(eventId: string, callsign: string): Promise<QRZLookup> {
-  const supabase = createServiceClient();
+  const pool = getPool();
 
-  const { data: event } = await supabase
-    .from('events')
-    .select('qrz_username, qrz_password, qrz_session_key, qrz_session_expires')
-    .eq('id', eventId)
-    .single();
+  const { rows } = await pool.query(
+    'SELECT qrz_username, qrz_password, qrz_session_key, qrz_session_expires FROM events WHERE id=$1',
+    [eventId]
+  );
+  const event = rows[0];
 
   if (!event?.qrz_username || !event?.qrz_password) {
     return { callsign, name: null, state: null, country: null, grid: null };
@@ -35,11 +35,11 @@ export async function lookupCallsign(eventId: string, callsign: string): Promise
 
   if (!sessionKey || !expires || expires <= now) {
     sessionKey = await fetchQRZSession(event.qrz_username, event.qrz_password);
-    const newExpires = new Date(now.getTime() + 50 * 60 * 1000); // 50 min
-    await supabase
-      .from('events')
-      .update({ qrz_session_key: sessionKey, qrz_session_expires: newExpires.toISOString() })
-      .eq('id', eventId);
+    const newExpires = new Date(now.getTime() + 50 * 60 * 1000);
+    await pool.query(
+      'UPDATE events SET qrz_session_key=$1, qrz_session_expires=$2 WHERE id=$3',
+      [sessionKey, newExpires.toISOString(), eventId]
+    );
   }
 
   const url = `${QRZ_BASE}?s=${encodeURIComponent(sessionKey)}&callsign=${encodeURIComponent(callsign.toUpperCase())}`;

@@ -1,24 +1,23 @@
-import { createServiceClient } from '@/lib/supabase-server';
+import { getPool } from '@/lib/db';
 import DashboardClient from '@/components/DashboardClient';
 import { redirect } from 'next/navigation';
 
 export default async function DashboardPage({ params }: { params: Promise<{ code: string }> }) {
   const { code } = await params;
-  const supabase = createServiceClient();
+  const pool = getPool();
 
-  const { data: event } = await supabase
-    .from('events')
-    .select('id, join_code, club_name, club_call, event_year, class, arrl_section, location, qrz_username, created_at')
-    .eq('join_code', code.toUpperCase())
-    .single();
+  const { rows: evRows } = await pool.query(
+    `SELECT id, join_code, club_name, club_call, event_year, class, arrl_section,
+            location, qrz_username, created_at
+     FROM events WHERE join_code=$1`,
+    [code.toUpperCase()]
+  );
+  if (!evRows[0]) redirect('/');
 
-  if (!event) redirect('/');
+  const { rows: qsos } = await pool.query(
+    'SELECT * FROM qsos WHERE event_id=$1 ORDER BY datetime_utc ASC',
+    [evRows[0].id]
+  );
 
-  const { data: qsos } = await supabase
-    .from('qsos')
-    .select('*')
-    .eq('event_id', event.id)
-    .order('datetime_utc', { ascending: true });
-
-  return <DashboardClient event={event} initialQSOs={qsos ?? []} />;
+  return <DashboardClient event={evRows[0]} initialQSOs={qsos} />;
 }

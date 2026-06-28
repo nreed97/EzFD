@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useRef, useState } from 'react';
-import { createClient } from '@/lib/supabase';
+import { useEffect, useRef, useState, useCallback } from 'react';
 import type { Band, Mode } from '@/lib/types';
 
 interface StationPresence {
@@ -9,6 +8,7 @@ interface StationPresence {
   station: number;
   band: Band;
   mode: Mode;
+  updated_at: string;
 }
 
 interface Props {
@@ -25,50 +25,49 @@ const MODE_COLORS: Record<Mode, string> = {
   DIG: 'text-green-400',
 };
 
+const HEARTBEAT_MS  = 30_000;
+const POLL_MS       = 15_000;
+
 export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode }: Props) {
   const [stations, setStations] = useState<StationPresence[]>([]);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const channelRef = useRef<any>(null);
-  const supabaseRef = useRef(createClient());
+  const lastBandRef = useRef<Band | null>(null);
+  const lastModeRef = useRef<Mode | null>(null);
 
-  useEffect(() => {
-    const supabase = supabaseRef.current;
-    const channel = supabase.channel(`presence-${eventId}`, {
-      config: { presence: { key: `${myStation}-${myOpCall}` } },
-    });
-
-    channelRef.current = channel as typeof channelRef.current;
-
-    channel
-      .on('presence', { event: 'sync' }, () => {
-        const state = channel.presenceState();
-        const active: StationPresence[] = [];
-        for (const presences of Object.values(state)) {
-          for (const p of presences as unknown as StationPresence[]) {
-            active.push(p);
-          }
-        }
-        setStations(active);
-      })
-      .subscribe(async (status) => {
-        if (status === 'SUBSCRIBED') {
-          await channel.track({ op_call: myOpCall, station: myStation, band: currentBand, mode: currentMode });
-        }
-      });
-
-    return () => { supabase.removeChannel(channel); };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+  const publishPresence = useCallback(async (band: Band, mode: Mode) => {
+    await fetch('/api/presence', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_id: eventId, op_call: myOpCall, station: myStation, band, mode }),
+    }).catch(() => {});
   }, [eventId, myOpCall, myStation]);
 
-  // Re-track whenever band/mode changes
+  const fetchPresence = useCallback(async () => {
+    const res = await fetch(`/api/presence?event_id=${eventId}`).catch(() => null);
+    if (res?.ok) setStations(await res.json());
+  }, [eventId]);
+
+  // Publish immediately on mount and whenever band/mode changes
   useEffect(() => {
-    const ch = channelRef.current;
-    if (!ch) return;
-    ch.track({ op_call: myOpCall, station: myStation, band: currentBand, mode: currentMode }).catch(() => {});
-  }, [currentBand, currentMode, myOpCall, myStation]);
+    if (currentBand === lastBandRef.current && currentMode === lastModeRef.current) return;
+    lastBandRef.current = currentBand;
+    lastModeRef.current = currentMode;
+    publishPresence(currentBand, currentMode);
+  }, [currentBand, currentMode, publishPresence]);
 
-  const others = stations.filter(s => !(s.op_call === myOpCall && s.station === myStation));
+  // Periodic heartbeat so our presence doesn't go stale
+  useEffect(() => {
+    const id = setInterval(() => publishPresence(lastBandRef.current ?? currentBand, lastModeRef.current ?? currentMode), HEARTBEAT_MS);
+    return () => clearInterval(id);
+  }, [publishPresence, currentBand, currentMode]);
 
+  // Poll for other stations' presence
+  useEffect(() => {
+    fetchPresence();
+    const id = setInterval(fetchPresence, POLL_MS);
+    return () => clearInterval(id);
+  }, [fetchPresence]);
+
+  const others = stations.filter(s => s.op_call !== myOpCall);
   if (others.length === 0) return null;
 
   return (
@@ -83,7 +82,7 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
             const conflict = s.band === currentBand && s.mode === currentMode;
             return (
               <div
-                key={`${s.station}-${s.op_call}`}
+                key={s.op_call}
                 className={`flex items-center justify-between rounded px-2 py-1 text-xs ${
                   conflict ? 'border border-red-700 bg-red-900/30' : 'bg-zinc-800/50'
                 }`}
@@ -94,7 +93,7 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
                 <span className="flex items-center gap-1.5">
                   <span className="font-mono text-zinc-200">{s.band}</span>
                   <span className={`font-mono font-bold ${MODE_COLORS[s.mode]}`}>{s.mode}</span>
-                  {conflict && <span className="text-red-400 font-bold">!</span>}
+                  {conflict && <span className="font-bold text-red-400">!</span>}
                 </span>
               </div>
             );

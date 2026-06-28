@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { createClient } from '@/lib/supabase';
 import { calculateScore } from '@/lib/scoring';
 import type { Event, QSO } from '@/lib/types';
 import Scoreboard from './Scoreboard';
+import UTCClock from './UTCClock';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
@@ -17,33 +17,27 @@ interface Props {
 
 export default function DashboardClient({ event, initialQSOs }: Props) {
   const [qsos, setQSOs] = useState<QSO[]>(initialQSOs);
-  const supabase = useRef(createClient());
 
+  // SSE subscription — same endpoint as the logger
   useEffect(() => {
-    const channel = supabase.current
-      .channel(`dashboard-${event.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'qsos', filter: `event_id=eq.${event.id}` },
-        () => {
-          // Re-fetch on any change
-          fetch(`/api/qso?event_id=${event.id}`)
-            .then(r => r.json())
-            .then(data => setQSOs(data ?? []));
-        }
-      )
-      .subscribe();
+    const es = new EventSource(`/api/realtime/${event.id}`);
 
-    return () => { supabase.current.removeChannel(channel); };
+    es.addEventListener('qso', (e: MessageEvent) => {
+      const { op, record } = JSON.parse(e.data) as { op: string; record: QSO };
+      if (op === 'INSERT') {
+        setQSOs(prev => prev.some(q => q.id === record.id) ? prev : [...prev, record]);
+      } else if (op === 'DELETE') {
+        setQSOs(prev => prev.filter(q => q.id !== record.id));
+      }
+    });
+
+    return () => es.close();
   }, [event.id]);
 
   const score = calculateScore(qsos);
-
-  // Rate tracking: QSOs per hour (last 60 min)
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const recentQSOs = qsos.filter(q => !q.is_dupe && q.datetime_utc > oneHourAgo).length;
 
-  // Operator breakdown
   const byOp: Record<string, number> = {};
   for (const q of qsos) {
     if (!q.is_dupe && q.operator_call) {
@@ -54,12 +48,13 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-6 py-3">
-        <div>
+        <div className="flex items-center gap-3">
           <span className="font-bold text-amber-400 text-xl">{event.club_call}</span>
-          <span className="ml-3 text-zinc-400 text-sm">{event.club_name}</span>
-          <span className="ml-3 text-zinc-600 text-sm">{event.class} · {event.arrl_section}</span>
+          <span className="text-zinc-400 text-sm">{event.club_name}</span>
+          <span className="text-zinc-600 text-sm">{event.class} · {event.arrl_section}</span>
         </div>
-        <div className="flex gap-3 text-sm">
+        <div className="flex items-center gap-3 text-sm">
+          <UTCClock />
           <Link href={`/event/${event.join_code}/log?op=&station=1`}
             className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800">
             ← Logger
@@ -75,15 +70,12 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden gap-0">
-        {/* Map */}
+      <div className="flex flex-1 overflow-hidden">
         <div className="flex-1">
           <MapView workedSections={score.sections} />
         </div>
 
-        {/* Stats sidebar */}
         <aside className="w-72 flex flex-col gap-4 overflow-y-auto border-l border-zinc-800 bg-zinc-900 p-4">
-          {/* Rate */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
             <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Rate</div>
             <div className="flex items-baseline gap-1">
@@ -94,7 +86,6 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
 
           <Scoreboard score={score} />
 
-          {/* Sections worked */}
           {score.sections.length > 0 && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
               <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">
@@ -110,7 +101,6 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
             </div>
           )}
 
-          {/* Operators */}
           {Object.keys(byOp).length > 0 && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
               <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Operators</div>
@@ -125,7 +115,6 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
             </div>
           )}
 
-          {/* Join info */}
           <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
             <div className="text-xs text-zinc-500 uppercase tracking-wider mb-1">Join Code</div>
             <div className="font-mono text-2xl font-bold tracking-[0.3em] text-amber-400">{event.join_code}</div>

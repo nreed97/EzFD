@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase-server';
+import { getPool } from '@/lib/db';
 
 export async function POST(request: Request) {
   const body = await request.json();
@@ -9,70 +9,56 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  const pool = getPool();
 
-  const { data: event } = await supabase
-    .from('events')
-    .select('class, arrl_section')
-    .eq('id', event_id)
-    .single();
+  const { rows: evRows } = await pool.query(
+    'SELECT class, arrl_section FROM events WHERE id = $1',
+    [event_id]
+  );
+  if (!evRows[0]) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+  const event = evRows[0];
 
-  if (!event) {
-    return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-  }
+  // Dupe check
+  const { rows: dupeRows } = await pool.query(
+    `SELECT id FROM qsos
+     WHERE event_id=$1 AND callsign=$2 AND band=$3 AND mode=$4 AND is_dupe=false
+     LIMIT 1`,
+    [event_id, callsign.toUpperCase().trim(), band, mode]
+  );
+  const is_dupe = dupeRows.length > 0;
 
-  // Dupe check: same callsign + band + mode in this event (excluding prior dupes)
-  const { data: existing } = await supabase
-    .from('qsos')
-    .select('id')
-    .eq('event_id', event_id)
-    .eq('callsign', callsign.toUpperCase())
-    .eq('band', band)
-    .eq('mode', mode)
-    .eq('is_dupe', false)
-    .maybeSingle();
-
-  const is_dupe = !!existing;
-
-  const { data, error } = await supabase
-    .from('qsos')
-    .insert({
+  const { rows } = await pool.query(
+    `INSERT INTO qsos
+       (event_id, callsign, band, mode, datetime_utc, sent_class, sent_section,
+        rcvd_class, rcvd_section, operator_call, station_number, is_dupe)
+     VALUES ($1,$2,$3,$4,NOW(),$5,$6,$7,$8,$9,$10,$11)
+     RETURNING *`,
+    [
       event_id,
-      callsign: callsign.toUpperCase().trim(),
+      callsign.toUpperCase().trim(),
       band,
       mode,
-      datetime_utc: new Date().toISOString(),
-      sent_class: event.class,
-      sent_section: event.arrl_section,
-      rcvd_class: rcvd_class?.toUpperCase().trim() ?? null,
-      rcvd_section: rcvd_section?.toUpperCase().trim() ?? null,
-      operator_call: operator_call?.toUpperCase().trim() ?? null,
-      station_number: station_number ?? 1,
+      event.class,
+      event.arrl_section,
+      rcvd_class?.toUpperCase().trim() ?? null,
+      rcvd_section?.toUpperCase().trim() ?? null,
+      operator_call?.toUpperCase().trim() ?? null,
+      station_number ?? 1,
       is_dupe,
-    })
-    .select()
-    .single();
+    ]
+  );
 
-  if (error) {
-    console.error('QSO insert error:', error);
-    return NextResponse.json({ error: 'Failed to log QSO' }, { status: 500 });
-  }
-
-  return NextResponse.json(data, { status: 201 });
+  return NextResponse.json(rows[0], { status: 201 });
 }
 
 export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const eventId = url.searchParams.get('event_id');
+  const eventId = new URL(request.url).searchParams.get('event_id');
   if (!eventId) return NextResponse.json({ error: 'event_id required' }, { status: 400 });
 
-  const supabase = createServiceClient();
-  const { data, error } = await supabase
-    .from('qsos')
-    .select('*')
-    .eq('event_id', eventId)
-    .order('datetime_utc', { ascending: false });
-
-  if (error) return NextResponse.json({ error: 'Failed to fetch QSOs' }, { status: 500 });
-  return NextResponse.json(data);
+  const pool = getPool();
+  const { rows } = await pool.query(
+    'SELECT * FROM qsos WHERE event_id=$1 ORDER BY datetime_utc DESC',
+    [eventId]
+  );
+  return NextResponse.json(rows);
 }

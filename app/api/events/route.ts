@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { createServiceClient } from '@/lib/supabase-server';
+import { getPool } from '@/lib/db';
 
 function generateJoinCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -14,38 +14,33 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const supabase = createServiceClient();
+  const pool = getPool();
 
+  // Collision-resistant join code
   let join_code = generateJoinCode();
-  let attempts = 0;
-
-  while (attempts < 10) {
-    const { data: existing } = await supabase.from('events').select('id').eq('join_code', join_code).maybeSingle();
-    if (!existing) break;
+  for (let i = 0; i < 10; i++) {
+    const { rows } = await pool.query('SELECT id FROM events WHERE join_code = $1', [join_code]);
+    if (rows.length === 0) break;
     join_code = generateJoinCode();
-    attempts++;
   }
 
-  const { data, error } = await supabase
-    .from('events')
-    .insert({
+  const { rows } = await pool.query(
+    `INSERT INTO events
+       (join_code, club_name, club_call, event_year, class, arrl_section, location, qrz_username, qrz_password)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+     RETURNING id, join_code`,
+    [
       join_code,
-      club_name: club_name.trim(),
-      club_call: club_call.toUpperCase().trim(),
-      event_year: event_year ?? new Date().getFullYear(),
-      class: fdClass.toUpperCase().trim(),
-      arrl_section: arrl_section.toUpperCase().trim(),
-      location: location?.trim() ?? null,
-      qrz_username: qrz_username?.trim() ?? null,
-      qrz_password: qrz_password ?? null,
-    })
-    .select('id, join_code')
-    .single();
+      club_name.trim(),
+      club_call.toUpperCase().trim(),
+      event_year ?? new Date().getFullYear(),
+      fdClass.toUpperCase().trim(),
+      arrl_section.toUpperCase().trim(),
+      location?.trim() ?? null,
+      qrz_username?.trim() ?? null,
+      qrz_password ?? null,
+    ]
+  );
 
-  if (error) {
-    console.error('Event creation error:', error);
-    return NextResponse.json({ error: 'Failed to create event' }, { status: 500 });
-  }
-
-  return NextResponse.json(data);
+  return NextResponse.json(rows[0]);
 }

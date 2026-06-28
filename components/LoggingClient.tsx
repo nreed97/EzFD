@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { createClient } from '@/lib/supabase';
 import { calculateScore } from '@/lib/scoring';
 import { enqueue, dequeue, loadQueue, type PendingQSO } from '@/lib/offline-queue';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
@@ -72,13 +71,10 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [submitting, setSubmitting] = useState(false);
   const [lastLogged, setLastLogged] = useState<DisplayQSO | null>(null);
   const [nightMode, setNightMode] = useState(false);
-  // Band/mode lifted up so BandActivity and presence tracking see them
   const [currentBand, setCurrentBand] = useState<Band>('20m');
   const [currentMode, setCurrentMode] = useState<Mode>('PH');
-  const supabase = useRef(createClient());
   const syncingRef = useRef(false);
 
-  // Load night mode preference
   useEffect(() => {
     setNightMode(localStorage.getItem('ezfd_night') === '1');
   }, []);
@@ -91,7 +87,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     });
   }
 
-  // Load leftover pending QSOs from storage on mount
+  // Restore any pending QSOs from localStorage on mount
   useEffect(() => {
     const stored = loadQueue(event.id);
     if (stored.length > 0) {
@@ -100,34 +96,30 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     }
   }, [event.id, event.class, event.arrl_section]);
 
-  // Real-time subscription
+  // SSE subscription for real-time QSO updates
   useEffect(() => {
-    const client = supabase.current;
-    const channel = client
-      .channel(`event-${event.id}`)
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'qsos', filter: `event_id=eq.${event.id}` },
-        (payload) => {
-          const q = payload.new as QSO;
-          setConfirmedQSOs(prev => prev.some(x => x.id === q.id) ? prev : [q, ...prev]);
-        }
-      )
-      .on('postgres_changes',
-        { event: 'DELETE', schema: 'public', table: 'qsos', filter: `event_id=eq.${event.id}` },
-        (payload) => {
-          setConfirmedQSOs(prev => prev.filter(x => x.id !== (payload.old as QSO).id));
-        }
-      )
-      .subscribe();
+    const es = new EventSource(`/api/realtime/${event.id}`);
 
-    return () => { client.removeChannel(channel); };
+    es.addEventListener('qso', (e: MessageEvent) => {
+      const { op, record } = JSON.parse(e.data) as { op: string; record: QSO };
+      if (op === 'INSERT') {
+        setConfirmedQSOs(prev => prev.some(q => q.id === record.id) ? prev : [record, ...prev]);
+      } else if (op === 'DELETE') {
+        setConfirmedQSOs(prev => prev.filter(q => q.id !== record.id));
+      }
+    });
+
+    es.onerror = () => {
+      // Browser will auto-reconnect for SSE; errors here are transient
+    };
+
+    return () => es.close();
   }, [event.id]);
 
   const flushQueue = useCallback(async () => {
     if (syncingRef.current) return;
     syncingRef.current = true;
-    const queue = loadQueue(event.id);
-    for (const pending of queue) {
+    for (const pending of loadQueue(event.id)) {
       const result = await submitQSOToServer(event.id, pending);
       if (!result) break;
       dequeue(event.id, pending.local_id);
@@ -138,8 +130,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   }, [event.id]);
 
   useEffect(() => {
-    function onOnline() { setIsOnline(true); flushQueue(); }
-    function onOffline() { setIsOnline(false); }
+    const onOnline  = () => { setIsOnline(true); flushQueue(); };
+    const onOffline = () => setIsOnline(false);
     setIsOnline(navigator.onLine);
     window.addEventListener('online', onOnline);
     window.addEventListener('offline', onOffline);
@@ -154,11 +146,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     rcvd_class: string; rcvd_section: string;
   }) => {
     setSubmitting(true);
-    const pending = enqueue(event.id, {
-      ...data,
-      operator_call: operatorCall,
-      station_number: stationNumber,
-    });
+    const pending = enqueue(event.id, { ...data, operator_call: operatorCall, station_number: stationNumber });
     const display = pendingToDisplay(pending, event.class, event.arrl_section);
     setPendingQSOs(prev => [display, ...prev]);
     setPendingCount(prev => prev + 1);
@@ -191,12 +179,10 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     ...pendingQSOs,
     ...confirmedQSOs.map(q => q as DisplayQSO),
   ];
-
   const score = calculateScore(confirmedQSOs);
 
   return (
     <div data-night={nightMode ? 'true' : undefined} className="night-scope flex h-screen flex-col overflow-hidden bg-zinc-950">
-      {/* Header */}
       <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-2 flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
           <span className="font-bold text-amber-400 text-lg shrink-0">{event.club_call}</span>
@@ -209,8 +195,6 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
         <div className="flex items-center gap-2 text-sm flex-shrink-0">
           <UTCClock />
-
-          {/* Score summary */}
           <span className="text-zinc-600 hidden sm:inline">|</span>
           <span className="text-zinc-400 hidden sm:inline">
             <span className="text-zinc-200 font-mono font-bold">{score.valid_qsos}</span>
@@ -220,7 +204,6 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             <span className="text-amber-400 font-mono font-bold">{score.total_score.toLocaleString()}</span>
           </span>
 
-          {/* Status badges */}
           {!isOnline && (
             <span className="rounded bg-red-900/50 border border-red-700 px-2 py-0.5 text-xs text-red-400">
               OFFLINE
@@ -237,16 +220,13 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             {operatorCall} · STN{stationNumber}
           </span>
 
-          {/* Night mode toggle */}
-          <button
-            onClick={toggleNight}
-            title={nightMode ? 'Exit night mode' : 'Enter night mode'}
+          <button onClick={toggleNight}
+            title={nightMode ? 'Exit night mode' : 'Enter night mode (preserves dark adaptation)'}
             className={`rounded border px-2 py-1 text-xs transition-colors ${
               nightMode
                 ? 'border-red-800 bg-red-900/40 text-red-400 hover:bg-red-900/60'
                 : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'
-            }`}
-          >
+            }`}>
             {nightMode ? '☀ Day' : '☾ Night'}
           </button>
 
@@ -269,7 +249,6 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       </header>
 
       <div className="flex flex-1 overflow-hidden">
-        {/* Left sidebar: form + activity + score */}
         <aside className="flex w-80 flex-col gap-3 overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-4 flex-shrink-0">
           <QSOForm
             eventId={event.id}
@@ -282,7 +261,6 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             submitting={submitting}
             lastLogged={lastLogged}
           />
-
           <BandActivity
             eventId={event.id}
             myOpCall={operatorCall}
@@ -290,11 +268,9 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             currentBand={currentBand}
             currentMode={currentMode}
           />
-
           <Scoreboard score={score} />
         </aside>
 
-        {/* Main: live log */}
         <main className="flex-1 overflow-hidden">
           <QSOTable qsos={displayQSOs} onDelete={deleteQSO} currentOpCall={operatorCall} />
         </main>

@@ -1,4 +1,4 @@
-import { createServiceClient } from '@/lib/supabase-server';
+import { getPool } from '@/lib/db';
 import LoggingClient from '@/components/LoggingClient';
 import { redirect } from 'next/navigation';
 
@@ -11,31 +11,26 @@ export default async function LogPage({
 }) {
   const { code } = await params;
   const { op, station } = await searchParams;
+  const pool = getPool();
 
-  const supabase = createServiceClient();
-
-  const { data: event } = await supabase
-    .from('events')
-    .select('id, join_code, club_name, club_call, event_year, class, arrl_section, location, qrz_username, created_at')
-    .eq('join_code', code.toUpperCase())
-    .single();
-
-  if (!event) redirect('/');
-
-  // If no op set, redirect back to join page
+  const { rows: evRows } = await pool.query(
+    `SELECT id, join_code, club_name, club_call, event_year, class, arrl_section,
+            location, qrz_username, created_at
+     FROM events WHERE join_code=$1`,
+    [code.toUpperCase()]
+  );
+  if (!evRows[0]) redirect('/');
   if (!op) redirect(`/event/${code}`);
 
-  const { data: qsos } = await supabase
-    .from('qsos')
-    .select('*')
-    .eq('event_id', event.id)
-    .order('datetime_utc', { ascending: false })
-    .limit(500);
+  const { rows: qsos } = await pool.query(
+    'SELECT * FROM qsos WHERE event_id=$1 ORDER BY datetime_utc DESC LIMIT 500',
+    [evRows[0].id]
+  );
 
   return (
     <LoggingClient
-      event={event}
-      initialQSOs={qsos ?? []}
+      event={evRows[0]}
+      initialQSOs={qsos}
       operatorCall={op.toUpperCase()}
       stationNumber={parseInt(station ?? '1', 10)}
     />
