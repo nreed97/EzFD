@@ -34,7 +34,7 @@ prompt() {
 confirm() {
   # confirm <message>  — exits unless user says y/Y/enter
   read -rp "$(echo -e "  ${BOLD}$1${NC} [Y/n]: ")" ans
-  [[ "${ans,,}" == "n" ]] && die "Aborted."
+  if [[ "${ans,,}" == "n" ]]; then die "Aborted."; fi
 }
 
 # ── Pre-flight checks ─────────────────────────────────────────────────────────
@@ -137,17 +137,25 @@ if [[ "$UPDATING" == "false" ]]; then
   fi
   log "Node.js $(node -v)"
 
-  # ── PostgreSQL 16 (PGDG) ─────────────────────────────────────────────────
+  # ── PostgreSQL (PGDG preferred; falls back to distro default) ────────────
   if ! command -v psql &>/dev/null; then
-    info "Installing PostgreSQL 16..."
+    info "Installing PostgreSQL..."
     install -d /usr/share/postgresql-common/pgdg
     curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
       -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
     echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
 https://apt.postgresql.org/pub/repos/apt ${DISTRO_CODENAME}-pgdg main" \
       > /etc/apt/sources.list.d/pgdg.list
-    apt-get update -qq
-    apt-get install -y -qq postgresql-16 >/dev/null
+    # Try PGDG (PostgreSQL 16). If the distro codename isn't in PGDG (e.g.
+    # focal is EOL), fall back to whatever PostgreSQL the distro ships.
+    if apt-get update -qq 2>/dev/null && apt-get install -y -qq postgresql-16 >/dev/null 2>&1; then
+      true
+    else
+      warn "PGDG PostgreSQL 16 unavailable for '${DISTRO_CODENAME}' — installing distro PostgreSQL"
+      rm -f /etc/apt/sources.list.d/pgdg.list
+      apt-get update -qq
+      apt-get install -y -qq postgresql >/dev/null
+    fi
   fi
   log "PostgreSQL $(psql --version | awk '{print $3}')"
 
