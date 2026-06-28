@@ -19,6 +19,21 @@ function queueKey(eventId: string) {
   return `${QUEUE_PREFIX}${eventId}`;
 }
 
+// crypto.randomUUID() requires a secure context (HTTPS/localhost).
+// Fall back to getRandomValues-based UUID v4 for plain-HTTP testing.
+function randomUUID(): string {
+  if (typeof crypto !== 'undefined' && crypto.randomUUID) {
+    return crypto.randomUUID();
+  }
+  const b = new Uint8Array(16);
+  crypto.getRandomValues(b);
+  b[6] = (b[6] & 0x0f) | 0x40;
+  b[8] = (b[8] & 0x3f) | 0x80;
+  return [...b].map((v, i) =>
+    ([4, 6, 8, 10].includes(i) ? '-' : '') + v.toString(16).padStart(2, '0')
+  ).join('');
+}
+
 export function loadQueue(eventId: string): PendingQSO[] {
   try {
     const raw = localStorage.getItem(queueKey(eventId));
@@ -38,7 +53,7 @@ function saveQueue(eventId: string, queue: PendingQSO[]) {
 
 export function enqueue(eventId: string, data: Omit<PendingQSO, 'local_id' | 'submitted_at' | 'event_id'>): PendingQSO {
   const entry: PendingQSO = {
-    local_id: crypto.randomUUID(),
+    local_id: randomUUID(),
     submitted_at: new Date().toISOString(),
     event_id: eventId,
     ...data,
