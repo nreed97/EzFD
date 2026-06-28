@@ -151,6 +151,7 @@ export default function QSOForm({
         ) : (
           <button
             type="button"
+            tabIndex={-1}
             onClick={() => setShowExtra(true)}
             className="mt-1 text-xs text-zinc-600 hover:text-zinc-400"
           >
