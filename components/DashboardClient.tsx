@@ -3,14 +3,20 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { calculateScore } from '@/lib/scoring';
-import type { Event, QSO } from '@/lib/types';
+import { calculateScore, calculateBonusPoints } from '@/lib/scoring';
+import type { Event, QSO, Bonuses } from '@/lib/types';
 import Scoreboard from './Scoreboard';
 import SectionGrid from './SectionGrid';
 import ThemeToggle from './ThemeToggle';
 import UTCClock from './UTCClock';
+import BonusTracker from './BonusTracker';
+import RateChart from './RateChart';
+import BandBreakdown from './BandBreakdown';
+import SummarySheet from './SummarySheet';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
+
+type MainView = 'map' | 'sections' | 'rate' | 'bands';
 
 interface Props {
   event: Event;
@@ -19,7 +25,9 @@ interface Props {
 
 export default function DashboardClient({ event, initialQSOs }: Props) {
   const [qsos, setQSOs] = useState<QSO[]>(initialQSOs);
-  const [mainView, setMainView] = useState<'map' | 'sections'>('map');
+  const [mainView, setMainView] = useState<MainView>('map');
+  const [bonuses, setBonuses] = useState<Bonuses>(event.bonuses ?? {});
+  const [showSummary, setShowSummary] = useState(false);
 
   useEffect(() => {
     const es = new EventSource(`/api/realtime/${event.id}`);
@@ -32,7 +40,8 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
     return () => es.close();
   }, [event.id]);
 
-  const score = calculateScore(qsos);
+  const score = calculateScore(qsos, bonuses);
+  const bonusPoints = calculateBonusPoints(bonuses, score.total_score);
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const recentQSOs = qsos.filter(q => !q.is_dupe && q.datetime_utc > oneHourAgo).length;
 
@@ -42,42 +51,48 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
       byOp[q.operator_call] = (byOp[q.operator_call] ?? 0) + 1;
     }
   }
+  const operators = Object.keys(byOp).sort();
+
+  const VIEW_TABS: { id: MainView; label: string }[] = [
+    { id: 'map',      label: 'Map' },
+    { id: 'sections', label: 'Sections' },
+    { id: 'rate',     label: 'Rate' },
+    { id: 'bands',    label: 'Bands' },
+  ];
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-zinc-950 light:bg-white">
-      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-6 py-3 light:border-zinc-200 light:bg-zinc-50 shrink-0">
+      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-6 py-3 light:border-zinc-200 light:bg-zinc-50 shrink-0 flex-wrap gap-2">
         <div className="flex items-center gap-3">
           <span className="font-bold text-amber-400 text-xl">{event.club_call}</span>
           <span className="text-zinc-400 text-sm light:text-zinc-600">{event.club_name}</span>
           <span className="text-zinc-600 text-sm light:text-zinc-400">{event.class} · {event.arrl_section}</span>
         </div>
-        <div className="flex items-center gap-2 text-sm">
+        <div className="flex items-center gap-2 text-sm flex-wrap">
           <UTCClock />
 
-          {/* Map / Sections toggle */}
           <div className="flex rounded border border-zinc-700 overflow-hidden light:border-zinc-300">
-            <button
-              onClick={() => setMainView('map')}
-              className={`px-2 py-1 text-xs transition-colors ${
-                mainView === 'map'
-                  ? 'bg-amber-400 text-zinc-900 font-semibold'
-                  : 'text-zinc-400 hover:bg-zinc-800 light:text-zinc-600 light:hover:bg-zinc-100'
-              }`}
-            >
-              Map
-            </button>
-            <button
-              onClick={() => setMainView('sections')}
-              className={`px-2 py-1 text-xs transition-colors ${
-                mainView === 'sections'
-                  ? 'bg-amber-400 text-zinc-900 font-semibold'
-                  : 'text-zinc-400 hover:bg-zinc-800 light:text-zinc-600 light:hover:bg-zinc-100'
-              }`}
-            >
-              Sections
-            </button>
+            {VIEW_TABS.map(tab => (
+              <button
+                key={tab.id}
+                onClick={() => setMainView(tab.id)}
+                className={`px-2 py-1 text-xs transition-colors ${
+                  mainView === tab.id
+                    ? 'bg-amber-400 text-zinc-900 font-semibold'
+                    : 'text-zinc-400 hover:bg-zinc-800 light:text-zinc-600 light:hover:bg-zinc-100'
+                }`}
+              >
+                {tab.label}
+              </button>
+            ))}
           </div>
 
+          <button
+            onClick={() => setShowSummary(true)}
+            className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
+          >
+            Summary
+          </button>
           <Link href={`/event/${event.join_code}`}
             className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
             ← Logger
@@ -96,13 +111,13 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
 
       <div className="flex flex-col flex-1 overflow-hidden md:flex-row">
         <div className="h-56 shrink-0 md:h-auto md:flex-1">
-          {mainView === 'map'
-            ? <MapView workedSections={score.sections} />
-            : <SectionGrid workedSections={score.sections} />
-          }
+          {mainView === 'map'      && <MapView workedSections={score.sections} />}
+          {mainView === 'sections' && <SectionGrid workedSections={score.sections} />}
+          {mainView === 'rate'     && <RateChart qsos={qsos} />}
+          {mainView === 'bands'    && <BandBreakdown score={score} />}
         </div>
 
-        <aside className="w-full md:w-72 flex flex-col gap-4 overflow-y-auto border-t md:border-t-0 md:border-l border-zinc-800 bg-zinc-900 p-4 light:border-zinc-200 light:bg-zinc-50">
+        <aside className="w-full md:w-72 flex flex-col gap-3 overflow-y-auto border-t md:border-t-0 md:border-l border-zinc-800 bg-zinc-900 p-4 light:border-zinc-200 light:bg-zinc-50">
           <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
             <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Rate</div>
             <div className="flex items-baseline gap-1">
@@ -111,7 +126,13 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
             </div>
           </div>
 
-          <Scoreboard score={score} />
+          <Scoreboard score={score} bonusPoints={bonusPoints} />
+
+          <BonusTracker
+            joinCode={event.join_code}
+            initialBonuses={bonuses}
+            baseScore={score.total_score}
+          />
 
           {score.sections.length > 0 && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
@@ -149,6 +170,16 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
           </div>
         </aside>
       </div>
+
+      {showSummary && (
+        <SummarySheet
+          event={event}
+          score={score}
+          bonuses={bonuses}
+          operators={operators}
+          onClose={() => setShowSummary(false)}
+        />
+      )}
     </div>
   );
 }

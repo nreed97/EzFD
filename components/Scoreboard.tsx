@@ -4,9 +4,10 @@ import type { Score } from '@/lib/types';
 
 interface Props {
   score: Score;
+  bonusPoints?: number;
 }
 
-export default function Scoreboard({ score }: Props) {
+export default function Scoreboard({ score, bonusPoints = 0 }: Props) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-xs light:border-zinc-200 light:bg-zinc-100/50">
       <h3 className="mb-2 font-semibold text-zinc-400 uppercase tracking-wider text-[10px] light:text-zinc-500">Score</h3>
@@ -35,9 +36,21 @@ export default function Scoreboard({ score }: Props) {
         <span className="font-mono text-zinc-200 light:text-zinc-800">{score.sections_worked}</span>
       </div>
       <div className="flex items-baseline justify-between border-t border-zinc-700 pt-2 light:border-zinc-200">
-        <span className="font-semibold text-zinc-200 light:text-zinc-800">Est. Score</span>
+        <span className="font-semibold text-zinc-200 light:text-zinc-800">{bonusPoints > 0 ? 'Base Score' : 'Est. Score'}</span>
         <span className="font-mono text-lg font-bold text-amber-400 light:text-amber-600">{score.total_score.toLocaleString()}</span>
       </div>
+      {bonusPoints > 0 && (
+        <>
+          <div className="flex items-baseline justify-between mt-1">
+            <span className="text-zinc-400 light:text-zinc-600">+ Bonuses</span>
+            <span className="font-mono text-zinc-200 light:text-zinc-800">+{bonusPoints.toLocaleString()}</span>
+          </div>
+          <div className="flex items-baseline justify-between border-t border-zinc-700 pt-1.5 mt-1 light:border-zinc-200">
+            <span className="font-semibold text-zinc-100 light:text-zinc-900">Claimed Score</span>
+            <span className="font-mono text-xl font-bold text-amber-400 light:text-amber-600">{(score.total_score + bonusPoints).toLocaleString()}</span>
+          </div>
+        </>
+      )}
 
       {Object.keys(score.by_band).length > 0 && (
         <div className="mt-3 border-t border-zinc-800 pt-2 light:border-zinc-200">

@@ -1,6 +1,26 @@
 export type Band = '160m' | '80m' | '40m' | '20m' | '15m' | '10m' | '6m' | '2m' | '1.25m' | '70cm' | 'SAT';
 export type Mode = 'PH' | 'CW' | 'DIG';
 
+export interface Bonuses {
+  emergency_power?: boolean;
+  w1aw_bulletin?: boolean;
+  satellite?: boolean;
+  natural_power?: boolean;
+  public_info_table?: boolean;
+  media_publicity?: boolean;
+  educational?: boolean;
+  message_to_sm?: boolean;
+  all_licensed?: boolean;
+  elected_official?: boolean;
+  web_posting?: boolean;
+  social_media?: boolean;
+  safety_officer?: boolean;
+  youth_ops?: number;
+  gota_qsos?: number;
+  served_agency?: number;
+  nts_traffic?: number;
+}
+
 export interface Event {
   id: string;
   join_code: string;
@@ -11,6 +31,7 @@ export interface Event {
   arrl_section: string;
   location: string | null;
   qrz_username: string | null;
+  bonuses: Bonuses;
   created_at: string;
 }
 
@@ -56,6 +77,8 @@ export interface Score {
   qso_points: number;
   sections_worked: number;
   total_score: number;
+  bonus_points: number;
+  claimed_score: number;
   by_band: Partial<Record<Band, BandStats>>;
   sections: string[];
 }

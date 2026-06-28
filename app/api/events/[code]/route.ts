@@ -7,7 +7,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ code: s
 
   const { rows } = await pool.query(
     `SELECT id, join_code, club_name, club_call, event_year, class, arrl_section,
-            location, qrz_username, created_at
+            location, qrz_username, bonuses, created_at
      FROM events WHERE join_code = $1`,
     [code.toUpperCase()]
   );

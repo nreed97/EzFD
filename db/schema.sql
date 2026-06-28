@@ -93,3 +93,8 @@ BEGIN
   END IF;
 END
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Migrations (idempotent — safe to re-run on existing installs)
+-- ---------------------------------------------------------------------------
+ALTER TABLE events ADD COLUMN IF NOT EXISTS bonuses JSONB NOT NULL DEFAULT '{}'::jsonb;
