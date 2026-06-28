@@ -1,8 +1,12 @@
 @import "tailwindcss";
 
+/* light: prefix activates when html.light is set */
+@custom-variant light (&:where(.light, .light *));
+
 @layer components {
   .input {
     @apply rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-100 placeholder-zinc-500 focus:border-amber-400 focus:outline-none transition-colors text-sm;
+    @apply light:border-zinc-300 light:bg-white light:text-zinc-900 light:placeholder-zinc-400;
   }
 }
 
@@ -11,7 +15,6 @@
   filter: brightness(0.35) sepia(0.4);
 }
 
-/* Ensure the night wrapper covers the full viewport */
 [data-night="true"] .night-scope {
   background-color: #000000;
 }

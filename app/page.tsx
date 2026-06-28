@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ThemeToggle from '@/components/ThemeToggle';
 
 export default function HomePage() {
   const router = useRouter();
@@ -35,8 +36,8 @@ export default function HomePage() {
 
       <div className="flex w-full max-w-md flex-col gap-6">
         {/* Join existing event */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
-          <h2 className="mb-4 text-lg font-semibold text-zinc-100">Join an Event</h2>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 light:border-zinc-200 light:bg-zinc-50">
+          <h2 className="mb-4 text-lg font-semibold text-zinc-100 light:text-zinc-900">Join an Event</h2>
           <form onSubmit={handleJoin} className="flex flex-col gap-3">
             <input
               type="text"
@@ -44,7 +45,7 @@ export default function HomePage() {
               onChange={e => setJoinCode(e.target.value.toUpperCase())}
               placeholder="Join code (e.g. ABC123)"
               maxLength={6}
-              className="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 font-mono text-lg tracking-widest text-zinc-100 placeholder-zinc-500 focus:border-amber-400 focus:outline-none"
+              className="input font-mono text-lg tracking-widest"
               autoComplete="off"
               spellCheck={false}
             />
@@ -60,9 +61,9 @@ export default function HomePage() {
         </div>
 
         {/* Create new event */}
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
-          <h2 className="mb-2 text-lg font-semibold text-zinc-100">Start a New Event</h2>
-          <p className="mb-4 text-sm text-zinc-400">Set up a Field Day log for your club. You&apos;ll get a join code to share with your operators.</p>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 light:border-zinc-200 light:bg-zinc-50">
+          <h2 className="mb-2 text-lg font-semibold text-zinc-100 light:text-zinc-900">Start a New Event</h2>
+          <p className="mb-4 text-sm text-zinc-400 light:text-zinc-600">Set up a Field Day log for your club. You&apos;ll get a join code to share with your operators.</p>
           <Link
             href="/event/new"
             className="block w-full rounded-lg border border-amber-400 px-4 py-2 text-center font-semibold text-amber-400 transition-colors hover:bg-amber-400 hover:text-zinc-900"
@@ -72,8 +73,9 @@ export default function HomePage() {
         </div>
       </div>
 
-      <footer className="text-center text-xs text-zinc-600">
-        73 de EzFD &bull; Open source Field Day logger
+      <footer className="flex items-center justify-center gap-4 text-xs text-zinc-600 light:text-zinc-400">
+        <span>73 de EzFD &bull; Open source Field Day logger</span>
+        <ThemeToggle />
       </footer>
     </main>
   );

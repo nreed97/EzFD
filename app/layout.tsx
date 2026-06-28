@@ -13,7 +13,13 @@ export const metadata: Metadata = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${geistSans.variable} ${geistMono.variable} h-full`}>
-      <body className="min-h-full bg-zinc-950 text-zinc-100 antialiased">{children}</body>
+      <head>
+        {/* Prevent flash of wrong theme on load */}
+        <script dangerouslySetInnerHTML={{ __html: `(function(){var t=localStorage.getItem('ezfd_theme');if(t==='light')document.documentElement.classList.add('light');})();` }} />
+      </head>
+      <body className="min-h-full bg-zinc-950 text-zinc-100 antialiased light:bg-white light:text-zinc-900">
+        {children}
+      </body>
     </html>
   );
 }

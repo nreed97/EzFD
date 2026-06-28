@@ -64,8 +64,8 @@ export default function NewEventPage() {
       <h1 className="mb-6 text-3xl font-bold text-amber-400">Create Field Day Event</h1>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <h2 className="mb-4 font-semibold text-zinc-300">Club Info</h2>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
+          <h2 className="mb-4 font-semibold text-zinc-300 light:text-zinc-700">Club Info</h2>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-sm text-zinc-400">Club Name</span>
@@ -103,8 +103,8 @@ export default function NewEventPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <h2 className="mb-4 font-semibold text-zinc-300">Field Day Setup</h2>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
+          <h2 className="mb-4 font-semibold text-zinc-300 light:text-zinc-700">Field Day Setup</h2>
           <div className="flex flex-col gap-3">
             <div className="flex gap-3">
               <fieldset className="flex flex-1 flex-col gap-1">
@@ -151,8 +151,8 @@ export default function NewEventPage() {
           </div>
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-          <h2 className="mb-1 font-semibold text-zinc-300">QRZ Lookup (optional)</h2>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
+          <h2 className="mb-1 font-semibold text-zinc-300 light:text-zinc-700">QRZ Lookup (optional)</h2>
           <p className="mb-4 text-xs text-zinc-500">Used to auto-fill callsign info for all operators in this event. Requires a QRZ.com XML subscription.</p>
           <div className="flex flex-col gap-3">
             <div className="flex gap-3">

@@ -21,9 +21,9 @@ interface Props {
 }
 
 const MODE_COLORS: Record<Mode, string> = {
-  PH:  'text-blue-400',
-  CW:  'text-yellow-400',
-  DIG: 'text-green-400',
+  PH:  'text-blue-400 light:text-blue-700',
+  CW:  'text-yellow-400 light:text-yellow-700',
+  DIG: 'text-green-400 light:text-green-700',
 };
 
 const HEARTBEAT_MS = 30_000;
@@ -101,13 +101,13 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
   const now = Date.now();
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 light:border-zinc-200 light:bg-zinc-100/50">
       <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
         Operators
       </h3>
       <div className="flex flex-col gap-1">
         {allOps.length === 0 && (
-          <p className="text-[11px] text-zinc-600">No operators online yet.</p>
+          <p className="text-[11px] text-zinc-600 light:text-zinc-400">No operators online yet.</p>
         )}
         {allOps
           .sort((a, b) => {
@@ -133,18 +133,18 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
                   conflict
                     ? 'border border-red-700 bg-red-900/30'
                     : isMe
-                      ? 'border border-zinc-700 bg-zinc-800/60'
-                      : 'bg-zinc-800/40'
+                      ? 'border border-zinc-700 bg-zinc-800/60 light:border-zinc-300 light:bg-zinc-200'
+                      : 'bg-zinc-800/40 light:bg-zinc-200/80'
                 } ${inactive && !isMe ? 'opacity-35' : ''}`}
               >
-                <span className={`font-mono font-semibold ${isMe ? 'text-amber-400' : 'text-zinc-200'}`}>
+                <span className={`font-mono font-semibold ${isMe ? 'text-amber-400 light:text-amber-700' : 'text-zinc-200 light:text-zinc-800'}`}>
                   {s.op_call}
                   {conflict && <span className="ml-1 text-red-400">!</span>}
                 </span>
                 <span className="flex items-center gap-2">
-                  <span className="font-mono text-zinc-300">{s.band}</span>
-                  <span className={`font-mono font-bold ${MODE_COLORS[s.mode] ?? 'text-zinc-300'}`}>{s.mode}</span>
-                  <span className={`font-mono text-[10px] ${inactive && !isMe ? 'text-zinc-600' : 'text-zinc-500'}`}>
+                  <span className="font-mono text-zinc-300 light:text-zinc-700">{s.band}</span>
+                  <span className={`font-mono font-bold ${MODE_COLORS[s.mode] ?? 'text-zinc-300 light:text-zinc-700'}`}>{s.mode}</span>
+                  <span className={`font-mono text-[10px] ${inactive && !isMe ? 'text-zinc-600 light:text-zinc-400' : 'text-zinc-500 light:text-zinc-500'}`}>
                     {lastQSO ? timeSince(lastQSO) : '—'}
                   </span>
                 </span>
