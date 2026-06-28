@@ -78,7 +78,7 @@ $$;
 
 DROP TRIGGER IF EXISTS qso_notify ON qsos;
 CREATE TRIGGER qso_notify
-  AFTER INSERT OR DELETE ON qsos
+  AFTER INSERT OR UPDATE OR DELETE ON qsos
   FOR EACH ROW EXECUTE FUNCTION notify_qso_change();
 
 -- ---------------------------------------------------------------------------

@@ -115,6 +115,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       const { op, record } = JSON.parse(e.data) as { op: string; record: QSO };
       if (op === 'INSERT') {
         setConfirmedQSOs(prev => prev.some(q => q.id === record.id) ? prev : [record, ...prev]);
+      } else if (op === 'UPDATE') {
+        setConfirmedQSOs(prev => prev.map(q => q.id === record.id ? record : q));
       } else if (op === 'DELETE') {
         setConfirmedQSOs(prev => prev.filter(q => q.id !== record.id));
       }
@@ -182,6 +184,10 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       setSubmitting(false);
     }
   }, [event.id, event.class, event.arrl_section, operatorCall, stationNumber]);
+
+  const updateQSO = useCallback((updated: QSO) => {
+    setConfirmedQSOs(prev => prev.map(q => q.id === updated.id ? updated : q));
+  }, []);
 
   const deleteQSO = useCallback(async (id: string, localId?: string) => {
     if (localId) {
@@ -304,6 +310,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             submitting={submitting}
             lastLogged={lastLogged}
             submitError={submitError}
+            existingQSOs={confirmedQSOs}
           />
           <BandActivity
             eventId={event.id}
@@ -317,7 +324,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
         </aside>
 
         <main className={`${mobileTab === 'qsos' ? 'flex flex-col' : 'hidden'} md:flex md:flex-col flex-1 overflow-hidden`}>
-          <QSOTable qsos={displayQSOs} onDelete={deleteQSO} currentOpCall={operatorCall} />
+          <QSOTable qsos={displayQSOs} onDelete={deleteQSO} onUpdate={updateQSO} currentOpCall={operatorCall} />
         </main>
       </div>
     </div>

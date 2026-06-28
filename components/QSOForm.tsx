@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { Band, Mode, DisplayQSO } from '@/lib/types';
+import type { Band, Mode, DisplayQSO, QSO } from '@/lib/types';
 import { ARRL_SECTIONS } from '@/lib/types';
 
 const BAND_GRID: Band[][] = [
@@ -11,8 +11,13 @@ const BAND_GRID: Band[][] = [
 ];
 
 const EXTRA_BANDS: Band[] = ['1.25m', '70cm'];
-
 const MODES: Mode[] = ['PH', 'CW', 'DIG'];
+
+const MODE_STYLE: Record<Mode, string> = {
+  PH:  'bg-blue-400/15 border-blue-400/40 text-blue-400',
+  CW:  'bg-yellow-400/15 border-yellow-400/40 text-yellow-400',
+  DIG: 'bg-green-400/15 border-green-400/40 text-green-400',
+};
 
 interface Props {
   eventId: string;
@@ -25,11 +30,12 @@ interface Props {
   submitting: boolean;
   lastLogged: DisplayQSO | null;
   submitError: string | null;
+  existingQSOs: QSO[];
 }
 
 export default function QSOForm({
   eventId, hasQRZ, band, mode, onBandChange, onModeChange,
-  onSubmit, submitting, lastLogged, submitError,
+  onSubmit, submitting, lastLogged, submitError, existingQSOs,
 }: Props) {
   const [callsign, setCallsign] = useState('');
   const [rcvdClass, setRcvdClass] = useState('');
@@ -83,6 +89,10 @@ export default function QSOForm({
     setShowQSY(false);
   }
 
+  // Client-side dupe check — server enforces authoritatively, this is just a heads-up
+  const isDupe = callsign.length >= 3 &&
+    existingQSOs.some(q => !q.is_dupe && q.callsign === callsign && q.band === band && q.mode === mode);
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       {/* Callsign */}
@@ -98,11 +108,16 @@ export default function QSOForm({
           spellCheck={false}
         />
         {lookingUp && <p className="mt-1 text-xs text-zinc-500">Looking up…</p>}
-        {qrzInfo && (
+        {qrzInfo && !isDupe && (
           <p className="mt-1 text-xs text-zinc-400">
             {qrzInfo.name}
             {qrzInfo.state ? ` · ${qrzInfo.state}` : ''}
             {qrzInfo.country && qrzInfo.country !== 'United States' ? ` · ${qrzInfo.country}` : ''}
+          </p>
+        )}
+        {isDupe && (
+          <p className="mt-1 text-xs text-yellow-500">
+            Already worked on {band} {mode} — will log as dupe
           </p>
         )}
       </div>
@@ -142,7 +157,7 @@ export default function QSOForm({
         </div>
       )}
 
-      {/* Feedback */}
+      {/* Post-log feedback */}
       {lastLogged && (
         <div className={`rounded-lg border p-2 text-xs ${
           lastLogged.is_dupe
@@ -152,7 +167,7 @@ export default function QSOForm({
               : 'border-green-800 bg-green-900/20 text-green-400'
         }`}>
           {lastLogged.is_dupe
-            ? `DUPE — ${lastLogged.callsign} already worked on ${lastLogged.band} ${lastLogged.mode}`
+            ? `Logged (dupe): ${lastLogged.callsign} · ${lastLogged.band} · ${lastLogged.mode}`
             : lastLogged._pending
               ? `Queued: ${lastLogged.callsign} · ${lastLogged.band} · ${lastLogged.mode} (syncing…)`
               : `Logged: ${lastLogged.callsign} · ${lastLogged.band} · ${lastLogged.mode}`}
@@ -173,14 +188,19 @@ export default function QSOForm({
           type="button"
           tabIndex={-1}
           onClick={() => setShowQSY(v => !v)}
-          className="flex w-full items-center justify-between text-xs hover:text-zinc-200"
+          className="flex w-full items-center justify-between rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 hover:border-zinc-500 hover:bg-zinc-750 transition-colors"
         >
-          <span>
-            <span className="font-mono font-semibold text-amber-400">{band}</span>
-            <span className="mx-1 text-zinc-600">·</span>
-            <span className="font-mono font-semibold text-amber-400">{mode}</span>
+          <div className="flex items-center gap-2">
+            <span className="rounded border bg-amber-400/15 border-amber-400/40 px-2.5 py-1 font-mono text-sm font-bold text-amber-400">
+              {band}
+            </span>
+            <span className={`rounded border px-2.5 py-1 font-mono text-sm font-bold ${MODE_STYLE[mode]}`}>
+              {mode}
+            </span>
+          </div>
+          <span className="text-xs font-semibold text-zinc-400 tracking-wide">
+            {showQSY ? '▲ DONE' : '▼ QSY'}
           </span>
-          <span className="text-zinc-500">{showQSY ? '▲ Done' : '▼ QSY'}</span>
         </button>
 
         {showQSY && (
