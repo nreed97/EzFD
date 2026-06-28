@@ -83,6 +83,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [nightMode, setNightMode] = useState(false);
   const [currentBand, setCurrentBand] = useState<Band>('20m');
   const [currentMode, setCurrentMode] = useState<Mode>('PH');
+  const [mobileTab, setMobileTab] = useState<'log' | 'qsos'>('log');
   const syncingRef = useRef(false);
 
   useEffect(() => {
@@ -171,6 +172,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           setPendingQSOs(prev => prev.filter(p => p._local_id !== pending.local_id));
           setPendingCount(prev => Math.max(0, prev - 1));
           setLastLogged(qso as DisplayQSO);
+          // On mobile, briefly flip to the QSO list so the operator sees it land
+          if (window.innerWidth < 768) setMobileTab('qsos');
         } else if (error) {
           setSubmitError(error);
         }
@@ -251,7 +254,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             Dashboard
           </button>
 
-          <div className="flex gap-1">
+          <div className="hidden sm:flex gap-1">
             <a href={`/api/export/${event.join_code}`}
               className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
               ADIF
@@ -264,8 +267,32 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
         </div>
       </header>
 
+      {/* Mobile tab bar */}
+      <div className="flex shrink-0 border-b border-zinc-800 bg-zinc-900 md:hidden">
+        <button
+          onClick={() => setMobileTab('log')}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+            mobileTab === 'log'
+              ? 'border-b-2 border-amber-400 text-amber-400'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          Log QSO
+        </button>
+        <button
+          onClick={() => setMobileTab('qsos')}
+          className={`flex-1 py-2 text-sm font-medium transition-colors ${
+            mobileTab === 'qsos'
+              ? 'border-b-2 border-amber-400 text-amber-400'
+              : 'text-zinc-500 hover:text-zinc-300'
+          }`}
+        >
+          QSOs ({displayQSOs.length})
+        </button>
+      </div>
+
       <div className="flex flex-1 overflow-hidden">
-        <aside className="flex w-80 flex-col gap-3 overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-4 flex-shrink-0">
+        <aside className={`${mobileTab === 'log' ? 'flex' : 'hidden'} md:flex w-full md:w-80 flex-col gap-3 overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-4 shrink-0`}>
           <QSOForm
             eventId={event.id}
             hasQRZ={!!event.qrz_username}
@@ -288,7 +315,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           <Scoreboard score={score} />
         </aside>
 
-        <main className="flex-1 overflow-hidden">
+        <main className={`${mobileTab === 'qsos' ? 'flex flex-col' : 'hidden'} md:flex md:flex-col flex-1 overflow-hidden`}>
           <QSOTable qsos={displayQSOs} onDelete={deleteQSO} currentOpCall={operatorCall} />
         </main>
       </div>

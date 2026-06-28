@@ -55,7 +55,7 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
         </div>
         <div className="flex items-center gap-3 text-sm">
           <UTCClock />
-          <Link href={`/event/${event.join_code}/log?op=&station=1`}
+          <Link href={`/event/${event.join_code}`}
             className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800">
             ← Logger
           </Link>
@@ -70,12 +70,12 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
         </div>
       </header>
 
-      <div className="flex flex-1 overflow-hidden">
-        <div className="flex-1">
+      <div className="flex flex-col flex-1 overflow-hidden md:flex-row">
+        <div className="h-56 shrink-0 md:h-auto md:flex-1">
           <MapView workedSections={score.sections} />
         </div>
 
-        <aside className="w-72 flex flex-col gap-4 overflow-y-auto border-l border-zinc-800 bg-zinc-900 p-4">
+        <aside className="w-full md:w-72 flex flex-col gap-4 overflow-y-auto border-t md:border-t-0 md:border-l border-zinc-800 bg-zinc-900 p-4">
           <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3">
             <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Rate</div>
             <div className="flex items-baseline gap-1">
