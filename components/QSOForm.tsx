@@ -36,6 +36,7 @@ export default function QSOForm({
   const [rcvdSection, setRcvdSection] = useState('');
   const [qrzInfo, setQrzInfo] = useState<{ name?: string; state?: string; country?: string } | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
+  const [showQSY, setShowQSY] = useState(false);
   const [showExtra, setShowExtra] = useState(false);
   const callRef = useRef<HTMLInputElement>(null);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -77,6 +78,11 @@ export default function QSOForm({
     callRef.current?.focus();
   }
 
+  function pickBand(b: Band) {
+    onBandChange(b);
+    setShowQSY(false);
+  }
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       {/* Callsign */}
@@ -99,87 +105,6 @@ export default function QSOForm({
             {qrzInfo.country && qrzInfo.country !== 'United States' ? ` · ${qrzInfo.country}` : ''}
           </p>
         )}
-      </div>
-
-      {/* Band grid */}
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">Band</label>
-        <div className="grid grid-cols-3 gap-1">
-          {BAND_GRID.flat().map(b => (
-            <button
-              key={b}
-              type="button"
-              tabIndex={-1}
-              onClick={() => onBandChange(b)}
-              className={`rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
-                band === b
-                  ? 'bg-amber-400 text-zinc-900'
-                  : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-              }`}
-            >
-              {b}
-            </button>
-          ))}
-        </div>
-        {/* Extra bands collapsed by default */}
-        {showExtra ? (
-          <div className="mt-1 flex gap-1">
-            {EXTRA_BANDS.map(b => (
-              <button
-                key={b}
-                type="button"
-                tabIndex={-1}
-                onClick={() => onBandChange(b)}
-                className={`flex-1 rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
-                  band === b
-                    ? 'bg-amber-400 text-zinc-900'
-                    : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-                }`}
-              >
-                {b}
-              </button>
-            ))}
-            <button
-              type="button"
-              tabIndex={-1}
-              onClick={() => setShowExtra(false)}
-              className="px-2 text-xs text-zinc-500 hover:text-zinc-300"
-            >
-              ↑
-            </button>
-          </div>
-        ) : (
-          <button
-            type="button"
-            tabIndex={-1}
-            onClick={() => setShowExtra(true)}
-            className="mt-1 text-xs text-zinc-600 hover:text-zinc-400"
-          >
-            + 1.25m / 70cm
-          </button>
-        )}
-      </div>
-
-      {/* Mode */}
-      <div>
-        <label className="block text-xs text-zinc-400 mb-1">Mode</label>
-        <div className="flex rounded-lg overflow-hidden border border-zinc-700">
-          {MODES.map(m => (
-            <button
-              key={m}
-              type="button"
-              tabIndex={-1}
-              onClick={() => onModeChange(m)}
-              className={`flex-1 py-2 text-sm font-bold transition-colors ${
-                mode === m
-                  ? 'bg-amber-400 text-zinc-900'
-                  : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
-              }`}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
       </div>
 
       {/* Exchange */}
@@ -241,6 +166,100 @@ export default function QSOForm({
       >
         {submitting ? 'Logging…' : 'Log QSO  [Enter]'}
       </button>
+
+      {/* QSY drawer */}
+      <div className="border-t border-zinc-800 pt-2">
+        <button
+          type="button"
+          tabIndex={-1}
+          onClick={() => setShowQSY(v => !v)}
+          className="flex w-full items-center justify-between text-xs hover:text-zinc-200"
+        >
+          <span>
+            <span className="font-mono font-semibold text-amber-400">{band}</span>
+            <span className="mx-1 text-zinc-600">·</span>
+            <span className="font-mono font-semibold text-amber-400">{mode}</span>
+          </span>
+          <span className="text-zinc-500">{showQSY ? '▲ Done' : '▼ QSY'}</span>
+        </button>
+
+        {showQSY && (
+          <div className="mt-2 flex flex-col gap-2">
+            <div className="grid grid-cols-3 gap-1">
+              {BAND_GRID.flat().map(b => (
+                <button
+                  key={b}
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => pickBand(b)}
+                  className={`rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
+                    band === b
+                      ? 'bg-amber-400 text-zinc-900'
+                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                  }`}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+
+            {showExtra ? (
+              <div className="flex gap-1">
+                {EXTRA_BANDS.map(b => (
+                  <button
+                    key={b}
+                    type="button"
+                    tabIndex={-1}
+                    onClick={() => pickBand(b)}
+                    className={`flex-1 rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
+                      band === b
+                        ? 'bg-amber-400 text-zinc-900'
+                        : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                    }`}
+                  >
+                    {b}
+                  </button>
+                ))}
+                <button
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => setShowExtra(false)}
+                  className="px-2 text-xs text-zinc-500 hover:text-zinc-300"
+                >
+                  ↑
+                </button>
+              </div>
+            ) : (
+              <button
+                type="button"
+                tabIndex={-1}
+                onClick={() => setShowExtra(true)}
+                className="text-left text-xs text-zinc-600 hover:text-zinc-400"
+              >
+                + 1.25m / 70cm
+              </button>
+            )}
+
+            <div className="flex rounded-lg overflow-hidden border border-zinc-700">
+              {MODES.map(m => (
+                <button
+                  key={m}
+                  type="button"
+                  tabIndex={-1}
+                  onClick={() => onModeChange(m)}
+                  className={`flex-1 py-2 text-sm font-bold transition-colors ${
+                    mode === m
+                      ? 'bg-amber-400 text-zinc-900'
+                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                  }`}
+                >
+                  {m}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </div>
     </form>
   );
 }
