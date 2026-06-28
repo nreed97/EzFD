@@ -19,7 +19,7 @@ A real-time, multi-operator ARRL Field Day logging application built for amateur
 | **Dupe checking** | Server-side duplicate detection (same callsign + band + mode); dupes are logged but flagged and excluded from scoring |
 | **ADIF export** | Download a standard `.adi` file for upload to ARRL or any log management tool |
 | **Cabrillo export** | Download a Cabrillo 3.0 `.log` file for direct contest submission |
-| **Docker deploy** | Single `docker compose up -d` starts both the app and a local PostgreSQL instance |
+| **One-command deploy** | `deploy.sh` installs all dependencies, configures systemd + nginx, and provisions SSL on any Ubuntu/Debian VPS |
 
 ---
 
@@ -58,49 +58,61 @@ A real-time, multi-operator ARRL Field Day logging application built for amateur
 
 ---
 
-## Quick Start (Docker)
+## Deploying to a VPS
 
-### Prerequisites
+`deploy.sh` is a single interactive script that turns a fresh Ubuntu or Debian server into a fully configured EzFD instance. It installs every dependency, configures PostgreSQL, builds the app, registers a systemd service, writes an nginx reverse-proxy config, and optionally provisions a Let's Encrypt TLS certificate.
 
-- [Docker](https://docs.docker.com/get-docker/) with the Compose plugin (`docker compose version`)
-- Git
+**Supported:** Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, Debian 12. Run as root or via `sudo`.
 
-### 1 — Clone
+### What it installs
+
+| Component | Version | Notes |
+|---|---|---|
+| Node.js | 20 (NodeSource) | App runtime |
+| PostgreSQL | 16 (PGDG) | Local database |
+| nginx | System package | Reverse proxy |
+| certbot | Latest (snap) | Let's Encrypt SSL (optional) |
+
+### Steps
+
+**1 — Provision the server**
+
+Spin up any Ubuntu 22.04/24.04 or Debian 12 VPS. A $6/month instance (1 vCPU, 1 GB RAM) is plenty for a Field Day event.
+
+If you want a domain name (e.g. `fd.k3abc.org`), create an **A record** pointing to the server's IP before running the script.
+
+**2 — Clone the repository**
 
 ```bash
 git clone https://github.com/nreed97/EzFD.git
 cd EzFD
 ```
 
-### 2 — Configure
+**3 — Run the deploy script**
 
 ```bash
-cp .env.example .env.local
+sudo bash deploy.sh
 ```
 
-Open `.env.local` and set a strong database password:
+The script will prompt you for:
 
-```env
-POSTGRES_PASSWORD=change_me_to_a_strong_password
-```
+- **Domain name** — e.g. `fd.k3abc.org`. Leave blank to access the app by IP address.
+- **Email address** — used by Let's Encrypt for certificate expiry notices. Leave blank to skip SSL.
+- **PostgreSQL password** — press Enter to auto-generate a strong password.
 
-That is the only required change. The app reads `DATABASE_URL` from the Compose environment automatically.
+A summary is shown before any changes are made. The full deployment (including `npm run build`) takes about 3–5 minutes.
 
-### 3 — Start
+**4 — Open the app**
+
+The script prints the URL when it finishes. Navigate to it from any device.
+
+### Updating
+
+Pull the latest code and re-run the script. It detects the existing installation, skips package setup, rebuilds the app, and restarts the service — database and config are preserved.
 
 ```bash
-docker compose up -d
+git pull && sudo bash deploy.sh
 ```
-
-The first run builds the Next.js image and initialises the database schema automatically. It takes about 60–90 seconds.
-
-```bash
-docker compose logs -f web   # watch startup
-```
-
-### 4 — Open
-
-Navigate to `http://<server-ip>:3000` from any device on the same network.
 
 ---
 
@@ -171,16 +183,23 @@ Both exports include only non-duplicate QSOs, sorted chronologically.
 
 ## Configuration Reference
 
-All configuration is through environment variables. In Docker deployments these are set in `.env.local`; for bare-metal deployments export them before starting the app.
+The deploy script writes `/opt/ezfd/.env` for you. If you need to change settings afterward, edit that file and restart the service:
 
-| Variable | Required | Description |
-|---|---|---|
-| `POSTGRES_PASSWORD` | **Yes** | Password for the `ezfd` database user. Set this before the first `docker compose up`. |
-| `DATABASE_URL` | Auto | Connection string built by Compose as `postgresql://ezfd:<POSTGRES_PASSWORD>@db:5432/ezfd`. Override to point at an external Postgres instance. |
+```bash
+sudo nano /opt/ezfd/.env
+sudo systemctl restart ezfd
+```
+
+| Variable | Description |
+|---|---|
+| `DATABASE_URL` | PostgreSQL connection string — `postgresql://ezfd:<password>@localhost/ezfd` |
+| `NODE_ENV` | Always `production` in deployed installs |
+| `PORT` | App port (default `3000`; nginx proxies from 80/443) |
+| `HOSTNAME` | Bind address — `127.0.0.1` so the app is only reachable via nginx |
 
 ### External PostgreSQL
 
-To use an existing PostgreSQL server instead of the bundled container, set `DATABASE_URL` directly and remove (or comment out) the `db` service from `docker-compose.yml`. Apply the schema manually:
+To use an existing PostgreSQL server, set `DATABASE_URL` to point at it and apply the schema manually:
 
 ```bash
 psql "$DATABASE_URL" -f db/schema.sql
@@ -264,62 +283,56 @@ EzFD/
 │   └── sections.ts                 # ARRL/RAC section names + map coordinates
 ├── db/
 │   └── schema.sql                  # Database schema, indexes, pg_notify trigger
-├── Dockerfile                      # Multi-stage Next.js standalone build
-├── docker-compose.yml              # App + PostgreSQL services
-└── .env.example                    # Environment variable template
+└── deploy.sh                       # VPS deployment script (Ubuntu/Debian)
 ```
 
 ---
 
-## Production Deployment Notes
+## Operations
 
-### Reverse Proxy (nginx)
+### Service management
 
-To run EzFD behind nginx on port 80/443, add these directives. The `proxy_buffering off` line is required — nginx buffers responses by default and will break the SSE stream.
-
-```nginx
-location / {
-    proxy_pass          http://localhost:3000;
-    proxy_http_version  1.1;
-    proxy_set_header    Upgrade $http_upgrade;
-    proxy_set_header    Connection '';
-    proxy_set_header    Host $host;
-    proxy_set_header    X-Real-IP $remote_addr;
-
-    # Required for SSE (real-time QSO updates)
-    proxy_buffering     off;
-    proxy_cache         off;
-    chunked_transfer_encoding on;
-}
+```bash
+systemctl status ezfd          # check running state
+systemctl restart ezfd         # restart after config change
+journalctl -u ezfd -f          # live logs
+journalctl -u ezfd --since today   # today's logs
 ```
-
-### TLS / HTTPS
-
-Use [Certbot](https://certbot.eff.org/) with the nginx plugin to obtain a free Let's Encrypt certificate. HTTPS is strongly recommended if the app is exposed beyond the local network.
 
 ### Backups
 
-QSO data lives in the `postgres_data` Docker volume. Back it up with:
+QSO data lives in the `ezfd` PostgreSQL database. Back up and restore with standard `pg_dump`:
 
 ```bash
-docker exec ezfd-db-1 pg_dump -U ezfd ezfd | gzip > ezfd_backup_$(date +%Y%m%d).sql.gz
+# Backup
+pg_dump -U ezfd ezfd | gzip > ezfd_$(date +%Y%m%d).sql.gz
+
+# Restore (to a fresh database)
+gunzip -c ezfd_20260628.sql.gz | psql -U ezfd ezfd
 ```
 
-Restore with:
+### nginx notes
+
+The deploy script writes `/etc/nginx/sites-available/ezfd` automatically. One directive is critical and must never be removed:
+
+```nginx
+proxy_buffering off;   # without this, SSE (real-time updates) silently breaks
+```
+
+### SSL / HTTPS
+
+SSL is configured during `deploy.sh` if you provide a domain and email. Certbot installs a systemd timer for automatic renewal. To renew manually or check renewal:
 
 ```bash
-gunzip -c ezfd_backup_20260622.sql.gz | docker exec -i ezfd-db-1 psql -U ezfd ezfd
+certbot renew --dry-run
+systemctl status snap.certbot.renew.timer
 ```
 
-### Updates
+To add SSL after the initial deploy (e.g. once DNS propagates):
 
 ```bash
-git pull
-docker compose build web
-docker compose up -d web
+certbot --nginx -d fd.k3abc.org
 ```
-
-The database schema is applied once on the first container start via `docker-entrypoint-initdb.d`. It will not re-run on subsequent updates. Future releases that include schema changes will ship with explicit migration instructions.
 
 ---
 
