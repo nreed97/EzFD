@@ -5,15 +5,23 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ARRL_SECTIONS } from '@/lib/types';
 
-const FD_CLASSES = ['1A','2A','3A','4A','5A','1B','2B','1C','1D','2D','3D','1E','2E','3E','1F'];
+const FD_CLASS_LETTERS = [
+  { value: 'A', label: 'A — Club portable' },
+  { value: 'B', label: 'B — Home/1 transmitter' },
+  { value: 'C', label: 'C — Mobile' },
+  { value: 'D', label: 'D — Home station' },
+  { value: 'E', label: 'E — Emergency operation' },
+  { value: 'F', label: 'F — EOC emergency power' },
+];
 
 export default function NewEventPage() {
   const router = useRouter();
+  const [classNum, setClassNum] = useState(3);
+  const [classLetter, setClassLetter] = useState('A');
   const [form, setForm] = useState({
     club_name: '',
     club_call: '',
     event_year: new Date().getFullYear(),
-    class: '3A',
     arrl_section: 'EPA',
     location: '',
     qrz_username: '',
@@ -34,7 +42,7 @@ export default function NewEventPage() {
     const res = await fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
+      body: JSON.stringify({ ...form, class: `${classNum}${classLetter}` }),
     });
 
     const data = await res.json();
@@ -99,12 +107,31 @@ export default function NewEventPage() {
           <h2 className="mb-4 font-semibold text-zinc-300">Field Day Setup</h2>
           <div className="flex flex-col gap-3">
             <div className="flex gap-3">
-              <label className="flex flex-1 flex-col gap-1">
+              <fieldset className="flex flex-1 flex-col gap-1">
                 <span className="text-sm text-zinc-400">FD Class</span>
-                <select value={form.class} onChange={e => set('class', e.target.value)} className="input">
-                  {FD_CLASSES.map(c => <option key={c}>{c}</option>)}
-                </select>
-              </label>
+                <div className="flex gap-1">
+                  <input
+                    type="number"
+                    min={1}
+                    max={99}
+                    value={classNum}
+                    onChange={e => setClassNum(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="input w-16 text-center font-mono"
+                    aria-label="Number of transmitters"
+                  />
+                  <select
+                    value={classLetter}
+                    onChange={e => setClassLetter(e.target.value)}
+                    className="input flex-1"
+                    aria-label="Class letter"
+                  >
+                    {FD_CLASS_LETTERS.map(({ value, label }) => (
+                      <option key={value} value={value}>{label}</option>
+                    ))}
+                  </select>
+                </div>
+                <span className="text-xs text-zinc-500">Class: {classNum}{classLetter}</span>
+              </fieldset>
               <label className="flex flex-1 flex-col gap-1">
                 <span className="text-sm text-zinc-400">ARRL Section</span>
                 <select value={form.arrl_section} onChange={e => set('arrl_section', e.target.value)} className="input">

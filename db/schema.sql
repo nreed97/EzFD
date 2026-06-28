@@ -80,3 +80,16 @@ DROP TRIGGER IF EXISTS qso_notify ON qsos;
 CREATE TRIGGER qso_notify
   AFTER INSERT OR DELETE ON qsos
   FOR EACH ROW EXECUTE FUNCTION notify_qso_change();
+
+-- ---------------------------------------------------------------------------
+-- Grants — schema is applied as postgres superuser so tables are owned by
+-- postgres. The ezfd app user needs explicit access.
+-- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'ezfd') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON events, qsos, presence TO ezfd;
+    GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO ezfd;
+  END IF;
+END
+$$;
