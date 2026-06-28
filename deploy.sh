@@ -220,9 +220,48 @@ if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='ezfd'"
   log "Database 'ezfd' created"
 fi
 
-# Apply schema (uses IF NOT EXISTS / CREATE OR REPLACE — safe to re-run)
+# Apply base schema (CREATE TABLE IF NOT EXISTS, triggers — safe to re-run on fresh DB)
 sudo -u postgres psql -d ezfd -f "$REPO_DIR/db/schema.sql" >/dev/null
 log "Database schema applied"
+
+# ── Schema migrations ─────────────────────────────────────────────────────────
+# Each migration is checked against the live schema before running — safe to
+# re-run on any install. Add new migrations at the END of this block only;
+# never edit or remove existing entries.
+# Format: apply_migration "description" "check SQL → returns 1 if done" "SQL to run"
+# ─────────────────────────────────────────────────────────────────────────────
+MIGRATIONS_APPLIED=0
+MIGRATIONS_SKIPPED=0
+
+apply_migration() {
+  local name="$1" check_sql="$2" apply_sql="$3"
+  if sudo -u postgres psql -d ezfd -tAc "$check_sql" 2>/dev/null | grep -q 1; then
+    ((MIGRATIONS_SKIPPED++)) || true
+  else
+    if sudo -u postgres psql -d ezfd -c "$apply_sql" >/dev/null 2>&1; then
+      log "  [new]  $name"
+      ((MIGRATIONS_APPLIED++)) || true
+    else
+      warn "  [FAIL] $name — check DB manually"
+    fi
+  fi
+}
+
+# ── v2: bonus point tracker ───────────────────────────────────────────────────
+apply_migration \
+  "events.bonuses (bonus point tracker)" \
+  "SELECT 1 FROM information_schema.columns
+     WHERE table_name='events' AND column_name='bonuses'" \
+  "ALTER TABLE events
+     ADD COLUMN bonuses JSONB NOT NULL DEFAULT '{}'::jsonb"
+
+# ── add future migrations above this line ────────────────────────────────────
+
+if   [[ $MIGRATIONS_APPLIED -gt 0 ]]; then
+  log "Migrations: $MIGRATIONS_APPLIED applied, $MIGRATIONS_SKIPPED already up to date"
+else
+  log "Migrations: all ${MIGRATIONS_SKIPPED} up to date"
+fi
 
 # ── Build ─────────────────────────────────────────────────────────────────────
 info "Building application (this takes ~60 seconds)..."
