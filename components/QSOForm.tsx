@@ -30,12 +30,13 @@ interface Props {
   submitting: boolean;
   lastLogged: DisplayQSO | null;
   submitError: string | null;
+  onDigHelp: () => void;
   existingQSOs: QSO[];
 }
 
 export default function QSOForm({
   eventId, hasQRZ, band, mode, onBandChange, onModeChange,
-  onSubmit, submitting, lastLogged, submitError, existingQSOs,
+  onSubmit, submitting, lastLogged, submitError, onDigHelp, existingQSOs,
 }: Props) {
   const [callsign, setCallsign] = useState('');
   const [rcvdClass, setRcvdClass] = useState('');
@@ -278,6 +279,18 @@ export default function QSOForm({
               ))}
             </div>
           </div>
+        )}
+
+        {mode === 'DIG' && (
+          <button
+            type="button"
+            tabIndex={-1}
+            onClick={onDigHelp}
+            className="mt-2 flex w-full items-center justify-center gap-1.5 rounded-lg border border-dashed border-zinc-600 bg-zinc-800/40 px-3 py-2 text-xs text-zinc-400 hover:border-blue-600 hover:text-blue-400 transition-colors"
+          >
+            <span>📡</span>
+            <span>Using WSJT-X or JTDX? Set up auto-import →</span>
+          </button>
         )}
       </div>
     </form>
