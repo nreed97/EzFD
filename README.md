@@ -1,5 +1,7 @@
 # EzFD — Field Day Logger
 
+> **⚠️ Vibe-coded disclaimer:** This project was built entirely with AI assistance (Claude). It works, but the code may contain rough edges, non-idiomatic patterns, or choices a seasoned developer would raise an eyebrow at. Use it, hack it, improve it — but don't cite it as a reference implementation for anything critical. You have been warned.
+
 A real-time, multi-operator ARRL Field Day logging application built for amateur radio clubs. EzFD replaces the common N3FJP + SMB-share + `.mdb` file setup with a self-hosted web app that any operator can use from any device on the network — no Windows software, no shared drives, no single point of failure.
 
 ---
@@ -13,10 +15,12 @@ A real-time, multi-operator ARRL Field Day logging application built for amateur
 | **Band activity panel** | See which band/mode each station is currently using; conflict warnings when two stations select the same band/mode |
 | **Live UTC clock** | Seconds-precision UTC display in the logger header |
 | **Night mode** | One-click dim (35% brightness + warm tone) to preserve dark adaptation during nighttime Field Day operations |
+| **Light/Dark theme** | Toggle between light and dark UI themes; preference is saved across sessions |
 | **QRZ callsign lookup** | Auto-fills name and state from QRZ.com XML API using a single shared club account (optional) |
 | **Scoring** | Live PH/CW/Digital QSO counts, section multiplier, and estimated score per ARRL Field Day rules |
-| **Section map** | Leaflet map with all 83 ARRL/RAC sections plotted; worked sections glow amber |
+| **Section map + grid** | Leaflet map with all ARRL/RAC sections plotted; worked sections glow amber. Toggle to a section grid for an at-a-glance view of what you're missing |
 | **Dupe checking** | Server-side duplicate detection (same callsign + band + mode); dupes are logged but flagged and excluded from scoring |
+| **QSO editing** | Edit any logged QSO inline; dupe status is re-evaluated automatically |
 | **ADIF export** | Download a standard `.adi` file for upload to ARRL or any log management tool |
 | **Cabrillo export** | Download a Cabrillo 3.0 `.log` file for direct contest submission |
 | **One-command deploy** | `deploy.sh` installs all dependencies, configures systemd + nginx, and provisions SSL on any Ubuntu/Debian VPS |
@@ -129,10 +133,9 @@ git pull && sudo bash deploy.sh
 
 Share the join code with your operators. Each operator:
 
-1. Opens `http://<server-ip>:3000`.
+1. Opens `http://<server-ip>` (or your domain).
 2. Enters the join code and clicks **Join Event**.
-3. Enters their callsign and selects their station number.
-4. Clicks **Enter Logger**.
+3. Enters their callsign and clicks **Enter Logger**.
 
 No account or password is required for operators.
 
@@ -141,32 +144,32 @@ No account or password is required for operators.
 The logging screen is laid out for speed:
 
 - **Callsign field** is always focused. Type the callsign — if QRZ is configured it auto-fills name and state after a short pause.
-- **Band grid** — click any band button. The currently selected band is highlighted amber.
-- **Mode buttons** — PH / CW / DIG toggle strip.
-- **Exchange fields** — received class (e.g. `2A`) and section (e.g. `NE`). The section field has autocomplete for all 83 ARRL/RAC sections.
+- **Exchange fields** — received class (e.g. `2A`) and section (e.g. `NE`). The section field has autocomplete for all ARRL/RAC sections.
 - Press **Enter** or click **Log QSO** to submit.
+- Use the **▼ QSY** button at the bottom to change band or mode.
 
-Duplicate contacts (same callsign + band + mode) are detected server-side and flagged with `[D]` in the log. They are stored but excluded from scoring.
+Duplicate contacts (same callsign + band + mode) are flagged with a `dupe` badge in the log and excluded from scoring, but still stored.
 
 ### Band Activity Panel
 
-The sidebar shows every other active operator's current band and mode (updated every 15 seconds). A **red row with `!`** means that station is on the same band and mode as you — a potential source of interference.
+The sidebar shows every active operator's current band and mode (updated in real-time). A **red row with `!`** means that station is on the same band and mode as you — a potential source of interference. Operators inactive for more than 15 minutes are greyed out.
 
 ### Night Mode
 
-Click **☾ Night** in the header. The entire logger dims to approximately 35% brightness with a warm tone to protect dark adaptation. Click **☀ Day** to restore normal brightness. The preference is saved in `localStorage` and persists across page reloads.
+Click **☾ Night** in the header. The entire logger dims to approximately 35% brightness with a warm tone to protect dark adaptation. Click **☀ Day** to restore normal brightness.
 
 ### Dashboard
 
 Click **Dashboard** from the logger to open the metrics view:
 
-- **Leaflet map** — all 83 ARRL/RAC sections as markers; worked ones glow amber. Hover for section name.
+- **Map view** — all ARRL/RAC sections as labeled markers on a world map; worked ones glow amber. Hover for section name.
+- **Sections view** — grid of all sections grouped by call district; worked sections highlighted amber. Good for spotting which sections you're missing.
 - **Rate** — QSOs logged in the last 60 minutes.
 - **Score** — PH/CW/Digital breakdown, section count, and estimated score.
 - **Sections worked** — chip list of every worked section abbreviation.
 - **Operator breakdown** — QSO count per operator callsign.
 
-The dashboard receives the same SSE stream as the logger and updates in real-time without a manual refresh.
+The dashboard receives the same SSE stream as the logger and updates in real-time.
 
 ### Exporting
 
@@ -258,7 +261,7 @@ EzFD/
 │   │       └── dashboard/page.tsx  # Metrics + map (server → DashboardClient)
 │   └── api/
 │       ├── events/                 # POST create event, GET by join code
-│       ├── qso/                    # POST log QSO, GET list, DELETE by id
+│       ├── qso/                    # POST log QSO, GET list, PATCH/DELETE by id
 │       ├── presence/               # GET/POST band-activity presence
 │       ├── realtime/[eventId]/     # SSE stream (pg_notify → EventSource)
 │       ├── qrz/                    # QRZ.com callsign lookup proxy
@@ -266,11 +269,13 @@ EzFD/
 ├── components/
 │   ├── LoggingClient.tsx           # Full logging UI (client component)
 │   ├── DashboardClient.tsx         # Dashboard UI (client component)
-│   ├── QSOForm.tsx                 # QSO entry form with band grid + mode toggle
-│   ├── QSOTable.tsx                # Real-time log table with pending indicators
+│   ├── QSOForm.tsx                 # QSO entry form with QSY drawer
+│   ├── QSOTable.tsx                # Real-time log table with edit + delete
 │   ├── Scoreboard.tsx              # Score breakdown widget
 │   ├── BandActivity.tsx            # Other-station band/mode conflict panel
 │   ├── MapView.tsx                 # Leaflet map (dynamic import, no SSR)
+│   ├── SectionGrid.tsx             # Section grid grouped by call district
+│   ├── ThemeToggle.tsx             # Light/dark theme toggle
 │   └── UTCClock.tsx                # Live UTC clock (1s resolution)
 ├── lib/
 │   ├── db.ts                       # pg Pool singleton
@@ -293,9 +298,9 @@ EzFD/
 ### Service management
 
 ```bash
-systemctl status ezfd          # check running state
-systemctl restart ezfd         # restart after config change
-journalctl -u ezfd -f          # live logs
+systemctl status ezfd              # check running state
+systemctl restart ezfd             # restart after config change
+journalctl -u ezfd -f              # live logs
 journalctl -u ezfd --since today   # today's logs
 ```
 
@@ -346,7 +351,7 @@ EzFD calculates scores per the current ARRL Field Day rules:
 | CW | 2 |
 | Digital (DIG) | 2 |
 
-**Multiplier:** number of unique ARRL/RAC sections worked (maximum 83).
+**Multiplier:** number of unique ARRL/RAC sections worked (maximum 84 including all Canadian provinces/territories).
 
 **Estimated score = total QSO points × sections worked**
 
@@ -356,4 +361,26 @@ Bonus points (GOTA station, W1AW contact, satellite QSO, emergency power, public
 
 ## License
 
-MIT — 73 de EzFD.
+```
+GLWT (Good Luck With That) Public License
+Copyright (c) 2026 Nick Reed (W0NY)
+
+Everyone is permitted to copy, distribute, modify, merge, sell, publish,
+sublicense, or do anything else with this software, with or without
+modification, for any purpose.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+The author is not responsible if this software:
+  - Causes you to miss a multiplier
+  - Crashes at 0200Z on Field Day night
+  - Logs your club's dupe count to the ARRL
+  - Achieves sentience and starts logging QSOs autonomously
+  - Otherwise ruins your Field Day
+
+USE AT YOUR OWN RISK.
+
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.
+
+73 de W0NY — good luck out there.
+```

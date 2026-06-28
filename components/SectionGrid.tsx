@@ -12,7 +12,7 @@ const GROUPS = [
   { label: '7',        sections: ['AK','AZ','EWA','ID','MT','NV','OR','UT','WWA','WY'] },
   { label: '8',        sections: ['MI','OH','WV'] },
   { label: '9',        sections: ['IL','IN','WI'] },
-  { label: '0',        sections: ['CO','IA','KS','MN','MO','ND','NE','SD'] },
+  { label: '10',       sections: ['CO','IA','KS','MN','MO','ND','NE','SD'] },
   { label: 'Canada',   sections: ['AB','BC','MB','NB','NL','NS','NT','ON','PEI','QC','SK','YT'] },
 ];
 
