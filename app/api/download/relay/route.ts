@@ -43,7 +43,7 @@ function buildBatFile(joinCode: string, apiUrl: string, operator: string, statio
     'set "SELF=%~f0"',
     'set "TF=%TEMP%\\ezfd-relay.ps1"',
     'powershell.exe -NoProfile -ExecutionPolicy Bypass -Command ^',
-    '  "$c=[IO.File]::ReadAllText($env:SELF,[Text.Encoding]::UTF8);$i=$c.IndexOf(\'#ezfd-ps-start#\');[IO.File]::WriteAllText($env:TF,$c.Substring($i+15),[Text.Encoding]::UTF8)"',
+    '  "$c=[IO.File]::ReadAllText($env:SELF,[Text.Encoding]::UTF8);$i=$c.LastIndexOf(\'#ezfd-ps-start#\');[IO.File]::WriteAllText($env:TF,$c.Substring($i+15),[Text.Encoding]::UTF8)"',
     'if %errorlevel% neq 0 (',
     '  echo.',
     '  echo  ERROR: Could not start relay. Try downloading again from EzFD.',
