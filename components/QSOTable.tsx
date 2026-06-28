@@ -1,10 +1,10 @@
 'use client';
 
-import type { QSO } from '@/lib/types';
+import type { DisplayQSO } from '@/lib/types';
 
 interface Props {
-  qsos: QSO[];
-  onDelete: (id: string) => void;
+  qsos: DisplayQSO[];
+  onDelete: (id: string, localId?: string) => void;
   currentOpCall: string;
 }
 
@@ -14,8 +14,8 @@ function formatUTC(iso: string) {
 }
 
 const MODE_COLORS: Record<string, string> = {
-  PH: 'text-blue-400',
-  CW: 'text-yellow-400',
+  PH:  'text-blue-400',
+  CW:  'text-yellow-400',
   DIG: 'text-green-400',
 };
 
@@ -49,15 +49,24 @@ export default function QSOTable({ qsos, onDelete, currentOpCall }: Props) {
         <tbody>
           {qsos.map(qso => (
             <tr
-              key={qso.id}
-              className={`border-b border-zinc-800/50 hover:bg-zinc-900/50 transition-colors ${
-                qso.is_dupe ? 'opacity-40' : ''
+              key={qso._local_id ?? qso.id}
+              className={`border-b border-zinc-800/50 transition-colors ${
+                qso._pending
+                  ? 'bg-yellow-950/20 opacity-70'
+                  : qso.is_dupe
+                    ? 'opacity-35'
+                    : 'hover:bg-zinc-900/50'
               }`}
             >
               <td className="px-3 py-1.5 font-mono text-xs text-zinc-400">{formatUTC(qso.datetime_utc)}</td>
               <td className="px-3 py-1.5 font-mono font-semibold text-zinc-100">
                 {qso.callsign}
-                {qso.is_dupe && <span className="ml-1 text-xs text-yellow-500">[D]</span>}
+                {qso._pending && (
+                  <span className="ml-1.5 text-[10px] text-yellow-500 animate-pulse">↑ sync</span>
+                )}
+                {qso.is_dupe && !qso._pending && (
+                  <span className="ml-1 text-xs text-yellow-500">[D]</span>
+                )}
               </td>
               <td className={`px-3 py-1.5 font-mono text-xs ${BAND_COLORS[qso.band] ?? 'text-zinc-300'}`}>
                 {qso.band}
@@ -75,7 +84,9 @@ export default function QSOTable({ qsos, onDelete, currentOpCall }: Props) {
               <td className="px-2 py-1.5">
                 <button
                   onClick={() => {
-                    if (confirm(`Delete QSO with ${qso.callsign}?`)) onDelete(qso.id);
+                    if (confirm(`Delete QSO with ${qso.callsign}?`)) {
+                      onDelete(qso.id, qso._local_id);
+                    }
                   }}
                   className="text-zinc-700 hover:text-red-400 transition-colors text-xs"
                   title="Delete QSO"

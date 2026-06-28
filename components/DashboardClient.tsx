@@ -66,7 +66,11 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
           </Link>
           <a href={`/api/export/${event.join_code}`}
             className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10">
-            Export ADIF
+            ADIF
+          </a>
+          <a href={`/api/export/${event.join_code}?format=cabrillo`}
+            className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10">
+            Cabrillo
           </a>
         </div>
       </header>

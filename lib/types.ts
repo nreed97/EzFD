@@ -60,6 +60,9 @@ export interface Score {
   sections: string[];
 }
 
+// QSO with an optional pending marker for optimistic UI
+export type DisplayQSO = QSO & { _pending?: true; _local_id?: string };
+
 export interface QRZLookup {
   callsign: string;
   name: string | null;

@@ -1,16 +1,16 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
-import type { Band, Mode, QSO } from '@/lib/types';
+import type { Band, Mode, DisplayQSO } from '@/lib/types';
 import { BANDS, MODES } from '@/lib/types';
 import { ARRL_SECTIONS } from '@/lib/types';
 
 interface Props {
   eventId: string;
   hasQRZ: boolean;
-  onSubmit: (data: { callsign: string; band: Band; mode: Mode; rcvd_class: string; rcvd_section: string }) => Promise<QSO | null>;
+  onSubmit: (data: { callsign: string; band: Band; mode: Mode; rcvd_class: string; rcvd_section: string }) => Promise<void>;
   submitting: boolean;
-  lastLogged: QSO | null;
+  lastLogged: DisplayQSO | null;
   defaultBand: Band;
   defaultMode: Mode;
 }
@@ -56,16 +56,13 @@ export default function QSOForm({ eventId, hasQRZ, onSubmit, submitting, lastLog
     e.preventDefault();
     if (!callsign || submitting) return;
 
-    const qso = await onSubmit({ callsign, band, mode, rcvd_class: rcvdClass, rcvd_section: rcvdSection });
-    if (qso) {
-      setDupeWarning(qso.is_dupe);
-      // Clear for next QSO
-      setCallsign('');
-      setRcvdClass('');
-      setRcvdSection('');
-      setQrzInfo(null);
-      callRef.current?.focus();
-    }
+    await onSubmit({ callsign, band, mode, rcvd_class: rcvdClass, rcvd_section: rcvdSection });
+    setDupeWarning(false);
+    setCallsign('');
+    setRcvdClass('');
+    setRcvdSection('');
+    setQrzInfo(null);
+    callRef.current?.focus();
   }
 
   return (
