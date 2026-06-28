@@ -3,27 +3,27 @@ import { getPool } from '@/lib/db';
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { event_id, callsign, band, mode, rcvd_class, rcvd_section, operator_call, station_number } = body;
+  const { event_id, join_code, callsign, band, mode, rcvd_class, rcvd_section, operator_call, station_number } = body;
 
-  if (!event_id || !callsign || !band || !mode) {
+  if ((!event_id && !join_code) || !callsign || !band || !mode) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
   const pool = getPool();
 
-  const { rows: evRows } = await pool.query(
-    'SELECT class, arrl_section FROM events WHERE id = $1',
-    [event_id]
-  );
+  const { rows: evRows } = join_code
+    ? await pool.query('SELECT id, class, arrl_section FROM events WHERE join_code = $1', [join_code.toUpperCase()])
+    : await pool.query('SELECT id, class, arrl_section FROM events WHERE id = $1', [event_id]);
   if (!evRows[0]) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   const event = evRows[0];
+  const resolvedEventId = event.id;
 
   // Dupe check
   const { rows: dupeRows } = await pool.query(
     `SELECT id FROM qsos
      WHERE event_id=$1 AND callsign=$2 AND band=$3 AND mode=$4 AND is_dupe=false
      LIMIT 1`,
-    [event_id, callsign.toUpperCase().trim(), band, mode]
+    [resolvedEventId, callsign.toUpperCase().trim(), band, mode]
   );
   const is_dupe = dupeRows.length > 0;
 
@@ -34,7 +34,7 @@ export async function POST(request: Request) {
      VALUES ($1,$2,$3,$4,NOW(),$5,$6,$7,$8,$9,$10,$11)
      RETURNING *`,
     [
-      event_id,
+      resolvedEventId,
       callsign.toUpperCase().trim(),
       band,
       mode,

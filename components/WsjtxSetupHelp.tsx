@@ -3,13 +3,13 @@
 import { useState, useEffect } from 'react';
 
 interface Props {
-  eventId: string;
+  joinCode: string;
   operatorCall: string;
   stationNumber: number;
   onClose: () => void;
 }
 
-export default function WsjtxSetupHelp({ eventId, operatorCall, stationNumber, onClose }: Props) {
+export default function WsjtxSetupHelp({ joinCode, operatorCall, stationNumber, onClose }: Props) {
   const [apiUrl, setApiUrl] = useState('');
   const [showAdif, setShowAdif] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -17,7 +17,7 @@ export default function WsjtxSetupHelp({ eventId, operatorCall, stationNumber, o
   useEffect(() => { setApiUrl(window.location.origin); }, []);
 
   const relayUrl = apiUrl
-    ? `/api/download/relay?event_id=${encodeURIComponent(eventId)}&operator=${encodeURIComponent(operatorCall)}&station=${stationNumber}&api_url=${encodeURIComponent(apiUrl)}`
+    ? `/api/download/relay?join_code=${encodeURIComponent(joinCode)}&operator=${encodeURIComponent(operatorCall)}&station=${stationNumber}&api_url=${encodeURIComponent(apiUrl)}`
     : '#';
 
   return (
@@ -178,7 +178,7 @@ export default function WsjtxSetupHelp({ eventId, operatorCall, stationNumber, o
                 </div>
                 {apiUrl && (
                   <div className="rounded border border-zinc-800 bg-zinc-900 p-2 font-mono text-zinc-500 break-all">
-                    {`node wsjtx-bridge.cjs --event-id ${eventId}${operatorCall ? ` --operator ${operatorCall}` : ''} --api-url ${apiUrl}`}
+                    {`node wsjtx-bridge.cjs --join-code ${joinCode}${operatorCall ? ` --operator ${operatorCall}` : ''} --api-url ${apiUrl}`}
                   </div>
                 )}
               </div>

@@ -9,16 +9,16 @@ import type { NextRequest } from 'next/server';
 export async function GET(request: NextRequest) {
   const { searchParams, protocol, host } = request.nextUrl;
 
-  const eventId  = searchParams.get('event_id')  ?? '';
+  const joinCode = (searchParams.get('join_code') ?? searchParams.get('event_id') ?? '').toUpperCase();
   const operator = searchParams.get('operator')   ?? '';
   const station  = searchParams.get('station')    ?? '1';
   const apiUrl   = searchParams.get('api_url')    ?? `${protocol}//${host}`;
 
-  if (!eventId) {
-    return NextResponse.json({ error: 'event_id required' }, { status: 400 });
+  if (!joinCode) {
+    return NextResponse.json({ error: 'join_code required' }, { status: 400 });
   }
 
-  const content = buildBatFile(eventId, apiUrl, operator, parseInt(station, 10) || 1);
+  const content = buildBatFile(joinCode, apiUrl, operator, parseInt(station, 10) || 1);
 
   return new NextResponse(content, {
     headers: {
@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
   });
 }
 
-function buildBatFile(eventId: string, apiUrl: string, operator: string, station: number): string {
-  const ps = buildPsScript(eventId, apiUrl, operator, station);
+function buildBatFile(joinCode: string, apiUrl: string, operator: string, station: number): string {
+  const ps = buildPsScript(joinCode, apiUrl, operator, station);
 
   const bat = [
     '@echo off',
@@ -75,10 +75,10 @@ function buildBatFile(eventId: string, apiUrl: string, operator: string, station
 // All PS single-quoted strings use the Q constant (ASCII 0x27) so
 // editors cannot silently substitute smart/curly quotes.
 // ------------------------------------------------------------------
-function buildPsScript(eventId: string, apiUrl: string, operator: string, station: number): string {
-  const safeId  = eventId.replace(/'/g, "''");
-  const safeUrl = apiUrl.replace(/'/g, "''");
-  const safeOp  = operator.replace(/'/g, "''");
+function buildPsScript(joinCode: string, apiUrl: string, operator: string, station: number): string {
+  const safeCode = joinCode.replace(/'/g, "''");
+  const safeUrl  = apiUrl.replace(/'/g, "''");
+  const safeOp   = operator.replace(/'/g, "''");
 
   // ASCII 0x27 straight single quote -- never auto-converted by editors.
   const Q = '\x27';
@@ -87,8 +87,8 @@ function buildPsScript(eventId: string, apiUrl: string, operator: string, statio
   // can sneak in from an editor with smart-quote correction enabled.
   const L = [
     '# EzFD WSJT-X Relay -- auto-generated, do not edit',
-    '$EventId      = ' + Q + safeId  + Q,
-    '$ApiUrl       = ' + Q + safeUrl + Q,
+    '$JoinCode     = ' + Q + safeCode + Q,
+    '$ApiUrl       = ' + Q + safeUrl  + Q,
     '$OperatorCall = ' + Q + safeOp  + Q,
     '$StationNum   = ' + String(station),
     '',
@@ -163,7 +163,7 @@ function buildPsScript(eventId: string, apiUrl: string, operator: string, statio
     '',
     'function Send-Qso($call, $band, $mode, $rcvdClass, $rcvdSection) {',
     '    $body = @{',
-    '        event_id       = $EventId',
+    '        join_code      = $JoinCode',
     '        callsign       = $call',
     '        band           = $band',
     '        mode           = $mode',
@@ -229,6 +229,7 @@ function buildPsScript(eventId: string, apiUrl: string, operator: string, statio
     'Write-Host "    EzFD  WSJT-X / JTDX  Relay" -ForegroundColor Cyan',
     'Write-Host "  ================================================" -ForegroundColor Cyan',
     'Write-Host "  Server:   $ApiUrl" -ForegroundColor DarkGray',
+    'Write-Host "  Event:    $JoinCode" -ForegroundColor DarkGray',
     'if ($OperatorCall) {',
     '    Write-Host "  Operator: $OperatorCall" -ForegroundColor DarkGray',
     '}',

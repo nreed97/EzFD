@@ -361,7 +361,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
       {showWsjtxHelp && (
         <WsjtxSetupHelp
-          eventId={event.id}
+          joinCode={event.join_code}
           operatorCall={operatorCall}
           stationNumber={stationNumber}
           onClose={() => setShowWsjtxHelp(false)}
