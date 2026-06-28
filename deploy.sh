@@ -124,6 +124,9 @@ echo
 if [[ "$UPDATING" == "false" ]]; then
   info "Installing system packages..."
   export DEBIAN_FRONTEND=noninteractive
+  # Remove any PGDG source left over from a previous partial run so the
+  # initial apt-get update doesn't fail on it before we handle it properly.
+  rm -f /etc/apt/sources.list.d/pgdg.list
   apt-get update -qq
 
   # Core utilities
