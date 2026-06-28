@@ -1,5 +1,6 @@
 import { parseStringPromise } from 'xml2js';
 import { getPool } from './db';
+import { decryptField } from './crypto';
 import type { QRZLookup } from './types';
 
 const QRZ_BASE = 'https://xmldata.qrz.com/xml/current/';
@@ -29,12 +30,14 @@ export async function lookupCallsign(eventId: string, callsign: string): Promise
     return { callsign, name: null, state: null, country: null, grid: null };
   }
 
+  const password = decryptField(event.qrz_password);
+
   let sessionKey = event.qrz_session_key;
   const now = new Date();
   const expires = event.qrz_session_expires ? new Date(event.qrz_session_expires) : null;
 
   if (!sessionKey || !expires || expires <= now) {
-    sessionKey = await fetchQRZSession(event.qrz_username, event.qrz_password);
+    sessionKey = await fetchQRZSession(event.qrz_username, password);
     const newExpires = new Date(now.getTime() + 50 * 60 * 1000);
     await pool.query(
       'UPDATE events SET qrz_session_key=$1, qrz_session_expires=$2 WHERE id=$3',

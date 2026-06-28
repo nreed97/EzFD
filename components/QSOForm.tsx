@@ -94,6 +94,11 @@ export default function QSOForm({
   const isDupe = callsign.length >= 3 &&
     existingQSOs.some(q => !q.is_dupe && q.callsign === callsign && q.band === band && q.mode === mode);
 
+  const callsignInvalid = callsign.length >= 3 && (() => {
+    const c = callsign.replace(/\/.*/, '');
+    return !/^[A-Z0-9]{3,}$/.test(c) || !/[A-Z]/.test(c) || !/[0-9]/.test(c);
+  })();
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       {/* Callsign */}
@@ -119,6 +124,11 @@ export default function QSOForm({
         {isDupe && (
           <p className="mt-1 text-xs text-yellow-500">
             Already worked on {band} {mode} — will log as dupe
+          </p>
+        )}
+        {callsignInvalid && !isDupe && (
+          <p className="mt-1 text-xs text-orange-400">
+            Unusual callsign format — double-check before logging
           </p>
         )}
       </div>
@@ -178,7 +188,7 @@ export default function QSOForm({
       <button
         type="submit"
         disabled={!callsign || submitting}
-        className="rounded-lg bg-amber-400 py-2.5 font-bold text-zinc-900 transition-colors hover:bg-amber-300 disabled:opacity-50 text-sm"
+        className="rounded-lg bg-amber-400 py-3 font-bold text-zinc-900 transition-colors hover:bg-amber-300 disabled:opacity-50 text-base"
       >
         {submitting ? 'Logging…' : 'Log QSO  [Enter]'}
       </button>
@@ -213,7 +223,7 @@ export default function QSOForm({
                   type="button"
                   tabIndex={-1}
                   onClick={() => pickBand(b)}
-                  className={`rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
+                  className={`rounded py-2.5 text-sm font-mono font-semibold transition-colors ${
                     band === b
                       ? 'bg-amber-400 text-zinc-900'
                       : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-200 light:text-zinc-700 light:hover:bg-zinc-300'
@@ -232,7 +242,7 @@ export default function QSOForm({
                     type="button"
                     tabIndex={-1}
                     onClick={() => pickBand(b)}
-                    className={`flex-1 rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
+                    className={`flex-1 rounded py-2.5 text-sm font-mono font-semibold transition-colors ${
                       band === b
                         ? 'bg-amber-400 text-zinc-900'
                         : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-200 light:text-zinc-700 light:hover:bg-zinc-300'
@@ -268,7 +278,7 @@ export default function QSOForm({
                   type="button"
                   tabIndex={-1}
                   onClick={() => onModeChange(m)}
-                  className={`flex-1 py-2 text-sm font-bold transition-colors ${
+                  className={`flex-1 py-3 text-sm font-bold transition-colors ${
                     mode === m
                       ? 'bg-amber-400 text-zinc-900'
                       : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-100 light:text-zinc-700 light:hover:bg-zinc-200'

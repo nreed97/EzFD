@@ -13,10 +13,11 @@ import BonusTracker from './BonusTracker';
 import RateChart from './RateChart';
 import BandBreakdown from './BandBreakdown';
 import SummarySheet from './SummarySheet';
+import SectionsNeeded from './SectionsNeeded';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
-type MainView = 'map' | 'sections' | 'rate' | 'bands';
+type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed';
 
 interface Props {
   event: Event;
@@ -45,17 +46,26 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const recentQSOs = qsos.filter(q => !q.is_dupe && q.datetime_utc > oneHourAgo).length;
 
-  const byOp: Record<string, number> = {};
+  const opStats: Record<string, { total: number; ph: number; cw: number; dig: number; first: number; last: number }> = {};
   for (const q of qsos) {
-    if (!q.is_dupe && q.operator_call) {
-      byOp[q.operator_call] = (byOp[q.operator_call] ?? 0) + 1;
-    }
+    if (q.is_dupe || !q.operator_call) continue;
+    const op = q.operator_call;
+    const t = new Date(q.datetime_utc).getTime();
+    if (!opStats[op]) opStats[op] = { total: 0, ph: 0, cw: 0, dig: 0, first: t, last: t };
+    const s = opStats[op];
+    s.total++;
+    if (q.mode === 'PH') s.ph++;
+    else if (q.mode === 'CW') s.cw++;
+    else s.dig++;
+    if (t < s.first) s.first = t;
+    if (t > s.last) s.last = t;
   }
-  const operators = Object.keys(byOp).sort();
+  const operators = Object.keys(opStats).sort();
 
   const VIEW_TABS: { id: MainView; label: string }[] = [
     { id: 'map',      label: 'Map' },
     { id: 'sections', label: 'Sections' },
+    { id: 'needed',   label: 'Needed' },
     { id: 'rate',     label: 'Rate' },
     { id: 'bands',    label: 'Bands' },
   ];
@@ -113,6 +123,7 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
         <div className="h-56 shrink-0 md:h-auto md:flex-1">
           {mainView === 'map'      && <MapView workedSections={score.sections} />}
           {mainView === 'sections' && <SectionGrid workedSections={score.sections} />}
+          {mainView === 'needed'   && <SectionsNeeded workedSections={score.sections} />}
           {mainView === 'rate'     && <RateChart qsos={qsos} />}
           {mainView === 'bands'    && <BandBreakdown score={score} />}
         </div>
@@ -150,17 +161,30 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
             </div>
           )}
 
-          {Object.keys(byOp).length > 0 && (
+          {Object.keys(opStats).length > 0 && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
               <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Operators</div>
-              {Object.entries(byOp)
-                .sort((a, b) => b[1] - a[1])
-                .map(([op, count]) => (
-                  <div key={op} className="flex items-center justify-between py-0.5">
-                    <span className="font-mono text-xs text-zinc-300 light:text-zinc-700">{op}</span>
-                    <span className="font-mono text-xs text-zinc-400 light:text-zinc-500">{count} QSOs</span>
-                  </div>
-                ))}
+              {Object.entries(opStats)
+                .sort((a, b) => b[1].total - a[1].total)
+                .map(([op, s]) => {
+                  const windowHours = Math.max((s.last - s.first) / 3_600_000, 1);
+                  const qhr = Math.round(s.total / windowHours);
+                  return (
+                    <div key={op} className="py-1 border-b border-zinc-800/50 last:border-0 light:border-zinc-200">
+                      <div className="flex items-baseline justify-between">
+                        <span className="font-mono text-xs font-bold text-zinc-200 light:text-zinc-800">{op}</span>
+                        <span className="font-mono text-xs text-zinc-400 light:text-zinc-500">{s.total} Q · {qhr}/hr</span>
+                      </div>
+                      {s.total > 0 && (
+                        <div className="mt-0.5 flex gap-1">
+                          {s.ph > 0 && <span className="text-[10px] text-blue-400 light:text-blue-600">{s.ph} PH</span>}
+                          {s.cw > 0 && <span className="text-[10px] text-yellow-400 light:text-yellow-600">{s.cw} CW</span>}
+                          {s.dig > 0 && <span className="text-[10px] text-green-400 light:text-green-600">{s.dig} DIG</span>}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
             </div>
           )}
 

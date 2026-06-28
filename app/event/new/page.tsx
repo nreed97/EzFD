@@ -26,6 +26,7 @@ export default function NewEventPage() {
     location: '',
     qrz_username: '',
     qrz_password: '',
+    admin_key: '',
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -42,7 +43,7 @@ export default function NewEventPage() {
     const res = await fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, class: `${classNum}${classLetter}` }),
+      body: JSON.stringify({ ...form, class: `${classNum}${classLetter}`, admin_key: form.admin_key }),
     });
 
     const data = await res.json();
@@ -178,6 +179,21 @@ export default function NewEventPage() {
               </label>
             </div>
           </div>
+        </div>
+
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
+          <h2 className="mb-1 font-semibold text-zinc-300 light:text-zinc-700">Admin Key</h2>
+          <p className="mb-4 text-xs text-zinc-500">Required if this server has been configured with an admin key. Leave blank on private/local deployments.</p>
+          <label className="flex flex-col gap-1">
+            <span className="text-sm text-zinc-400">Admin Key</span>
+            <input
+              type="password"
+              value={form.admin_key}
+              onChange={e => set('admin_key', e.target.value)}
+              autoComplete="off"
+              className="input"
+            />
+          </label>
         </div>
 
         {error && <p className="rounded-lg border border-red-800 bg-red-900/30 p-3 text-sm text-red-400">{error}</p>}

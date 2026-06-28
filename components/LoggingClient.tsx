@@ -295,27 +295,47 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       </header>
 
       {/* Mobile tab bar */}
-      <div className="flex shrink-0 border-b border-zinc-800 bg-zinc-900 md:hidden light:border-zinc-200 light:bg-zinc-50">
-        <button
-          onClick={() => setMobileTab('log')}
-          className={`flex-1 py-2 text-sm font-medium transition-colors ${
-            mobileTab === 'log'
-              ? 'border-b-2 border-amber-400 text-amber-400'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          Log QSO
-        </button>
-        <button
-          onClick={() => setMobileTab('qsos')}
-          className={`flex-1 py-2 text-sm font-medium transition-colors ${
-            mobileTab === 'qsos'
-              ? 'border-b-2 border-amber-400 text-amber-400'
-              : 'text-zinc-500 hover:text-zinc-300'
-          }`}
-        >
-          QSOs ({displayQSOs.length})
-        </button>
+      <div className="shrink-0 border-b border-zinc-800 bg-zinc-900 md:hidden light:border-zinc-200 light:bg-zinc-50">
+        <div className="flex items-center justify-between px-3 py-1 border-b border-zinc-800/50 light:border-zinc-200">
+          <span className="font-mono text-xs text-zinc-400 light:text-zinc-600">
+            <span className="text-zinc-200 font-bold light:text-zinc-800">{score.valid_qsos}</span>
+            <span className="text-zinc-600 mx-1">Q</span>
+            <span className="text-zinc-200 font-bold light:text-zinc-800">{score.sections_worked}</span>
+            <span className="text-zinc-600 mx-1">×</span>
+            <span className="text-amber-400 font-bold">{score.total_score.toLocaleString()}</span>
+          </span>
+          <button
+            onClick={() => {
+              sessionStorage.removeItem(`ezfd_op_${event.join_code}`);
+              router.push(`/event/${event.join_code}`);
+            }}
+            className="font-mono text-xs text-zinc-400 border border-zinc-700 rounded px-2 py-0.5 light:border-zinc-300 light:text-zinc-600"
+          >
+            {operatorCall} ⇄
+          </button>
+        </div>
+        <div className="flex">
+          <button
+            onClick={() => setMobileTab('log')}
+            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+              mobileTab === 'log'
+                ? 'border-b-2 border-amber-400 text-amber-400'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            Log QSO
+          </button>
+          <button
+            onClick={() => setMobileTab('qsos')}
+            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${
+              mobileTab === 'qsos'
+                ? 'border-b-2 border-amber-400 text-amber-400'
+                : 'text-zinc-500 hover:text-zinc-300'
+            }`}
+          >
+            QSOs ({displayQSOs.length})
+          </button>
+        </div>
       </div>
 
       <div className="flex flex-1 overflow-hidden">
