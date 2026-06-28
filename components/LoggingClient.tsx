@@ -10,6 +10,8 @@ import QSOTable from './QSOTable';
 import Scoreboard from './Scoreboard';
 import BandActivity from './BandActivity';
 import UTCClock from './UTCClock';
+import AdifImport from './AdifImport';
+import WsjtxSetupHelp from './WsjtxSetupHelp';
 
 interface Props {
   event: Event;
@@ -84,6 +86,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [currentBand, setCurrentBand] = useState<Band>('20m');
   const [currentMode, setCurrentMode] = useState<Mode>('PH');
   const [mobileTab, setMobileTab] = useState<'log' | 'qsos'>('log');
+  const [showAdifImport, setShowAdifImport] = useState(false);
+  const [showWsjtxHelp, setShowWsjtxHelp] = useState(false);
   const syncingRef = useRef(false);
 
   useEffect(() => {
@@ -255,6 +259,13 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           </button>
 
           <div className="hidden sm:flex gap-1">
+            <button
+              onClick={() => setShowAdifImport(true)}
+              className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
+              title="Import QSOs from WSJT-X / JTDX ADIF file"
+            >
+              Import ADIF
+            </button>
             <a href={`/api/export/${event.join_code}`}
               className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
               ADIF
@@ -304,6 +315,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             submitting={submitting}
             lastLogged={lastLogged}
             submitError={submitError}
+            onDigHelp={() => setShowWsjtxHelp(true)}
           />
           <BandActivity
             eventId={event.id}
@@ -320,6 +332,24 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           <QSOTable qsos={displayQSOs} onDelete={deleteQSO} currentOpCall={operatorCall} />
         </main>
       </div>
+
+      {showAdifImport && (
+        <AdifImport
+          eventId={event.id}
+          operatorCall={operatorCall}
+          stationNumber={stationNumber}
+          onClose={() => setShowAdifImport(false)}
+        />
+      )}
+
+      {showWsjtxHelp && (
+        <WsjtxSetupHelp
+          eventId={event.id}
+          operatorCall={operatorCall}
+          stationNumber={stationNumber}
+          onClose={() => setShowWsjtxHelp(false)}
+        />
+      )}
     </div>
   );
 }
