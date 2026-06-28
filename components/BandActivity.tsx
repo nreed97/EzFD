@@ -98,8 +98,6 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
     }
   }
 
-  if (allOps.length === 0) return null;
-
   const now = Date.now();
 
   return (
@@ -108,6 +106,9 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
         Operators
       </h3>
       <div className="flex flex-col gap-1">
+        {allOps.length === 0 && (
+          <p className="text-[11px] text-zinc-600">No operators online yet.</p>
+        )}
         {allOps
           .sort((a, b) => {
             // Me first, then by last QSO recency
