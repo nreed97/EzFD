@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import type { Band, Mode } from '@/lib/types';
+import type { Band, Mode, DisplayQSO } from '@/lib/types';
 
 interface StationPresence {
   op_call: string;
@@ -17,6 +17,7 @@ interface Props {
   myStation: number;
   currentBand: Band;
   currentMode: Mode;
+  qsos: DisplayQSO[];
 }
 
 const MODE_COLORS: Record<Mode, string> = {
@@ -25,13 +26,28 @@ const MODE_COLORS: Record<Mode, string> = {
   DIG: 'text-green-400',
 };
 
-const HEARTBEAT_MS  = 30_000;
-const POLL_MS       = 15_000;
+const HEARTBEAT_MS = 30_000;
+const POLL_MS      = 15_000;
+const INACTIVE_MS  = 15 * 60 * 1000;
 
-export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode }: Props) {
+function timeSince(iso: string): string {
+  const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (s < 60)   return `${s}s`;
+  if (s < 3600) return `${Math.floor(s / 60)}m`;
+  return `${Math.floor(s / 3600)}h`;
+}
+
+export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos }: Props) {
   const [stations, setStations] = useState<StationPresence[]>([]);
+  const [tick, setTick] = useState(0);
   const lastBandRef = useRef<Band | null>(null);
   const lastModeRef = useRef<Mode | null>(null);
+
+  // Re-render every 10s so "Xm ago" stays fresh
+  useEffect(() => {
+    const id = setInterval(() => setTick(t => t + 1), 10_000);
+    return () => clearInterval(id);
+  }, []);
 
   const publishPresence = useCallback(async (band: Band, mode: Mode) => {
     await fetch('/api/presence', {
@@ -46,7 +62,6 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
     if (res?.ok) setStations(await res.json());
   }, [eventId]);
 
-  // Publish immediately on mount and whenever band/mode changes
   useEffect(() => {
     if (currentBand === lastBandRef.current && currentMode === lastModeRef.current) return;
     lastBandRef.current = currentBand;
@@ -54,46 +69,83 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
     publishPresence(currentBand, currentMode);
   }, [currentBand, currentMode, publishPresence]);
 
-  // Periodic heartbeat so our presence doesn't go stale
   useEffect(() => {
     const id = setInterval(() => publishPresence(lastBandRef.current ?? currentBand, lastModeRef.current ?? currentMode), HEARTBEAT_MS);
     return () => clearInterval(id);
   }, [publishPresence, currentBand, currentMode]);
 
-  // Poll for other stations' presence
   useEffect(() => {
     fetchPresence();
     const id = setInterval(fetchPresence, POLL_MS);
     return () => clearInterval(id);
   }, [fetchPresence]);
 
-  const others = stations.filter(s => s.op_call !== myOpCall);
-  if (others.length === 0) return null;
+  // Last QSO time per operator from the live QSO list
+  const lastQSOByOp: Record<string, string> = {};
+  for (const q of qsos) {
+    if (q.operator_call && !q._pending) {
+      const cur = lastQSOByOp[q.operator_call];
+      if (!cur || q.datetime_utc > cur) lastQSOByOp[q.operator_call] = q.datetime_utc;
+    }
+  }
+
+  // Merge presence list with any op who has logged but has no presence row
+  const presenceMap = new Map(stations.map(s => [s.op_call, s]));
+  const allOps: StationPresence[] = [...stations];
+  for (const op of Object.keys(lastQSOByOp)) {
+    if (!presenceMap.has(op)) {
+      allOps.push({ op_call: op, station: 0, band: '20m', mode: 'PH', updated_at: lastQSOByOp[op] });
+    }
+  }
+
+  if (allOps.length === 0) return null;
+
+  const now = Date.now();
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
       <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-        Other Stations
+        Operators
       </h3>
       <div className="flex flex-col gap-1">
-        {others
-          .sort((a, b) => a.station - b.station)
+        {allOps
+          .sort((a, b) => {
+            // Me first, then by last QSO recency
+            if (a.op_call === myOpCall) return -1;
+            if (b.op_call === myOpCall) return 1;
+            const aLast = lastQSOByOp[a.op_call] ?? '';
+            const bLast = lastQSOByOp[b.op_call] ?? '';
+            return bLast.localeCompare(aLast);
+          })
           .map(s => {
-            const conflict = s.band === currentBand && s.mode === currentMode;
+            const isMe = s.op_call === myOpCall;
+            const lastQSO = lastQSOByOp[s.op_call];
+            const inactive = lastQSO
+              ? now - new Date(lastQSO).getTime() > INACTIVE_MS
+              : true;
+            const conflict = !isMe && s.band === currentBand && s.mode === currentMode;
+
             return (
               <div
                 key={s.op_call}
-                className={`flex items-center justify-between rounded px-2 py-1 text-xs ${
-                  conflict ? 'border border-red-700 bg-red-900/30' : 'bg-zinc-800/50'
-                }`}
+                className={`flex items-center justify-between rounded px-2 py-1 text-xs transition-opacity ${
+                  conflict
+                    ? 'border border-red-700 bg-red-900/30'
+                    : isMe
+                      ? 'border border-zinc-700 bg-zinc-800/60'
+                      : 'bg-zinc-800/40'
+                } ${inactive && !isMe ? 'opacity-35' : ''}`}
               >
-                <span className="font-mono text-zinc-400">
-                  STN{s.station} <span className="text-zinc-300">{s.op_call}</span>
+                <span className={`font-mono font-semibold ${isMe ? 'text-amber-400' : 'text-zinc-200'}`}>
+                  {s.op_call}
+                  {conflict && <span className="ml-1 text-red-400">!</span>}
                 </span>
-                <span className="flex items-center gap-1.5">
-                  <span className="font-mono text-zinc-200">{s.band}</span>
-                  <span className={`font-mono font-bold ${MODE_COLORS[s.mode]}`}>{s.mode}</span>
-                  {conflict && <span className="font-bold text-red-400">!</span>}
+                <span className="flex items-center gap-2">
+                  <span className="font-mono text-zinc-300">{s.band}</span>
+                  <span className={`font-mono font-bold ${MODE_COLORS[s.mode] ?? 'text-zinc-300'}`}>{s.mode}</span>
+                  <span className={`font-mono text-[10px] ${inactive && !isMe ? 'text-zinc-600' : 'text-zinc-500'}`}>
+                    {lastQSO ? timeSince(lastQSO) : '—'}
+                  </span>
                 </span>
               </div>
             );

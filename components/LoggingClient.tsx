@@ -311,6 +311,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             myStation={stationNumber}
             currentBand={currentBand}
             currentMode={currentMode}
+            qsos={displayQSOs}
           />
           <Scoreboard score={score} />
         </aside>
