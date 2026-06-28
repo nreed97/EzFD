@@ -39,11 +39,14 @@ function pendingToDisplay(p: PendingQSO, sentClass: string, sentSection: string)
   };
 }
 
-async function submitQSOToServer(eventId: string, pending: PendingQSO): Promise<QSO | null> {
+async function submitQSOToServer(eventId: string, pending: PendingQSO): Promise<{ qso: QSO | null; error?: string }> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
     const res = await fetch('/api/qso', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: controller.signal,
       body: JSON.stringify({
         event_id: eventId,
         callsign: pending.callsign,
@@ -55,10 +58,16 @@ async function submitQSOToServer(eventId: string, pending: PendingQSO): Promise<
         station_number: pending.station_number,
       }),
     });
-    if (!res.ok) return null;
-    return res.json();
-  } catch {
-    return null;
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({})) as { error?: string };
+      return { qso: null, error: body.error ?? `Server error ${res.status}` };
+    }
+    return { qso: await res.json() };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : 'Network error';
+    return { qso: null, error: msg.includes('abort') ? 'Request timed out' : msg };
+  } finally {
+    clearTimeout(timeout);
   }
 }
 
@@ -69,6 +78,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [isOnline, setIsOnline] = useState(true);
   const [pendingCount, setPendingCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
   const [lastLogged, setLastLogged] = useState<DisplayQSO | null>(null);
   const [nightMode, setNightMode] = useState(false);
   const [currentBand, setCurrentBand] = useState<Band>('20m');
@@ -146,22 +156,28 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     rcvd_class: string; rcvd_section: string;
   }) => {
     setSubmitting(true);
-    const pending = enqueue(event.id, { ...data, operator_call: operatorCall, station_number: stationNumber });
-    const display = pendingToDisplay(pending, event.class, event.arrl_section);
-    setPendingQSOs(prev => [display, ...prev]);
-    setPendingCount(prev => prev + 1);
-    setLastLogged(display);
+    setSubmitError(null);
+    try {
+      const pending = enqueue(event.id, { ...data, operator_call: operatorCall, station_number: stationNumber });
+      const display = pendingToDisplay(pending, event.class, event.arrl_section);
+      setPendingQSOs(prev => [display, ...prev]);
+      setPendingCount(prev => prev + 1);
+      setLastLogged(display);
 
-    if (navigator.onLine) {
-      const result = await submitQSOToServer(event.id, pending);
-      if (result) {
-        dequeue(event.id, pending.local_id);
-        setPendingQSOs(prev => prev.filter(p => p._local_id !== pending.local_id));
-        setPendingCount(prev => Math.max(0, prev - 1));
-        setLastLogged(result as DisplayQSO);
+      if (navigator.onLine) {
+        const { qso, error } = await submitQSOToServer(event.id, pending);
+        if (qso) {
+          dequeue(event.id, pending.local_id);
+          setPendingQSOs(prev => prev.filter(p => p._local_id !== pending.local_id));
+          setPendingCount(prev => Math.max(0, prev - 1));
+          setLastLogged(qso as DisplayQSO);
+        } else if (error) {
+          setSubmitError(error);
+        }
       }
+    } finally {
+      setSubmitting(false);
     }
-    setSubmitting(false);
   }, [event.id, event.class, event.arrl_section, operatorCall, stationNumber]);
 
   const deleteQSO = useCallback(async (id: string, localId?: string) => {
@@ -260,6 +276,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             onSubmit={logQSO}
             submitting={submitting}
             lastLogged={lastLogged}
+            submitError={submitError}
           />
           <BandActivity
             eventId={event.id}

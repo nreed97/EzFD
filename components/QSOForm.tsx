@@ -24,11 +24,12 @@ interface Props {
   onSubmit: (data: { callsign: string; band: Band; mode: Mode; rcvd_class: string; rcvd_section: string }) => Promise<void>;
   submitting: boolean;
   lastLogged: DisplayQSO | null;
+  submitError: string | null;
 }
 
 export default function QSOForm({
   eventId, hasQRZ, band, mode, onBandChange, onModeChange,
-  onSubmit, submitting, lastLogged,
+  onSubmit, submitting, lastLogged, submitError,
 }: Props) {
   const [callsign, setCallsign] = useState('');
   const [rcvdClass, setRcvdClass] = useState('');
@@ -85,7 +86,7 @@ export default function QSOForm({
           ref={callRef}
           value={callsign}
           onChange={e => handleCallChange(e.target.value)}
-          placeholder="W1ABC"
+          placeholder="W0NY"
           className="input w-full font-mono text-xl tracking-widest"
           autoComplete="off"
           spellCheck={false}
@@ -207,6 +208,13 @@ export default function QSOForm({
           </datalist>
         </div>
       </div>
+
+      {/* Server error */}
+      {submitError && (
+        <div className="rounded-lg border border-red-800 bg-red-900/30 p-2 text-xs text-red-400">
+          Error: {submitError}
+        </div>
+      )}
 
       {/* Feedback */}
       {lastLogged && (

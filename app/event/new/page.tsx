@@ -84,7 +84,7 @@ export default function NewEventPage() {
                   required
                   value={form.club_call}
                   onChange={e => set('club_call', e.target.value.toUpperCase())}
-                  placeholder="W1ABC"
+                  placeholder="W0NY"
                   className="input font-mono tracking-widest"
                 />
               </label>
@@ -161,7 +161,7 @@ export default function NewEventPage() {
                 <input
                   value={form.qrz_username}
                   onChange={e => set('qrz_username', e.target.value)}
-                  placeholder="W1ABC"
+                  placeholder="W0NY"
                   autoComplete="off"
                   className="input"
                 />
