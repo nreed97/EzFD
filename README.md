@@ -336,7 +336,7 @@ systemctl status snap.certbot.renew.timer
 To add SSL after the initial deploy (e.g. once DNS propagates):
 
 ```bash
-certbot --nginx -d fd.k3abc.org
+certbot --nginx -d fd.w0ny.org
 ```
 
 ---
