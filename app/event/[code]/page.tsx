@@ -54,9 +54,9 @@ export default function EventJoinPage() {
       <div className="w-full max-w-sm">
         <div className="mb-6 text-center">
           <p className="text-sm font-mono text-amber-400 tracking-widest">{code}</p>
-          <h1 className="mt-1 text-2xl font-bold text-zinc-100">{event.club_name}</h1>
-          <p className="text-zinc-400">{event.club_call} &bull; {event.class} &bull; {event.arrl_section}</p>
-          {event.location && <p className="mt-1 text-sm text-zinc-500">{event.location}</p>}
+          <h1 className="mt-1 text-2xl font-bold text-zinc-100 light:text-zinc-900">{event.club_name}</h1>
+          <p className="text-zinc-400 light:text-zinc-600">{event.club_call} &bull; {event.class} &bull; {event.arrl_section}</p>
+          {event.location && <p className="mt-1 text-sm text-zinc-500 light:text-zinc-500">{event.location}</p>}
         </div>
 
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 light:border-zinc-200 light:bg-zinc-50">

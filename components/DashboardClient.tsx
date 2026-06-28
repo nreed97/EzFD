@@ -83,11 +83,11 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
             ← Logger
           </Link>
           <a href={`/api/export/${event.join_code}`}
-            className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10">
+            className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10 light:border-amber-600 light:text-amber-700">
             ADIF
           </a>
           <a href={`/api/export/${event.join_code}?format=cabrillo`}
-            className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10">
+            className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10 light:border-amber-600 light:text-amber-700">
             Cabrillo
           </a>
           <ThemeToggle />
@@ -120,7 +120,7 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
               </div>
               <div className="flex flex-wrap gap-1">
                 {score.sections.map(s => (
-                  <span key={s} className="rounded bg-amber-400/10 px-1.5 py-0.5 font-mono text-xs text-amber-400">
+                  <span key={s} className="rounded bg-amber-400/10 px-1.5 py-0.5 font-mono text-xs text-amber-400 light:bg-amber-50 light:text-amber-700">
                     {s}
                   </span>
                 ))}

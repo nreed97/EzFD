@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { LatLngExpression } from 'leaflet';
@@ -19,10 +19,15 @@ function MapBounds() {
   return null;
 }
 
-function sectionIcon(section: string, worked: boolean) {
-  const bg    = worked ? '#fbbf24' : 'rgba(24,24,27,0.85)';
-  const color = worked ? '#1c1917' : '#52525b';
-  const border = worked ? '#d97706' : '#3f3f46';
+function sectionIcon(section: string, worked: boolean, lightMode: boolean) {
+  let bg: string, color: string, border: string;
+  if (worked) {
+    bg = '#fbbf24'; color = '#1c1917'; border = '#d97706';
+  } else if (lightMode) {
+    bg = 'rgba(255,255,255,0.9)'; color = '#52525b'; border = '#a1a1aa';
+  } else {
+    bg = 'rgba(24,24,27,0.85)'; color = '#52525b'; border = '#3f3f46';
+  }
   const weight = worked ? '700' : '500';
   return L.divIcon({
     className: '',
@@ -51,16 +56,31 @@ function sectionIcon(section: string, worked: boolean) {
 
 export default function MapView({ workedSections }: Props) {
   const workedSet = new Set(workedSections.map(s => s.toUpperCase()));
+  const [lightMode, setLightMode] = useState(false);
+
+  useEffect(() => {
+    setLightMode(document.documentElement.classList.contains('light'));
+    const observer = new MutationObserver(() => {
+      setLightMode(document.documentElement.classList.contains('light'));
+    });
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
+    return () => observer.disconnect();
+  }, []);
+
+  const tileUrl = lightMode
+    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
+    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
 
   return (
     <MapContainer
       center={[39.5, -98.35]}
       zoom={3}
-      style={{ height: '100%', width: '100%', background: '#111' }}
+      style={{ height: '100%', width: '100%', background: lightMode ? '#e8e8e8' : '#111' }}
       zoomControl={true}
     >
       <TileLayer
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        key={tileUrl}
+        url={tileUrl}
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
       />
       <MapBounds />
@@ -71,7 +91,7 @@ export default function MapView({ workedSections }: Props) {
           <Marker
             key={section}
             position={[info.lat, info.lon] as LatLngExpression}
-            icon={sectionIcon(section, worked)}
+            icon={sectionIcon(section, worked, lightMode)}
           >
             <Tooltip>
               <span className="font-mono font-bold">{section}</span>

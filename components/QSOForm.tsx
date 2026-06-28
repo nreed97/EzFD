@@ -14,9 +14,9 @@ const EXTRA_BANDS: Band[] = ['1.25m', '70cm'];
 const MODES: Mode[] = ['PH', 'CW', 'DIG'];
 
 const MODE_STYLE: Record<Mode, string> = {
-  PH:  'bg-blue-400/15 border-blue-400/40 text-blue-400',
-  CW:  'bg-yellow-400/15 border-yellow-400/40 text-yellow-400',
-  DIG: 'bg-green-400/15 border-green-400/40 text-green-400',
+  PH:  'bg-blue-400/15 border-blue-400/40 text-blue-400 light:bg-blue-50 light:border-blue-500 light:text-blue-700',
+  CW:  'bg-yellow-400/15 border-yellow-400/40 text-yellow-400 light:bg-yellow-50 light:border-yellow-600 light:text-yellow-700',
+  DIG: 'bg-green-400/15 border-green-400/40 text-green-400 light:bg-green-50 light:border-green-600 light:text-green-700',
 };
 
 interface Props {
@@ -97,7 +97,7 @@ export default function QSOForm({
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       {/* Callsign */}
       <div>
-        <label className="block text-xs text-zinc-400 mb-1">Callsign</label>
+        <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Callsign</label>
         <input
           ref={callRef}
           value={callsign}
@@ -109,7 +109,7 @@ export default function QSOForm({
         />
         {lookingUp && <p className="mt-1 text-xs text-zinc-500">Looking up…</p>}
         {qrzInfo && !isDupe && (
-          <p className="mt-1 text-xs text-zinc-400">
+          <p className="mt-1 text-xs text-zinc-400 light:text-zinc-600">
             {qrzInfo.name}
             {qrzInfo.state ? ` · ${qrzInfo.state}` : ''}
             {qrzInfo.country && qrzInfo.country !== 'United States' ? ` · ${qrzInfo.country}` : ''}
@@ -125,7 +125,7 @@ export default function QSOForm({
       {/* Exchange */}
       <div className="flex gap-2">
         <div className="w-20">
-          <label className="block text-xs text-zinc-400 mb-1">Rcvd Class</label>
+          <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Rcvd Class</label>
           <input
             value={rcvdClass}
             onChange={e => setRcvdClass(e.target.value.toUpperCase())}
@@ -135,7 +135,7 @@ export default function QSOForm({
           />
         </div>
         <div className="flex-1">
-          <label className="block text-xs text-zinc-400 mb-1">Rcvd Section</label>
+          <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Rcvd Section</label>
           <input
             list="section-list"
             value={rcvdSection}
@@ -163,7 +163,7 @@ export default function QSOForm({
           lastLogged.is_dupe
             ? 'border-yellow-700 bg-yellow-900/30 text-yellow-400'
             : lastLogged._pending
-              ? 'border-zinc-700 bg-zinc-800/50 text-zinc-400'
+              ? 'border-zinc-700 bg-zinc-800/50 text-zinc-400 light:border-zinc-300 light:bg-zinc-100 light:text-zinc-600'
               : 'border-green-800 bg-green-900/20 text-green-400'
         }`}>
           {lastLogged.is_dupe
@@ -183,22 +183,22 @@ export default function QSOForm({
       </button>
 
       {/* QSY drawer */}
-      <div className="border-t border-zinc-800 pt-2">
+      <div className="border-t border-zinc-800 pt-2 light:border-zinc-200">
         <button
           type="button"
           tabIndex={-1}
           onClick={() => setShowQSY(v => !v)}
-          className="flex w-full items-center justify-between rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 hover:border-zinc-500 hover:bg-zinc-750 transition-colors"
+          className="flex w-full items-center justify-between rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 hover:border-zinc-500 hover:bg-zinc-750 transition-colors light:border-zinc-300 light:bg-zinc-100 light:hover:bg-zinc-200 light:hover:border-zinc-400"
         >
           <div className="flex items-center gap-2">
-            <span className="rounded border bg-amber-400/15 border-amber-400/40 px-2.5 py-1 font-mono text-sm font-bold text-amber-400">
+            <span className="rounded border bg-amber-400/15 border-amber-400/40 px-2.5 py-1 font-mono text-sm font-bold text-amber-400 light:bg-amber-50 light:border-amber-600 light:text-amber-700">
               {band}
             </span>
             <span className={`rounded border px-2.5 py-1 font-mono text-sm font-bold ${MODE_STYLE[mode]}`}>
               {mode}
             </span>
           </div>
-          <span className="text-xs font-semibold text-zinc-400 tracking-wide">
+          <span className="text-xs font-semibold text-zinc-400 tracking-wide light:text-zinc-600">
             {showQSY ? '▲ DONE' : '▼ QSY'}
           </span>
         </button>
@@ -215,7 +215,7 @@ export default function QSOForm({
                   className={`rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
                     band === b
                       ? 'bg-amber-400 text-zinc-900'
-                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-200 light:text-zinc-700 light:hover:bg-zinc-300'
                   }`}
                 >
                   {b}
@@ -234,7 +234,7 @@ export default function QSOForm({
                     className={`flex-1 rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
                       band === b
                         ? 'bg-amber-400 text-zinc-900'
-                        : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                        : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-200 light:text-zinc-700 light:hover:bg-zinc-300'
                     }`}
                   >
                     {b}
@@ -244,7 +244,7 @@ export default function QSOForm({
                   type="button"
                   tabIndex={-1}
                   onClick={() => setShowExtra(false)}
-                  className="px-2 text-xs text-zinc-500 hover:text-zinc-300"
+                  className="px-2 text-xs text-zinc-500 hover:text-zinc-300 light:text-zinc-600 light:hover:text-zinc-800"
                 >
                   ↑
                 </button>
@@ -254,13 +254,13 @@ export default function QSOForm({
                 type="button"
                 tabIndex={-1}
                 onClick={() => setShowExtra(true)}
-                className="text-left text-xs text-zinc-600 hover:text-zinc-400"
+                className="text-left text-xs text-zinc-600 hover:text-zinc-400 light:text-zinc-500 light:hover:text-zinc-700"
               >
                 + 1.25m / 70cm
               </button>
             )}
 
-            <div className="flex rounded-lg overflow-hidden border border-zinc-700">
+            <div className="flex rounded-lg overflow-hidden border border-zinc-700 light:border-zinc-300">
               {MODES.map(m => (
                 <button
                   key={m}
@@ -270,7 +270,7 @@ export default function QSOForm({
                   className={`flex-1 py-2 text-sm font-bold transition-colors ${
                     mode === m
                       ? 'bg-amber-400 text-zinc-900'
-                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-100 light:text-zinc-700 light:hover:bg-zinc-200'
                   }`}
                 >
                   {m}

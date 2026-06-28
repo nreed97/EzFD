@@ -24,20 +24,20 @@ function formatUTC(iso: string) {
 }
 
 const MODE_COLORS: Record<string, string> = {
-  PH:  'text-blue-400',
-  CW:  'text-yellow-400',
-  DIG: 'text-green-400',
+  PH:  'text-blue-400 light:text-blue-700',
+  CW:  'text-yellow-400 light:text-yellow-700',
+  DIG: 'text-green-400 light:text-green-700',
 };
 
 const BAND_COLORS: Record<string, string> = {
-  '160m': 'text-rose-400',
-  '80m':  'text-orange-400',
-  '40m':  'text-amber-400',
-  '20m':  'text-lime-400',
-  '15m':  'text-emerald-400',
-  '10m':  'text-cyan-400',
-  '6m':   'text-sky-400',
-  '2m':   'text-violet-400',
+  '160m': 'text-rose-400 light:text-rose-700',
+  '80m':  'text-orange-400 light:text-orange-700',
+  '40m':  'text-amber-400 light:text-amber-700',
+  '20m':  'text-lime-400 light:text-lime-700',
+  '15m':  'text-emerald-400 light:text-emerald-700',
+  '10m':  'text-cyan-400 light:text-cyan-700',
+  '6m':   'text-sky-400 light:text-sky-700',
+  '2m':   'text-violet-400 light:text-violet-700',
 };
 
 // ---------------------------------------------------------------------------
@@ -88,13 +88,13 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
         onClick={e => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-zinc-200">Edit QSO</h3>
-          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 text-lg leading-none">✕</button>
+          <h3 className="text-sm font-semibold text-zinc-200 light:text-zinc-800">Edit QSO</h3>
+          <button onClick={onClose} className="text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700 text-lg leading-none">✕</button>
         </div>
 
         <div className="flex flex-col gap-3">
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Callsign</label>
+            <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Callsign</label>
             <input
               value={callsign}
               onChange={e => setCallsign(e.target.value.toUpperCase().replace(/[^A-Z0-9/]/g, ''))}
@@ -104,7 +104,7 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
           </div>
 
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Band</label>
+            <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Band</label>
             <div className="grid grid-cols-3 gap-1">
               {BAND_GRID.flat().map(b => (
                 <button
@@ -112,7 +112,7 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
                   type="button"
                   onClick={() => setBand(b)}
                   className={`rounded py-1.5 text-xs font-mono font-semibold transition-colors ${
-                    band === b ? 'bg-amber-400 text-zinc-900' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                    band === b ? 'bg-amber-400 text-zinc-900' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-100 light:text-zinc-700 light:hover:bg-zinc-200'
                   }`}
                 >
                   {b}
@@ -122,15 +122,15 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
           </div>
 
           <div>
-            <label className="block text-xs text-zinc-400 mb-1">Mode</label>
-            <div className="flex rounded-lg overflow-hidden border border-zinc-700">
+            <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Mode</label>
+            <div className="flex rounded-lg overflow-hidden border border-zinc-700 light:border-zinc-300">
               {MODES.map(m => (
                 <button
                   key={m}
                   type="button"
                   onClick={() => setMode(m)}
                   className={`flex-1 py-2 text-sm font-bold transition-colors ${
-                    mode === m ? 'bg-amber-400 text-zinc-900' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700'
+                    mode === m ? 'bg-amber-400 text-zinc-900' : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-100 light:text-zinc-700 light:hover:bg-zinc-200'
                   }`}
                 >
                   {m}
@@ -141,7 +141,7 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
 
           <div className="flex gap-2">
             <div className="w-24">
-              <label className="block text-xs text-zinc-400 mb-1">Rcvd Class</label>
+              <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Rcvd Class</label>
               <input
                 value={rcvdClass}
                 onChange={e => setRcvdClass(e.target.value.toUpperCase())}
@@ -150,7 +150,7 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
               />
             </div>
             <div className="flex-1">
-              <label className="block text-xs text-zinc-400 mb-1">Rcvd Section</label>
+              <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Rcvd Section</label>
               <input
                 list="edit-section-list"
                 value={rcvdSection}
@@ -176,7 +176,7 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
             </button>
             <button
               onClick={onClose}
-              className="flex-1 rounded-lg border border-zinc-700 py-2 text-sm text-zinc-300 hover:bg-zinc-800"
+              className="flex-1 rounded-lg border border-zinc-700 py-2 text-sm text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-700 light:hover:bg-zinc-100"
             >
               Cancel
             </button>
@@ -222,16 +222,16 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall }: Pr
             {qsos.map(qso => (
               <tr
                 key={qso._local_id ?? qso.id}
-                className={`border-b border-zinc-800/50 transition-colors ${
+                className={`border-b border-zinc-800/50 light:border-zinc-200 transition-colors ${
                   qso._pending
-                    ? 'bg-yellow-950/20 opacity-70'
+                    ? 'bg-yellow-950/20 light:bg-yellow-50/50 opacity-70'
                     : qso.is_dupe
                       ? 'opacity-40'
-                      : 'hover:bg-zinc-900/50'
+                      : 'hover:bg-zinc-900/50 light:hover:bg-zinc-100'
                 }`}
               >
-                <td className="px-3 py-1.5 font-mono text-xs text-zinc-400">{formatUTC(qso.datetime_utc)}</td>
-                <td className="px-3 py-1.5 font-mono font-semibold text-zinc-100">
+                <td className="px-3 py-1.5 font-mono text-xs text-zinc-400 light:text-zinc-600">{formatUTC(qso.datetime_utc)}</td>
+                <td className="px-3 py-1.5 font-mono font-semibold text-zinc-100 light:text-zinc-900">
                   <span className="flex items-center gap-1.5 flex-wrap">
                     {qso.callsign}
                     {qso._pending && (
@@ -250,9 +250,9 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall }: Pr
                 <td className={`px-3 py-1.5 font-mono text-xs font-bold ${MODE_COLORS[qso.mode] ?? 'text-zinc-300'}`}>
                   {qso.mode}
                 </td>
-                <td className="px-3 py-1.5 font-mono text-xs text-zinc-400">{qso.rcvd_class ?? '—'}</td>
-                <td className="px-3 py-1.5 font-mono text-xs text-zinc-400">{qso.rcvd_section ?? '—'}</td>
-                <td className="px-3 py-1.5 font-mono text-xs text-zinc-500">
+                <td className="px-3 py-1.5 font-mono text-xs text-zinc-400 light:text-zinc-600">{qso.rcvd_class ?? '—'}</td>
+                <td className="px-3 py-1.5 font-mono text-xs text-zinc-400 light:text-zinc-600">{qso.rcvd_section ?? '—'}</td>
+                <td className="px-3 py-1.5 font-mono text-xs text-zinc-500 light:text-zinc-600">
                   {qso.operator_call === currentOpCall
                     ? <span className="text-amber-400">{qso.operator_call}</span>
                     : qso.operator_call ?? '—'}
@@ -262,7 +262,7 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall }: Pr
                     {!qso._pending && (
                       <button
                         onClick={() => setEditingQSO(qso)}
-                        className="text-zinc-600 hover:text-zinc-300 transition-colors text-xs"
+                        className="text-zinc-600 hover:text-zinc-300 light:text-zinc-400 light:hover:text-zinc-700 transition-colors text-xs"
                         title="Edit QSO"
                       >
                         ✎
@@ -274,7 +274,7 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall }: Pr
                           onDelete(qso.id, qso._local_id);
                         }
                       }}
-                      className="text-zinc-700 hover:text-red-400 transition-colors text-xs"
+                      className="text-zinc-700 hover:text-red-400 light:text-zinc-400 transition-colors text-xs"
                       title="Delete QSO"
                     >
                       ✕
@@ -285,7 +285,7 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall }: Pr
             ))}
             {qsos.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-zinc-600">
+                <td colSpan={8} className="px-3 py-8 text-center text-zinc-600 light:text-zinc-400">
                   No QSOs logged yet. Start logging!
                 </td>
               </tr>

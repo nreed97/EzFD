@@ -45,7 +45,7 @@ export default function HomePage() {
               onChange={e => setJoinCode(e.target.value.toUpperCase())}
               placeholder="Join code (e.g. ABC123)"
               maxLength={6}
-              className="rounded-lg border border-zinc-700 bg-zinc-800 px-4 py-2 font-mono text-lg tracking-widest text-zinc-100 placeholder-zinc-500 focus:border-amber-400 focus:outline-none"
+              className="input font-mono text-lg tracking-widest"
               autoComplete="off"
               spellCheck={false}
             />
