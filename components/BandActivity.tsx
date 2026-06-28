@@ -101,7 +101,7 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
   const now = Date.now();
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3">
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 light:border-zinc-200 light:bg-zinc-100/50">
       <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
         Operators
       </h3>

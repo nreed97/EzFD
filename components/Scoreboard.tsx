@@ -8,7 +8,7 @@ interface Props {
 
 export default function Scoreboard({ score }: Props) {
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-xs">
+    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-xs light:border-zinc-200 light:bg-zinc-100/50">
       <h3 className="mb-2 font-semibold text-zinc-400 uppercase tracking-wider text-[10px]">Score</h3>
 
       <div className="grid grid-cols-3 gap-y-1 mb-3">
@@ -26,16 +26,16 @@ export default function Scoreboard({ score }: Props) {
         </div>
       </div>
 
-      <div className="flex items-baseline justify-between border-t border-zinc-800 pt-2 mb-1">
-        <span className="text-zinc-400">QSO pts</span>
-        <span className="font-mono text-zinc-200">{score.qso_points}</span>
+      <div className="flex items-baseline justify-between border-t border-zinc-800 pt-2 mb-1 light:border-zinc-200">
+        <span className="text-zinc-400 light:text-zinc-600">QSO pts</span>
+        <span className="font-mono text-zinc-200 light:text-zinc-800">{score.qso_points}</span>
       </div>
       <div className="flex items-baseline justify-between mb-1">
-        <span className="text-zinc-400">× Sections</span>
-        <span className="font-mono text-zinc-200">{score.sections_worked}</span>
+        <span className="text-zinc-400 light:text-zinc-600">× Sections</span>
+        <span className="font-mono text-zinc-200 light:text-zinc-800">{score.sections_worked}</span>
       </div>
-      <div className="flex items-baseline justify-between border-t border-zinc-700 pt-2">
-        <span className="font-semibold text-zinc-200">Est. Score</span>
+      <div className="flex items-baseline justify-between border-t border-zinc-700 pt-2 light:border-zinc-200">
+        <span className="font-semibold text-zinc-200 light:text-zinc-800">Est. Score</span>
         <span className="font-mono text-lg font-bold text-amber-400">{score.total_score.toLocaleString()}</span>
       </div>
 

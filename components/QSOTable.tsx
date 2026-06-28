@@ -84,7 +84,7 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-sm rounded-xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl"
+        className="w-full max-w-sm rounded-xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl light:border-zinc-200 light:bg-white"
         onClick={e => e.stopPropagation()}
       >
         <div className="mb-4 flex items-center justify-between">
@@ -206,7 +206,7 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall }: Pr
 
       <div className="h-full overflow-auto">
         <table className="w-full text-sm">
-          <thead className="sticky top-0 bg-zinc-950 text-xs text-zinc-500 uppercase">
+          <thead className="sticky top-0 bg-zinc-950 text-xs text-zinc-500 uppercase light:bg-white light:text-zinc-400">
             <tr>
               <th className="px-3 py-2 text-left w-16">UTC</th>
               <th className="px-3 py-2 text-left">Callsign</th>

@@ -59,8 +59,8 @@ export default function EventJoinPage() {
           {event.location && <p className="mt-1 text-sm text-zinc-500">{event.location}</p>}
         </div>
 
-        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6">
-          <h2 className="mb-4 font-semibold text-zinc-200">Sign In as Operator</h2>
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 light:border-zinc-200 light:bg-zinc-50">
+          <h2 className="mb-4 font-semibold text-zinc-200 light:text-zinc-800">Sign In as Operator</h2>
           <form onSubmit={handleJoin} className="flex flex-col gap-3">
             <label className="flex flex-col gap-1">
               <span className="text-sm text-zinc-400">Your Callsign</span>

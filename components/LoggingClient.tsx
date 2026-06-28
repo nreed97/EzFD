@@ -10,6 +10,7 @@ import QSOTable from './QSOTable';
 import Scoreboard from './Scoreboard';
 import BandActivity from './BandActivity';
 import UTCClock from './UTCClock';
+import ThemeToggle from './ThemeToggle';
 
 interface Props {
   event: Event;
@@ -207,8 +208,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const score = calculateScore(confirmedQSOs);
 
   return (
-    <div data-night={nightMode ? 'true' : undefined} className="night-scope flex h-screen flex-col overflow-hidden bg-zinc-950">
-      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-2 flex-shrink-0">
+    <div data-night={nightMode ? 'true' : undefined} className="night-scope flex h-screen flex-col overflow-hidden bg-zinc-950 light:bg-white">
+      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-2 flex-shrink-0 light:border-zinc-200 light:bg-zinc-50">
         <div className="flex items-center gap-3 min-w-0">
           <span className="font-bold text-amber-400 text-lg shrink-0">{event.club_call}</span>
           <span className="text-zinc-600">|</span>
@@ -221,10 +222,10 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
         <div className="flex items-center gap-2 text-sm flex-shrink-0">
           <UTCClock />
           <span className="text-zinc-600 hidden sm:inline">|</span>
-          <span className="text-zinc-400 hidden sm:inline">
-            <span className="text-zinc-200 font-mono font-bold">{score.valid_qsos}</span>
+          <span className="text-zinc-400 hidden sm:inline light:text-zinc-500">
+            <span className="text-zinc-200 font-mono font-bold light:text-zinc-800">{score.valid_qsos}</span>
             <span className="text-zinc-600 mx-1">Q</span>
-            <span className="text-zinc-200 font-mono font-bold">{score.sections_worked}</span>
+            <span className="text-zinc-200 font-mono font-bold light:text-zinc-800">{score.sections_worked}</span>
             <span className="text-zinc-600 mx-1">×</span>
             <span className="text-amber-400 font-mono font-bold">{score.total_score.toLocaleString()}</span>
           </span>
@@ -241,9 +242,11 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             </button>
           )}
 
-          <span className="text-xs text-zinc-500 font-mono hidden md:inline">
+          <span className="text-xs text-zinc-500 font-mono hidden md:inline light:text-zinc-600">
             {operatorCall}
           </span>
+
+          <ThemeToggle />
 
           <button onClick={toggleNight}
             title={nightMode ? 'Exit night mode' : 'Enter night mode (preserves dark adaptation)'}
@@ -256,7 +259,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           </button>
 
           <button onClick={() => router.push(`/event/${event.join_code}/dashboard`)}
-            className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+            className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
             Dashboard
           </button>
 
@@ -274,7 +277,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       </header>
 
       {/* Mobile tab bar */}
-      <div className="flex shrink-0 border-b border-zinc-800 bg-zinc-900 md:hidden">
+      <div className="flex shrink-0 border-b border-zinc-800 bg-zinc-900 md:hidden light:border-zinc-200 light:bg-zinc-50">
         <button
           onClick={() => setMobileTab('log')}
           className={`flex-1 py-2 text-sm font-medium transition-colors ${
@@ -298,7 +301,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className={`${mobileTab === 'log' ? 'flex' : 'hidden'} md:flex w-full md:w-80 flex-col gap-3 overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-4 shrink-0`}>
+        <aside className={`${mobileTab === 'log' ? 'flex' : 'hidden'} md:flex w-full md:w-80 flex-col gap-3 overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-4 shrink-0 light:border-zinc-200 light:bg-zinc-50`}>
           <QSOForm
             eventId={event.id}
             hasQRZ={!!event.qrz_username}
