@@ -5,8 +5,8 @@
 
 @layer components {
   .input {
-    @apply rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-100 placeholder-zinc-500 focus:border-amber-400 focus:outline-none transition-colors text-sm;
-    @apply light:border-zinc-300 light:bg-white light:text-zinc-900 light:placeholder-zinc-400;
+    @apply rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-100 placeholder-zinc-600 focus:border-amber-400 focus:outline-none transition-colors text-sm;
+    @apply light:border-zinc-300 light:bg-white light:text-zinc-900 light:placeholder-zinc-300;
   }
 }
 
