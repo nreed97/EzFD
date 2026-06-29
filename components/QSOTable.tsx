@@ -18,7 +18,7 @@ interface Props {
   currentOpCall: string;
 }
 
-function formatUTC(iso: string) {
+function formatUTC(iso: string | Date) {
   const d = new Date(iso);
   return d.toUTCString().slice(17, 22) + 'Z';
 }

@@ -44,7 +44,7 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
   const score = calculateScore(qsos, bonuses);
   const bonusPoints = calculateBonusPoints(bonuses, score.total_score);
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
-  const recentQSOs = qsos.filter(q => !q.is_dupe && q.datetime_utc > oneHourAgo).length;
+  const recentQSOs = qsos.filter(q => !q.is_dupe && (typeof q.datetime_utc === 'string' ? q.datetime_utc : q.datetime_utc.toISOString()) > oneHourAgo).length;
 
   const opStats: Record<string, { total: number; ph: number; cw: number; dig: number; first: number; last: number }> = {};
   for (const q of qsos) {

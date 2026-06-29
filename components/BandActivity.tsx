@@ -85,7 +85,8 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
   for (const q of qsos) {
     if (q.operator_call && !q._pending) {
       const cur = lastQSOByOp[q.operator_call];
-      if (!cur || q.datetime_utc > cur) lastQSOByOp[q.operator_call] = q.datetime_utc;
+      const dt = typeof q.datetime_utc === 'string' ? q.datetime_utc : q.datetime_utc.toISOString();
+      if (!cur || dt > cur) lastQSOByOp[q.operator_call] = dt;
     }
   }
 
