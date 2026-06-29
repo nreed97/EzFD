@@ -242,7 +242,7 @@ if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='ezfd'"
 fi
 
 # Apply base schema (CREATE TABLE IF NOT EXISTS, triggers — safe to re-run on fresh DB)
-sudo -u postgres psql -d ezfd -f "$REPO_DIR/db/schema.sql" >/dev/null
+sudo -u postgres psql -d ezfd >/dev/null < "$REPO_DIR/db/schema.sql"
 log "Database schema applied"
 
 # ── Schema migrations ─────────────────────────────────────────────────────────
