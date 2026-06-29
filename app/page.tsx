@@ -75,6 +75,15 @@ export default function HomePage() {
 
       <footer className="flex items-center justify-center gap-4 text-xs text-zinc-600 light:text-zinc-400">
         <span>73 de EzFD &bull; Open source Field Day logger</span>
+        <a
+          href="https://github.com/nreed97/EzFD"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="hover:text-zinc-300 light:hover:text-zinc-700 transition-colors"
+          aria-label="View source on GitHub"
+        >
+          GitHub
+        </a>
         <ThemeToggle />
       </footer>
     </main>
