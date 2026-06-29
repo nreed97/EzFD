@@ -68,7 +68,7 @@ menu_pick() {
   local i=1
   for opt in "$@"; do
     printf "  ${BOLD}%2d)${NC}  %s\n" "$i" "$opt"
-    ((i++))
+    (( i++ )) || true
   done
   echo
   local _input=""
