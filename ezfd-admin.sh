@@ -6,7 +6,7 @@
 #   sudo bash ezfd-admin.sh            interactive menu
 #   sudo bash ezfd-admin.sh --json     dump all data as JSON (stdout, pipeable)
 # ─────────────────────────────────────────────────────────────────────────────
-set -euo pipefail
+set -uo pipefail
 IFS=$'\n\t'
 
 # ── Colours ───────────────────────────────────────────────────────────────────
@@ -322,7 +322,7 @@ list_events() {
     if [[ "$choice" -le "${#codes[@]}" ]]; then
       view_event "${codes[$((choice-1))]}"
     else
-      return
+      return 0
     fi
   done
 }
