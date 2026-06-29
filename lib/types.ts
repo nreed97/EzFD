@@ -106,17 +106,20 @@ export const MODE_POINTS: Record<Mode, number> = {
 };
 
 export const ARRL_SECTIONS = [
-  'CT','EMA','ME','NH','RI','VT','WMA',
-  'ENY','NLI','NNJ','NNY','SNJ','WNY',
-  'DE','EPA','MDC','WPA',
-  'AL','GA','KY','NC','NFL','SFL','SC','TN','VA','WCF',
-  'AR','LA','MS','NM','NTX','OK','STX','WTX',
-  'AK','AZ','EWA','ID','MT','NV','OR','UT','WWA','WY',
-  'EB','LAX','ORG','SB','SCV','SDG','SF','SJV','SV','PAC',
-  'MI','OH','WV',
-  'IL','IN','WI',
-  'CO','IA','KS','MN','MO','ND','NE','SD',
-  'AB','BC','MB','NB','NL','NS','NT','ON','PEI','QC','SK','YT',
+  'AB','AK','AL','AR','AZ',
+  'BC','CO','CT',
+  'DE','EB','EMA','ENY','EPA','EWA',
+  'GA','IA','ID','IL','IN',
+  'KS','KY','LA','LAX',
+  'MB','MDC','ME','MI','MN','MO','MS','MT',
+  'NB','NC','ND','NE','NFL','NH','NL','NLI','NM','NNJ','NNY','NS','NT','NTX','NV',
+  'OH','OK','ON','OR','ORG',
+  'PAC','PEI','QC',
+  'RI','SB','SC','SCV','SD','SDG','SF','SFL','SJV','SK','SNJ','STX','SV',
+  'TN','UT',
+  'VA','VT',
+  'WCF','WI','WMA','WNY','WPA','WTX','WV','WWA','WY',
+  'YT',
 ] as const;
 
 export type ARRLSection = typeof ARRL_SECTIONS[number];
