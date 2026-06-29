@@ -201,6 +201,7 @@ view_event() {
     "Export QSOs to CSV  (/tmp/qsos_${code}.csv)" \
     "Export full backup (JSON → /tmp/ezfd_${code}_backup.json)" \
     "Change join code" \
+    "Edit event settings (power / class / section)" \
     "Clear all dupes (mark as non-dupe)" \
     "Delete ALL QSOs for this event" \
     "Delete this event entirely" \
@@ -240,7 +241,64 @@ view_event() {
        fi
        pause ;;
 
-    4) # Clear dupes
+    4) # Edit event settings
+       echo
+       echo -e "  ${BOLD}Edit event settings for ${CYAN}${code}${NC}"
+       echo -e "  ${DIM}Leave a field blank to keep the current value.${NC}"
+       echo
+
+       local cur_power cur_class cur_section
+       IFS='|' read -r cur_power cur_class cur_section < <(PG -c \
+         "SELECT power, class, arrl_section FROM events WHERE id='$uuid';" 2>/dev/null)
+
+       # Power
+       printf "  Current power: ${BOLD}%s${NC}\n" "$cur_power"
+       echo -e "  ${DIM}Options: HIGH, LOW, QRP${NC}"
+       local new_power=""
+       read -rp "$(echo -e "  New power [Enter to keep]: ")" new_power
+       new_power="${new_power^^}"
+       if [[ -n "$new_power" ]]; then
+         if [[ "$new_power" =~ ^(HIGH|LOW|QRP)$ ]]; then
+           PG -c "UPDATE events SET power='$new_power' WHERE id='$uuid';" >/dev/null
+           log "Power updated: ${cur_power} → ${new_power}"
+         else
+           warn "Invalid power — must be HIGH, LOW, or QRP. Skipping."
+         fi
+       fi
+       echo
+
+       # Class
+       printf "  Current class: ${BOLD}%s${NC}\n" "$cur_class"
+       echo -e "  ${DIM}FD examples: 3A, 2B  |  WFD examples: 2O, 1H${NC}"
+       local new_class=""
+       read -rp "$(echo -e "  New class [Enter to keep]: ")" new_class
+       new_class="${new_class^^}"
+       if [[ -n "$new_class" ]]; then
+         if [[ "$new_class" =~ ^[0-9]+[A-Z]+$ ]]; then
+           PG -c "UPDATE events SET class='$new_class' WHERE id='$uuid';" >/dev/null
+           log "Class updated: ${cur_class} → ${new_class}"
+         else
+           warn "Invalid class format (expected number + letters, e.g. 3A). Skipping."
+         fi
+       fi
+       echo
+
+       # ARRL Section
+       printf "  Current section: ${BOLD}%s${NC}\n" "$cur_section"
+       local new_section=""
+       read -rp "$(echo -e "  New section [Enter to keep]: ")" new_section
+       new_section="${new_section^^}"
+       if [[ -n "$new_section" ]]; then
+         if [[ "$new_section" =~ ^[A-Z]{2,5}$ ]]; then
+           PG -c "UPDATE events SET arrl_section='$new_section' WHERE id='$uuid';" >/dev/null
+           log "Section updated: ${cur_section} → ${new_section}"
+         else
+           warn "Invalid section format. Skipping."
+         fi
+       fi
+       pause ;;
+
+    5) # Clear dupes
        local n; n=$(PG -c "SELECT COUNT(*) FROM qsos WHERE event_id='$uuid' AND is_dupe;" 2>/dev/null)
        if [[ "$n" == "0" ]]; then
          warn "No dupes to clear."; pause; return
@@ -253,7 +311,7 @@ view_event() {
        fi
        pause ;;
 
-    5) # Delete all QSOs
+    6) # Delete all QSOs
        local n; n=$(PG -c "SELECT COUNT(*) FROM qsos WHERE event_id='$uuid';" 2>/dev/null)
        if confirm_danger "This will permanently delete ALL ${n} QSOs for event ${code}."; then
          PG -c "DELETE FROM qsos WHERE event_id='$uuid';" >/dev/null
@@ -263,7 +321,7 @@ view_event() {
        fi
        pause ;;
 
-    6) # Delete event
+    7) # Delete event
        if confirm_danger "This will permanently delete event ${code} AND all its QSOs."; then
          PG -c "DELETE FROM events WHERE id='$uuid';" >/dev/null
          log "Event ${code} deleted."
@@ -273,11 +331,11 @@ view_event() {
          warn "Cancelled."; pause
        fi ;;
 
-    7) return ;;
+    8) return 0 ;;
   esac
 
   # Re-show detail after action (unless deleted)
-  [[ "$choice" != "6" ]] && view_event "$code"
+  [[ "$choice" != "7" ]] && view_event "$code"
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
