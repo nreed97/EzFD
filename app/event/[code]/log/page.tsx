@@ -15,7 +15,7 @@ export default async function LogPage({
 
   const { rows: evRows } = await pool.query(
     `SELECT id, join_code, club_name, club_call, event_year, class, arrl_section,
-            location, qrz_username, created_at
+            event_type, power, location, qrz_username, created_at
      FROM events WHERE join_code=$1`,
     [code.toUpperCase()]
   );
