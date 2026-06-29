@@ -13,47 +13,65 @@ A real-time, multi-operator ARRL Field Day logging application built for amateur
 | **Multi-op, real-time log** | Every QSO appears on all connected devices within milliseconds via PostgreSQL `pg_notify` + Server-Sent Events |
 | **Offline tolerance** | QSOs are written to `localStorage` first and synced when connectivity restores — nothing is lost on a flaky WiFi link |
 | **Band activity panel** | See which band/mode each station is currently using; conflict warnings when two stations select the same band/mode |
-| **Live UTC clock** | Seconds-precision UTC display in the logger header |
-| **Night mode** | One-click dim (35% brightness + warm tone) to preserve dark adaptation during nighttime Field Day operations |
-| **Light/Dark theme** | Toggle between light and dark UI themes; preference is saved across sessions |
-| **QRZ callsign lookup** | Auto-fills name and state from QRZ.com XML API using a single shared club account (optional) |
-| **Scoring** | Live PH/CW/Digital QSO counts, section multiplier, and estimated score per ARRL Field Day rules |
-| **Section map + grid** | Leaflet map with all ARRL/RAC sections plotted; worked sections glow amber. Toggle to a section grid for an at-a-glance view of what you're missing |
-| **Dupe checking** | Server-side duplicate detection (same callsign + band + mode); dupes are logged but flagged and excluded from scoring |
+| **WSJT-X / JTDX relay** | Download a self-contained `.bat` file that watches your ADIF log and auto-submits new digital QSOs to the server — no manual entry |
+| **ADIF import** | Bulk-import QSOs from any `.adi` file; dupes are detected and flagged automatically |
+| **Callsign validation** | QSO form warns on unusual callsign patterns before logging |
+| **QRZ callsign lookup** | Auto-fills name and state from QRZ.com XML API using a shared club account (optional); credentials encrypted at rest with AES-256-GCM |
+| **Dupe checking** | Server-side duplicate detection (same callsign + band + mode); dupes are logged, flagged, and excluded from scoring |
 | **QSO editing** | Edit any logged QSO inline; dupe status is re-evaluated automatically |
-| **ADIF export** | Download a standard `.adi` file for upload to ARRL or any log management tool |
-| **Cabrillo export** | Download a Cabrillo 3.0 `.log` file for direct contest submission |
-| **One-command deploy** | `deploy.sh` installs all dependencies, configures systemd + nginx, and provisions SSL on any Ubuntu/Debian VPS |
+| **Bonus point tracker** | Track all 17 ARRL Field Day bonus categories including emergency power (doubles base score), GOTA, W1AW, satellite, youth ops, and more |
+| **Live scoring** | PH/CW/Digital QSO counts, section multiplier, base score, bonus points, and claimed score — all updated in real time |
+| **Dashboard — Map** | Leaflet map with all ARRL/RAC sections plotted; worked sections glow amber |
+| **Dashboard — Sections** | Grid of all sections grouped by call district; worked sections highlighted amber |
+| **Dashboard — Sections Needed** | Unworked sections grouped by call district with worked ones struck through — the hunt list |
+| **Dashboard — Rate chart** | Hourly QSO rate bar chart; zero hours shown as hairlines so contest gaps are visible |
+| **Dashboard — Band breakdown** | Band × PH/CW/DIG matrix sorted by points |
+| **Summary sheet** | Printable ARRL-style summary with QSO table, score calculation, active bonus line items, sections worked, and operator list |
+| **Operator stats** | Per-operator QSO count, Q/hr (over their operating window), and PH/CW/DIG mode split |
+| **Night mode** | One-click dim (35% brightness + warm tone) to preserve dark adaptation during nighttime operations |
+| **Light/Dark theme** | Toggle between light and dark UI themes; preference is saved across sessions |
+| **PWA / installable** | Add to home screen on Android/iOS or install as a desktop app via Chrome — works offline for the logging UI |
+| **ADIF + Cabrillo export** | Download standard `.adi` or Cabrillo 3.0 `.log` for ARRL submission or LoTW upload |
+| **One-command deploy** | `deploy.sh` installs all dependencies, generates secrets, configures systemd + nginx, and provisions SSL on any Ubuntu/Debian VPS |
 
 ---
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│  Browser (any device on the network)                │
-│                                                     │
-│  ┌──────────────┐   ┌────────────────────────────┐  │
-│  │  Logger UI   │   │   Dashboard (map + stats)  │  │
-│  │  (Next.js)   │   │   (Next.js + Leaflet)      │  │
-│  └──────┬───────┘   └────────────┬───────────────┘  │
-│         │ EventSource SSE        │ EventSource SSE  │
-└─────────┼────────────────────────┼──────────────────┘
-          │                        │
-┌─────────▼────────────────────────▼──────────────────┐
-│  Next.js App (Node.js standalone, port 3000)        │
-│                                                     │
-│  API routes: /api/events  /api/qso  /api/presence   │
-│              /api/realtime/[eventId]  (SSE)         │
-│              /api/qrz  /api/export/[code]           │
-└─────────────────────────┬───────────────────────────┘
-                          │ pg (node-postgres)
-┌─────────────────────────▼───────────────────────────┐
-│  PostgreSQL 16                                      │
-│                                                     │
-│  tables: events · qsos · presence                  │
-│  trigger: qso_notify → pg_notify("qsos_<eventId>") │
-└─────────────────────────────────────────────────────┘
+┌────────────────────────────────────────────────────────────────┐
+│  Browser / PWA (any device on the network)                     │
+│                                                                 │
+│  ┌──────────────────┐   ┌────────────────────────────────────┐  │
+│  │   Logger UI      │   │  Dashboard (map + charts + stats)  │  │
+│  │   (Next.js)      │   │  (Next.js + Leaflet)               │  │
+│  └────────┬─────────┘   └──────────────┬─────────────────────┘  │
+│           │ EventSource SSE             │ EventSource SSE        │
+└───────────┼─────────────────────────────┼────────────────────────┘
+            │                             │
+┌───────────▼─────────────────────────────▼────────────────────────┐
+│  Next.js App (Node.js standalone, port 3000)                     │
+│                                                                   │
+│  /api/events    /api/qso    /api/presence    /api/qrz             │
+│  /api/realtime/[eventId]  (SSE)                                   │
+│  /api/export/[code]  /api/import/adif                             │
+│  /api/events/[code]/bonuses                                       │
+│  /api/download/relay  /api/download/wsjtx-bridge                  │
+└──────────────────────────┬────────────────────────────────────────┘
+                           │ pg (node-postgres)
+┌──────────────────────────▼────────────────────────────────────────┐
+│  PostgreSQL 16                                                    │
+│                                                                   │
+│  tables: events · qsos · presence                                 │
+│  trigger: qso_notify → pg_notify("qsos_<eventId>")               │
+└───────────────────────────────────────────────────────────────────┘
+
+  Windows machine (optional)
+  ┌──────────────────────────────────────────────────┐
+  │  WSJT-X / JTDX  →  wsjtx_log.adi                │
+  │  ezfd-wsjt-relay.bat (FileSystemWatcher)         │
+  │      → POST /api/qso  (join_code auth)           │
+  └──────────────────────────────────────────────────┘
 ```
 
 **Real-time flow:** When any operator logs a QSO, the server inserts the row. A PostgreSQL trigger immediately calls `pg_notify`. The SSE endpoint (`/api/realtime/[eventId]`) has an active `LISTEN` connection to the database and pushes the payload to every connected browser as an `event: qso` message. No polling, no third-party realtime service.
@@ -64,7 +82,7 @@ A real-time, multi-operator ARRL Field Day logging application built for amateur
 
 ## Deploying to a VPS
 
-`deploy.sh` is a single interactive script that turns a fresh Ubuntu or Debian server into a fully configured EzFD instance. It installs every dependency, configures PostgreSQL, builds the app, registers a systemd service, writes an nginx reverse-proxy config, and optionally provisions a Let's Encrypt TLS certificate.
+`deploy.sh` is a single interactive script that turns a fresh Ubuntu or Debian server into a fully configured EzFD instance. It installs every dependency, generates secrets, configures PostgreSQL, builds the app, registers a systemd service, writes an nginx reverse-proxy config, and optionally provisions a Let's Encrypt TLS certificate.
 
 **Supported:** Ubuntu 22.04 LTS, Ubuntu 24.04 LTS, Debian 12. Run as root or via `sudo`.
 
@@ -100,9 +118,12 @@ sudo bash deploy.sh
 
 The script will prompt you for:
 
-- **Domain name** — e.g. `fd.k3abc.org`. Leave blank to access the app by IP address.
+- **Domain name** — e.g. `fd.k3abc.org`. Leave blank to access by IP address.
 - **Email address** — used by Let's Encrypt for certificate expiry notices. Leave blank to skip SSL.
-- **PostgreSQL password** — press Enter to auto-generate a strong password.
+- **PostgreSQL password** — press Enter to auto-generate.
+- **Admin key** — optional. If set, this key must be entered when creating a new event, preventing unauthorised event creation on a public-facing server. Leave blank to allow open event creation.
+
+The script also auto-generates an `EZFD_ENCRYPTION_KEY` (AES-256-GCM, 32 bytes) on first run and preserves it on subsequent updates. This key encrypts QRZ credentials in the database.
 
 A summary is shown before any changes are made. The full deployment (including `npm run build`) takes about 3–5 minutes.
 
@@ -112,7 +133,7 @@ The script prints the URL when it finishes. Navigate to it from any device.
 
 ### Updating
 
-Pull the latest code and re-run the script. It detects the existing installation, skips package setup, rebuilds the app, and restarts the service — database and config are preserved.
+Pull the latest code and re-run the script. It detects the existing installation, skips package setup, rebuilds the app, and restarts the service — database, secrets, and config are preserved.
 
 ```bash
 git pull && sudo bash deploy.sh
@@ -126,8 +147,9 @@ git pull && sudo bash deploy.sh
 
 1. Open the app and click **Create Event**.
 2. Fill in your club name, callsign, Field Day class (e.g. `3A`), and ARRL section.
-3. Optionally enter QRZ.com credentials — a single XML-subscription account shared by all operators during the event.
-4. Click **Create Event & Get Join Code**. You will receive a 6-character join code (e.g. `W3K7RZ`).
+3. Optionally enter QRZ.com credentials — a single XML-subscription account shared by all operators during the event. Credentials are encrypted at rest with AES-256-GCM.
+4. If the server has an admin key configured, enter it in the **Admin Key** field.
+5. Click **Create Event & Get Join Code**. You will receive a 6-character join code (e.g. `HBDAXF`).
 
 ### Joining an Event
 
@@ -143,33 +165,69 @@ No account or password is required for operators.
 
 The logging screen is laid out for speed:
 
-- **Callsign field** is always focused. Type the callsign — if QRZ is configured it auto-fills name and state after a short pause.
+- **Callsign field** is always focused. Type the callsign — if QRZ is configured it auto-fills name and state after a short pause. An orange warning appears for unusual callsign formats.
 - **Exchange fields** — received class (e.g. `2A`) and section (e.g. `NE`). The section field has autocomplete for all ARRL/RAC sections.
 - Press **Enter** or click **Log QSO** to submit.
 - Use the **▼ QSY** button at the bottom to change band or mode.
 
 Duplicate contacts (same callsign + band + mode) are flagged with a `dupe` badge in the log and excluded from scoring, but still stored.
 
+On mobile, the tab bar shows the current score and your operator callsign. Tap the callsign to change operator.
+
 ### Band Activity Panel
 
 The sidebar shows every active operator's current band and mode (updated in real-time). A **red row with `!`** means that station is on the same band and mode as you — a potential source of interference. Operators inactive for more than 15 minutes are greyed out.
 
-### Night Mode
+### WSJT-X / JTDX Relay
 
-Click **☾ Night** in the header. The entire logger dims to approximately 35% brightness with a warm tone to protect dark adaptation. Click **☀ Day** to restore normal brightness.
+For digital operation, EzFD can watch your WSJT-X or JTDX log file and submit new QSOs automatically:
+
+1. In the logger, click the **WSJT-X/JTDX** button (or select DIG mode and click the banner).
+2. Click **Download Relay Script** to get `ezfd-wsjt-relay.bat`.
+3. Double-click the `.bat` file on the Windows machine running WSJT-X/JTDX.
+
+The script requires no installation — it uses PowerShell built into Windows 10/11. It watches `wsjtx_log.adi` for new records and posts each QSO to the server using your join code. Leave the window open while operating; close it when done.
+
+### ADIF Import
+
+To bulk-import QSOs from WSJT-X, JTDX, or any other logger:
+
+1. In the logger header, click **Import ADIF**.
+2. Select your `.adi` file.
+3. QSOs are imported with dupe detection; already-logged contacts are skipped.
 
 ### Dashboard
 
-Click **Dashboard** from the logger to open the metrics view:
+Click **Dashboard** from the logger to open the metrics view. Five tabs:
 
-- **Map view** — all ARRL/RAC sections as labeled markers on a world map; worked ones glow amber. Hover for section name.
-- **Sections view** — grid of all sections grouped by call district; worked sections highlighted amber. Good for spotting which sections you're missing.
-- **Rate** — QSOs logged in the last 60 minutes.
-- **Score** — PH/CW/Digital breakdown, section count, and estimated score.
-- **Sections worked** — chip list of every worked section abbreviation.
-- **Operator breakdown** — QSO count per operator callsign.
+| Tab | Contents |
+|---|---|
+| **Map** | All ARRL/RAC sections as markers on a world map; worked sections glow amber |
+| **Sections** | Grid of all sections grouped by call district; worked sections highlighted |
+| **Needed** | Unworked sections in red grouped by call district; worked ones struck through |
+| **Rate** | Hourly QSO rate bar chart for the full contest period |
+| **Bands** | Band × PH/CW/DIG matrix sorted by points descending |
 
-The dashboard receives the same SSE stream as the logger and updates in real-time.
+The sidebar shows live rate (QSOs in the last 60 minutes), score breakdown, bonus tracker, sections worked, and per-operator stats.
+
+### Bonus Tracker
+
+In the dashboard sidebar, click **Bonuses** to expand the tracker. Check boxes or enter counts for each applicable bonus:
+
+- **Emergency power** — doubles the entire base score (100% bonus)
+- **W1AW bulletin, Satellite QSO, Natural power, Public info table** — +100 pts each
+- **Media publicity, Educational activity, Message to SM, 100% licensed** — +100 pts each
+- **Elected official visit, Web posting, Social media** — +50 pts each
+- **Safety officer** — +25 pts
+- **Youth operators** — +20 pts each
+- **GOTA QSOs** — +10 pts each (capped at 1,000)
+- **Served agency reps, NTS messages** — +10 pts each (capped at 100)
+
+Changes save immediately. The Scoreboard updates to show Base Score, Bonus Points, and Claimed Score.
+
+### Summary Sheet
+
+Click **Summary** in the dashboard header to open a printable ARRL-style summary sheet showing the full QSO table, score calculation with bonus line items, sections worked, and operator list. Click **Print** to send it to your printer or save as PDF.
 
 ### Exporting
 
@@ -193,12 +251,14 @@ sudo nano /opt/ezfd/.env
 sudo systemctl restart ezfd
 ```
 
-| Variable | Description |
-|---|---|
-| `DATABASE_URL` | PostgreSQL connection string — `postgresql://ezfd:<password>@localhost/ezfd` |
-| `NODE_ENV` | Always `production` in deployed installs |
-| `PORT` | App port (default `3000`; nginx proxies from 80/443) |
-| `HOSTNAME` | Bind address — `127.0.0.1` so the app is only reachable via nginx |
+| Variable | Required | Description |
+|---|---|---|
+| `DATABASE_URL` | Yes | PostgreSQL connection string — `postgresql://ezfd:<password>@localhost/ezfd` |
+| `EZFD_ENCRYPTION_KEY` | Yes | 64-char hex string (32 bytes). AES-256-GCM key for QRZ credential encryption. Auto-generated by `deploy.sh`. Generate manually: `openssl rand -hex 32` |
+| `EZFD_ADMIN_KEY` | No | If set, this key must be submitted when creating a new event. Prevents unauthorised event creation on public servers. |
+| `NODE_ENV` | Yes | Always `production` in deployed installs |
+| `PORT` | Yes | App port (default `3000`; nginx proxies from 80/443) |
+| `HOSTNAME` | Yes | Bind address — `127.0.0.1` so the app is only reachable via nginx |
 
 ### External PostgreSQL
 
@@ -208,7 +268,7 @@ To use an existing PostgreSQL server, set `DATABASE_URL` to point at it and appl
 psql "$DATABASE_URL" -f db/schema.sql
 ```
 
-PostgreSQL 14 or newer is required (uses `gen_random_uuid()`, `pg_notify`, and `ON CONFLICT DO UPDATE`).
+PostgreSQL 14 or newer is required (uses `gen_random_uuid()`, `pg_notify`, and `pgcrypto`).
 
 ---
 
@@ -231,7 +291,11 @@ Create `.env.local`:
 
 ```env
 DATABASE_URL=postgresql://postgres:password@localhost:5432/ezfd_dev
+EZFD_ENCRYPTION_KEY=<output of: openssl rand -hex 32>
+# EZFD_ADMIN_KEY=optional
 ```
+
+`EZFD_ENCRYPTION_KEY` is required to save QRZ credentials. Without it, event creation with a QRZ password will return an error.
 
 Initialise the schema:
 
@@ -252,43 +316,67 @@ Open `http://localhost:3000`.
 ```
 EzFD/
 ├── app/
-│   ├── page.tsx                    # Landing page (join / create event)
+│   ├── page.tsx                        # Landing page (join / create event)
+│   ├── layout.tsx                      # Root layout — metadata, PWA tags, SW registrar
 │   ├── event/
-│   │   ├── new/page.tsx            # Create event form
+│   │   ├── new/page.tsx                # Create event form (with admin key field)
 │   │   └── [code]/
-│   │       ├── page.tsx            # Operator sign-in gate
-│   │       ├── log/page.tsx        # Main logging view (server → LoggingClient)
-│   │       └── dashboard/page.tsx  # Metrics + map (server → DashboardClient)
+│   │       ├── page.tsx                # Operator sign-in gate
+│   │       ├── log/page.tsx            # Main logging view (server → LoggingClient)
+│   │       └── dashboard/page.tsx      # Metrics + map (server → DashboardClient)
 │   └── api/
-│       ├── events/                 # POST create event, GET by join code
-│       ├── qso/                    # POST log QSO, GET list, PATCH/DELETE by id
-│       ├── presence/               # GET/POST band-activity presence
-│       ├── realtime/[eventId]/     # SSE stream (pg_notify → EventSource)
-│       ├── qrz/                    # QRZ.com callsign lookup proxy
-│       └── export/[code]/          # ADIF + Cabrillo download (?format=cabrillo)
+│       ├── events/
+│       │   ├── route.ts                # POST create event (admin key check + QRZ encryption)
+│       │   └── [code]/
+│       │       ├── route.ts            # GET event by join code
+│       │       └── bonuses/route.ts    # PATCH bonus point tracker state
+│       ├── qso/
+│       │   ├── route.ts                # POST log QSO (accepts join_code or event_id)
+│       │   └── [id]/route.ts           # PATCH edit QSO, DELETE remove QSO
+│       ├── presence/route.ts           # GET/POST band-activity presence (15-min TTL)
+│       ├── realtime/[eventId]/route.ts # SSE stream (pg_notify → EventSource)
+│       ├── qrz/route.ts                # QRZ.com callsign lookup proxy
+│       ├── export/[code]/route.ts      # ADIF + Cabrillo download (?format=cabrillo)
+│       ├── import/adif/route.ts        # POST bulk ADIF import
+│       └── download/
+│           ├── relay/route.ts          # GET self-contained WSJT-X relay .bat file
+│           └── wsjtx-bridge/route.ts   # GET Node.js bridge script (alternative relay)
 ├── components/
-│   ├── LoggingClient.tsx           # Full logging UI (client component)
-│   ├── DashboardClient.tsx         # Dashboard UI (client component)
-│   ├── QSOForm.tsx                 # QSO entry form with QSY drawer
-│   ├── QSOTable.tsx                # Real-time log table with edit + delete
-│   ├── Scoreboard.tsx              # Score breakdown widget
-│   ├── BandActivity.tsx            # Other-station band/mode conflict panel
-│   ├── MapView.tsx                 # Leaflet map (dynamic import, no SSR)
-│   ├── SectionGrid.tsx             # Section grid grouped by call district
-│   ├── ThemeToggle.tsx             # Light/dark theme toggle
-│   └── UTCClock.tsx                # Live UTC clock (1s resolution)
+│   ├── LoggingClient.tsx               # Full logging UI (client component)
+│   ├── DashboardClient.tsx             # Dashboard UI with 5-tab view (client component)
+│   ├── QSOForm.tsx                     # QSO entry form with callsign validation + QSY drawer
+│   ├── QSOTable.tsx                    # Real-time log table with inline edit + delete
+│   ├── Scoreboard.tsx                  # Score breakdown (base score, bonuses, claimed score)
+│   ├── BandActivity.tsx                # Other-station band/mode conflict panel
+│   ├── BonusTracker.tsx                # 17-category ARRL bonus tracker with PATCH save
+│   ├── RateChart.tsx                   # Hourly QSO rate bar chart (pure CSS)
+│   ├── BandBreakdown.tsx               # Band × PH/CW/DIG matrix sorted by points
+│   ├── SectionsNeeded.tsx              # Unworked sections hunt list grouped by district
+│   ├── SummarySheet.tsx                # Printable ARRL summary sheet modal
+│   ├── MapView.tsx                     # Leaflet section map (dynamic import, no SSR)
+│   ├── SectionGrid.tsx                 # Section grid grouped by call district
+│   ├── AdifImport.tsx                  # Bulk ADIF import modal
+│   ├── WsjtxSetupHelp.tsx              # WSJT-X relay download + setup instructions modal
+│   ├── SwRegistrar.tsx                 # PWA service worker registration (client component)
+│   ├── ThemeToggle.tsx                 # Light/dark theme toggle
+│   └── UTCClock.tsx                    # Live UTC clock (1s resolution)
 ├── lib/
-│   ├── db.ts                       # pg Pool singleton
-│   ├── types.ts                    # Shared TypeScript types + band/mode constants
-│   ├── scoring.ts                  # Field Day score calculation
-│   ├── adif.ts                     # ADIF file generation
-│   ├── cabrillo.ts                 # Cabrillo 3.0 file generation
-│   ├── offline-queue.ts            # localStorage QSO queue for offline tolerance
-│   ├── qrz.ts                      # QRZ XML API client with session caching
-│   └── sections.ts                 # ARRL/RAC section names + map coordinates
+│   ├── db.ts                           # pg Pool singleton
+│   ├── types.ts                        # Shared TypeScript types + ARRL sections constant
+│   ├── scoring.ts                      # Field Day score + bonus calculation
+│   ├── crypto.ts                       # AES-256-GCM encrypt/decrypt for DB fields
+│   ├── adif.ts                         # ADIF file generation
+│   ├── cabrillo.ts                     # Cabrillo 3.0 file generation
+│   ├── offline-queue.ts                # localStorage QSO queue for offline tolerance
+│   ├── qrz.ts                          # QRZ XML API client with session caching + decryption
+│   └── sections.ts                     # ARRL/RAC section names + map coordinates
 ├── db/
-│   └── schema.sql                  # Database schema, indexes, pg_notify trigger
-└── deploy.sh                       # VPS deployment script (Ubuntu/Debian)
+│   └── schema.sql                      # Schema, indexes, pg_notify trigger, idempotent migrations
+├── public/
+│   ├── manifest.json                   # PWA manifest (standalone display, amber theme)
+│   ├── sw.js                           # Service worker (cache-first static, network-first pages)
+│   └── icons/icon.svg                  # App icon (amber rounded rect, "FD" text)
+└── deploy.sh                           # VPS deployment script (Ubuntu/Debian)
 ```
 
 ---
@@ -315,6 +403,8 @@ pg_dump -U ezfd ezfd | gzip > ezfd_$(date +%Y%m%d).sql.gz
 # Restore (to a fresh database)
 gunzip -c ezfd_20260628.sql.gz | psql -U ezfd ezfd
 ```
+
+> **Important:** The `EZFD_ENCRYPTION_KEY` in `/opt/ezfd/.env` is required to decrypt QRZ credentials after a restore. Keep a copy of that file in a safe place alongside your database backup.
 
 ### nginx notes
 
@@ -351,11 +441,11 @@ EzFD calculates scores per the current ARRL Field Day rules:
 | CW | 2 |
 | Digital (DIG) | 2 |
 
-**Multiplier:** number of unique ARRL/RAC sections worked (maximum 84 including all Canadian provinces/territories).
+**Base score = total QSO points × sections worked** (maximum 84 sections including all Canadian provinces/territories).
 
-**Estimated score = total QSO points × sections worked**
+**Claimed score = base score + bonus points**
 
-Bonus points (GOTA station, W1AW contact, satellite QSO, emergency power, public information table, etc.) are not currently tracked. The score displayed is a floor — your actual submitted score will be higher after accounting for applicable bonuses.
+Bonus points are tracked in the dashboard's Bonus Tracker panel. The most significant bonus is **Emergency Power** which doubles the entire base score. All 17 ARRL Field Day bonus categories are supported.
 
 ---
 
