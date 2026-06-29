@@ -64,8 +64,8 @@ export default function SummarySheet({ event, score, bonuses, operators, onClose
 
             <div className="flex items-center justify-between border-b border-zinc-800 light:border-zinc-200 px-5 py-4">
               <div>
-                <h2 className="font-bold text-zinc-100 light:text-zinc-900">Field Day Summary Sheet</h2>
-                <p className="text-xs text-zinc-500 mt-0.5">ARRL Field Day {event.event_year}</p>
+                <h2 className="font-bold text-zinc-100 light:text-zinc-900">{event.event_type === 'WFD' ? 'Winter Field Day' : 'Field Day'} Summary Sheet</h2>
+                <p className="text-xs text-zinc-500 mt-0.5">{event.event_type === 'WFD' ? 'Winter Field Day' : 'ARRL Field Day'} {event.event_year}</p>
               </div>
               <div className="flex gap-2 print:hidden">
                 <button

@@ -9,7 +9,7 @@ function generateJoinCode(): string {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { club_name, club_call, event_year, class: fdClass, arrl_section, location, qrz_username, qrz_password, admin_key } = body;
+  const { club_name, club_call, event_year, class: fdClass, arrl_section, location, qrz_username, qrz_password, admin_key, event_type } = body;
 
   if (!club_name || !club_call || !fdClass || !arrl_section) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -45,8 +45,8 @@ export async function POST(request: Request) {
 
   const { rows } = await pool.query(
     `INSERT INTO events
-       (join_code, club_name, club_call, event_year, class, arrl_section, location, qrz_username, qrz_password)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9)
+       (join_code, club_name, club_call, event_year, class, arrl_section, location, qrz_username, qrz_password, event_type)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)
      RETURNING id, join_code`,
     [
       join_code,
@@ -58,6 +58,7 @@ export async function POST(request: Request) {
       location?.trim() ?? null,
       qrz_username?.trim() ?? null,
       encryptedPassword,
+      event_type === 'WFD' ? 'WFD' : 'FD',
     ]
   );
 

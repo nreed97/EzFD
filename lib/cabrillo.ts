@@ -44,7 +44,7 @@ export function generateCabrillo(event: Event, qsos: QSO[]): string {
   const header = [
     'START-OF-LOG: 3.0',
     `CALLSIGN: ${event.club_call}`,
-    `CONTEST: ARRL-FD`,
+    `CONTEST: ${event.event_type === 'WFD' ? 'WFD' : 'ARRL-FD'}`,
     `CATEGORY-OPERATOR: MULTI-OP`,
     `CATEGORY-BAND: ALL`,
     `CATEGORY-POWER: HIGH`,

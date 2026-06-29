@@ -27,6 +27,7 @@ export interface Event {
   club_name: string;
   club_call: string;
   event_year: number;
+  event_type: 'FD' | 'WFD';
   class: string;
   arrl_section: string;
   location: string | null;

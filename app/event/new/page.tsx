@@ -14,8 +14,15 @@ const FD_CLASS_LETTERS = [
   { value: 'F', label: 'F — EOC emergency power' },
 ];
 
+const WFD_CLASS_LETTERS = [
+  { value: 'H', label: 'H — Home station' },
+  { value: 'O', label: 'O — Outdoor/portable' },
+  { value: 'I', label: 'I — Indoor/club' },
+];
+
 export default function NewEventPage() {
   const router = useRouter();
+  const [eventType, setEventType] = useState<'FD' | 'WFD'>('FD');
   const [classNum, setClassNum] = useState(3);
   const [classLetter, setClassLetter] = useState('A');
   const [form, setForm] = useState({
@@ -43,7 +50,7 @@ export default function NewEventPage() {
     const res = await fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, class: `${classNum}${classLetter}`, admin_key: form.admin_key }),
+      body: JSON.stringify({ ...form, class: `${classNum}${classLetter}`, admin_key: form.admin_key, event_type: eventType }),
     });
 
     const data = await res.json();
@@ -105,11 +112,33 @@ export default function NewEventPage() {
         </div>
 
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
-          <h2 className="mb-4 font-semibold text-zinc-300 light:text-zinc-700">Field Day Setup</h2>
+          <h2 className="mb-4 font-semibold text-zinc-300 light:text-zinc-700">Event Setup</h2>
           <div className="flex flex-col gap-3">
+            <fieldset className="flex flex-col gap-1">
+              <span className="text-sm text-zinc-400">Event Type</span>
+              <div className="flex gap-2">
+                {(['FD', 'WFD'] as const).map(type => (
+                  <button
+                    key={type}
+                    type="button"
+                    onClick={() => {
+                      setEventType(type);
+                      setClassLetter(type === 'WFD' ? 'H' : 'A');
+                    }}
+                    className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
+                      eventType === type
+                        ? 'border-amber-400 bg-amber-400/10 text-amber-400'
+                        : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 light:border-zinc-300 light:text-zinc-600'
+                    }`}
+                  >
+                    {type === 'FD' ? 'ARRL Field Day' : 'Winter Field Day'}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <div className="flex flex-col gap-3 sm:flex-row">
               <fieldset className="flex flex-1 flex-col gap-1">
-                <span className="text-sm text-zinc-400">FD Class</span>
+                <span className="text-sm text-zinc-400">{eventType === 'WFD' ? 'WFD' : 'FD'} Class</span>
                 <div className="flex">
                   <input
                     type="number"
@@ -126,7 +155,7 @@ export default function NewEventPage() {
                     className="input flex-1 rounded-l-none"
                     aria-label="Class letter"
                   >
-                    {FD_CLASS_LETTERS.map(({ value, label }) => (
+                    {(eventType === 'WFD' ? WFD_CLASS_LETTERS : FD_CLASS_LETTERS).map(({ value, label }) => (
                       <option key={value} value={value}>{label}</option>
                     ))}
                   </select>
