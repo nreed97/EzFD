@@ -114,9 +114,9 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
             // Me first, then by last QSO recency
             if (a.op_call === myOpCall) return -1;
             if (b.op_call === myOpCall) return 1;
-            const aLast = lastQSOByOp[a.op_call] ?? '';
-            const bLast = lastQSOByOp[b.op_call] ?? '';
-            return bLast.localeCompare(aLast);
+            const aLast = typeof lastQSOByOp[a.op_call] === 'string' ? lastQSOByOp[a.op_call] : '';
+            const bLast = typeof lastQSOByOp[b.op_call] === 'string' ? lastQSOByOp[b.op_call] : '';
+            return bLast > aLast ? -1 : bLast < aLast ? 1 : 0;
           })
           .map(s => {
             const isMe = s.op_call === myOpCall;
