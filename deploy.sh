@@ -80,17 +80,19 @@ echo
 echo -e "${BOLD}Configuration${NC}"
 echo
 
-# Domain
-prompt DOMAIN "Domain name (e.g. fd.w0ny.xyz) — leave blank for IP-only access" ""
+# Domain — pre-fill from previous deploy if available
+SAVED_DOMAIN="$(grep '^EZFD_DOMAIN=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- || true)"
+prompt DOMAIN "Domain name (e.g. fd.w0ny.xyz) — leave blank for IP-only access" "${SAVED_DOMAIN}"
 DOMAIN="${DOMAIN,,}"
 
-# SSL / Let's Encrypt
+# SSL / Let's Encrypt — pre-fill email from previous deploy if available
 SETUP_SSL=false
 CERT_EMAIL=""
 if [[ -n "$DOMAIN" ]]; then
+  SAVED_EMAIL="$(grep '^EZFD_CERT_EMAIL=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- || true)"
   echo
   echo -e "  ${BLUE}Tip:${NC} SSL requires that ${BOLD}$DOMAIN${NC} already points to this server's IP."
-  prompt CERT_EMAIL "Email for Let's Encrypt (leave blank to skip SSL for now)" ""
+  prompt CERT_EMAIL "Email for Let's Encrypt (leave blank to skip SSL for now)" "${SAVED_EMAIL}"
   [[ -n "$CERT_EMAIL" ]] && SETUP_SSL=true
 fi
 
@@ -332,6 +334,8 @@ HOSTNAME=127.0.0.1
 DATABASE_URL=postgresql://ezfd:${PG_PASS}@localhost/ezfd
 EZFD_ENCRYPTION_KEY=${EZFD_ENC_KEY}
 EZFD_ADMIN_KEY=${EZFD_ADMIN_KEY}
+EZFD_DOMAIN=${DOMAIN}
+EZFD_CERT_EMAIL=${CERT_EMAIL}
 EOF
 chmod 600   "$APP_DIR/.env"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
