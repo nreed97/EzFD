@@ -355,6 +355,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           )}
           <QSOForm
             eventId={event.id}
+            eventType={event.event_type}
             hasQRZ={!!event.qrz_username}
             band={currentBand}
             mode={currentMode}

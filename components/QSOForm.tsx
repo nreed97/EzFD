@@ -19,8 +19,12 @@ const MODE_STYLE: Record<Mode, string> = {
   DIG: 'bg-green-400/15 border-green-400/40 text-green-400 light:bg-green-50 light:border-green-600 light:text-green-700',
 };
 
+const FD_CLASS_LETTERS  = new Set(['A','B','C','D','E','F']);
+const WFD_CLASS_LETTERS = new Set(['H','O','I']);
+
 interface Props {
   eventId: string;
+  eventType: 'FD' | 'WFD';
   hasQRZ: boolean;
   band: Band;
   mode: Mode;
@@ -35,7 +39,7 @@ interface Props {
 }
 
 export default function QSOForm({
-  eventId, hasQRZ, band, mode, onBandChange, onModeChange,
+  eventId, eventType, hasQRZ, band, mode, onBandChange, onModeChange,
   onSubmit, submitting, lastLogged, submitError, onDigHelp, existingQSOs,
 }: Props) {
   const [callsign, setCallsign] = useState('');
@@ -103,6 +107,17 @@ export default function QSOForm({
     return !/^[A-Z0-9]{3,}$/.test(c) || !/[A-Z]/.test(c) || !/[0-9]/.test(c);
   })();
 
+  const validLetters = eventType === 'WFD' ? WFD_CLASS_LETTERS : FD_CLASS_LETTERS;
+  const classInvalid = rcvdClass.length > 0 && (() => {
+    const m = rcvdClass.match(/^(\d+)([A-Z]+)$/);
+    if (!m) return true;
+    const [, num, letter] = m;
+    return parseInt(num, 10) < 1 || !validLetters.has(letter);
+  })();
+
+  const sectionInvalid = rcvdSection.length > 0 &&
+    !(ARRL_SECTIONS as readonly string[]).includes(rcvdSection);
+
   return (
     <form onSubmit={handleSubmit} className="flex flex-col gap-3">
       {/* Callsign */}
@@ -145,8 +160,8 @@ export default function QSOForm({
             value={rcvdClass}
             onChange={e => setRcvdClass(e.target.value.toUpperCase())}
             placeholder="3A"
-            className="input w-full font-mono"
-            maxLength={4}
+            className={`input w-full font-mono ${classInvalid ? 'border-orange-500' : ''}`}
+            maxLength={6}
           />
         </div>
         <div className="flex-1">
@@ -156,7 +171,7 @@ export default function QSOForm({
             value={rcvdSection}
             onChange={e => setRcvdSection(e.target.value.toUpperCase())}
             placeholder="MN"
-            className="input w-full font-mono"
+            className={`input w-full font-mono ${sectionInvalid ? 'border-orange-500' : ''}`}
             maxLength={5}
           />
           <datalist id="section-list">
@@ -164,6 +179,16 @@ export default function QSOForm({
           </datalist>
         </div>
       </div>
+      {classInvalid && (
+        <p className="text-xs text-orange-400">
+          Invalid class — expected a number + {eventType === 'WFD' ? 'H, O, or I' : 'A–F'} (e.g. {eventType === 'WFD' ? '2O' : '3A'})
+        </p>
+      )}
+      {sectionInvalid && (
+        <p className="text-xs text-orange-400">
+          &ldquo;{rcvdSection}&rdquo; is not a valid ARRL/RAC section
+        </p>
+      )}
 
       {/* Server error */}
       {submitError && (
