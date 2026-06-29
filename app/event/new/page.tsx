@@ -23,6 +23,7 @@ const WFD_CLASS_LETTERS = [
 export default function NewEventPage() {
   const router = useRouter();
   const [eventType, setEventType] = useState<'FD' | 'WFD'>('FD');
+  const [power, setPower] = useState<'HIGH' | 'LOW' | 'QRP'>('HIGH');
   const [classNum, setClassNum] = useState(3);
   const [classLetter, setClassLetter] = useState('A');
   const [form, setForm] = useState({
@@ -50,7 +51,7 @@ export default function NewEventPage() {
     const res = await fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, class: `${classNum}${classLetter}`, admin_key: form.admin_key, event_type: eventType }),
+      body: JSON.stringify({ ...form, class: `${classNum}${classLetter}`, admin_key: form.admin_key, event_type: eventType, power }),
     });
 
     const data = await res.json();
@@ -168,6 +169,25 @@ export default function NewEventPage() {
                 </select>
               </label>
             </div>
+            <fieldset className="flex flex-col gap-1">
+              <span className="text-sm text-zinc-400">Power Category</span>
+              <div className="flex gap-2">
+                {(['HIGH', 'LOW', 'QRP'] as const).map(p => (
+                  <button
+                    key={p}
+                    type="button"
+                    onClick={() => setPower(p)}
+                    className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
+                      power === p
+                        ? 'border-amber-400 bg-amber-400/10 text-amber-400'
+                        : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 light:border-zinc-300 light:text-zinc-600'
+                    }`}
+                  >
+                    {p}
+                  </button>
+                ))}
+              </div>
+            </fieldset>
             <label className="flex flex-col gap-1">
               <span className="text-sm text-zinc-400">Location (optional)</span>
               <input

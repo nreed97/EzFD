@@ -47,7 +47,7 @@ export function generateCabrillo(event: Event, qsos: QSO[]): string {
     `CONTEST: ${event.event_type === 'WFD' ? 'WFD' : 'ARRL-FD'}`,
     `CATEGORY-OPERATOR: MULTI-OP`,
     `CATEGORY-BAND: ALL`,
-    `CATEGORY-POWER: HIGH`,
+    `CATEGORY-POWER: ${event.power ?? 'HIGH'}`,
     `CATEGORY-MODE: MIXED`,
     `CATEGORY-TRANSMITTER: ${numTx}`,
     `CLAIMED-SCORE: ${qsoPoints * sections.size}`,

@@ -12,6 +12,7 @@ import BandActivity from './BandActivity';
 import UTCClock from './UTCClock';
 import AdifImport from './AdifImport';
 import WsjtxSetupHelp from './WsjtxSetupHelp';
+import SectionsNeeded from './SectionsNeeded';
 import ThemeToggle from './ThemeToggle';
 
 interface Props {
@@ -89,6 +90,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [mobileTab, setMobileTab] = useState<'log' | 'qsos'>('log');
   const [showAdifImport, setShowAdifImport] = useState(false);
   const [showWsjtxHelp, setShowWsjtxHelp] = useState(false);
+  const [showNeeds, setShowNeeds] = useState(false);
+  const [bandConflict, setBandConflict] = useState(false);
   const syncingRef = useRef(false);
 
   useEffect(() => {
@@ -344,6 +347,12 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
       <div className="flex flex-1 overflow-hidden">
         <aside className={`${mobileTab === 'log' ? 'flex' : 'hidden'} md:flex w-full md:w-80 flex-col gap-3 overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-4 shrink-0 light:border-zinc-200 light:bg-zinc-50`}>
+          {bandConflict && (
+            <div className="flex items-center gap-2 rounded-lg border border-yellow-600 bg-yellow-900/30 px-3 py-2 text-xs text-yellow-400">
+              <span className="text-base">⚠</span>
+              <span>Another station is on <strong>{currentBand} {currentMode}</strong> — band conflict!</span>
+            </div>
+          )}
           <QSOForm
             eventId={event.id}
             hasQRZ={!!event.qrz_username}
@@ -365,8 +374,16 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             currentBand={currentBand}
             currentMode={currentMode}
             qsos={displayQSOs}
+            onConflict={setBandConflict}
           />
           <Scoreboard score={score} />
+          <button
+            type="button"
+            onClick={() => setShowNeeds(true)}
+            className="w-full rounded-lg border border-zinc-700 py-2 text-xs font-semibold text-zinc-400 hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
+          >
+            Sections Needed ({Math.max(0, 84 - score.sections_worked)})
+          </button>
         </aside>
 
         <main className={`${mobileTab === 'qsos' ? 'flex flex-col' : 'hidden'} md:flex md:flex-col flex-1 overflow-hidden`}>
@@ -390,6 +407,26 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           stationNumber={stationNumber}
           onClose={() => setShowWsjtxHelp(false)}
         />
+      )}
+
+      {showNeeds && (
+        <div
+          className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/75 p-4 overflow-y-auto"
+          onClick={e => { if (e.target === e.currentTarget) setShowNeeds(false); }}
+        >
+          <div className="w-full max-w-lg my-8 rounded-xl border border-zinc-700 bg-zinc-900 light:border-zinc-200 light:bg-white">
+            <div className="flex items-center justify-between border-b border-zinc-800 light:border-zinc-200 px-4 py-3">
+              <h2 className="font-semibold text-zinc-200 light:text-zinc-800">Sections Needed</h2>
+              <button
+                onClick={() => setShowNeeds(false)}
+                className="rounded border border-zinc-700 px-3 py-1 text-xs text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-500"
+              >
+                Close
+              </button>
+            </div>
+            <SectionsNeeded workedSections={score.sections} />
+          </div>
+        </div>
       )}
     </div>
   );

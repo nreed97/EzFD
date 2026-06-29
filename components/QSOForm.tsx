@@ -85,6 +85,10 @@ export default function QSOForm({
     callRef.current?.focus();
   }
 
+  // TODO: CAT control — integrate Hamlib/flrig via a local relay to auto-populate
+  // band and mode from the radio. Also explore CW keying via PTT/serial keyer.
+  // The relay could expose a small WebSocket or HTTP endpoint on localhost that
+  // the logging page polls, similar to the WSJT-X UDP relay already in place.
   function pickBand(b: Band) {
     onBandChange(b);
     setShowQSY(false);
@@ -170,18 +174,28 @@ export default function QSOForm({
 
       {/* Post-log feedback */}
       {lastLogged && (
-        <div className={`rounded-lg border p-2 text-xs ${
+        <div className={`rounded-lg border px-3 py-2 ${
           lastLogged.is_dupe
-            ? 'border-yellow-700 bg-yellow-900/30 text-yellow-400'
+            ? 'border-yellow-700 bg-yellow-900/30'
             : lastLogged._pending
-              ? 'border-zinc-700 bg-zinc-800/50 text-zinc-400 light:border-zinc-300 light:bg-zinc-100 light:text-zinc-600'
-              : 'border-green-800 bg-green-900/20 text-green-400'
+              ? 'border-zinc-700 bg-zinc-800/50 light:border-zinc-300 light:bg-zinc-100'
+              : 'border-green-800 bg-green-900/20'
         }`}>
-          {lastLogged.is_dupe
-            ? `Logged (dupe): ${lastLogged.callsign} · ${lastLogged.band} · ${lastLogged.mode}`
-            : lastLogged._pending
-              ? `Queued: ${lastLogged.callsign} · ${lastLogged.band} · ${lastLogged.mode} (syncing…)`
-              : `Logged: ${lastLogged.callsign} · ${lastLogged.band} · ${lastLogged.mode}`}
+          <div className="flex items-baseline justify-between gap-2">
+            <span className={`font-mono text-lg font-bold tracking-wider ${
+              lastLogged.is_dupe ? 'text-yellow-400' : lastLogged._pending ? 'text-zinc-300 light:text-zinc-700' : 'text-green-400'
+            }`}>
+              {lastLogged.callsign}
+            </span>
+            <span className="text-xs text-zinc-500 light:text-zinc-400">
+              {lastLogged.band} · {lastLogged.mode}
+            </span>
+          </div>
+          <p className={`text-[11px] mt-0.5 ${
+            lastLogged.is_dupe ? 'text-yellow-600' : lastLogged._pending ? 'text-zinc-500' : 'text-green-600'
+          }`}>
+            {lastLogged.is_dupe ? 'Logged as dupe' : lastLogged._pending ? 'Queued — syncing…' : 'Logged ✓'}
+          </p>
         </div>
       )}
 

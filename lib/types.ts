@@ -28,6 +28,7 @@ export interface Event {
   club_call: string;
   event_year: number;
   event_type: 'FD' | 'WFD';
+  power: 'HIGH' | 'LOW' | 'QRP';
   class: string;
   arrl_section: string;
   location: string | null;

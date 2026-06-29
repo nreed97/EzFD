@@ -18,6 +18,7 @@ interface Props {
   currentBand: Band;
   currentMode: Mode;
   qsos: DisplayQSO[];
+  onConflict?: (conflicting: boolean) => void;
 }
 
 const MODE_COLORS: Record<Mode, string> = {
@@ -37,11 +38,12 @@ function timeSince(iso: string): string {
   return `${Math.floor(s / 3600)}h`;
 }
 
-export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos }: Props) {
+export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos, onConflict }: Props) {
   const [stations, setStations] = useState<StationPresence[]>([]);
   const [tick, setTick] = useState(0);
   const lastBandRef = useRef<Band | null>(null);
   const lastModeRef = useRef<Mode | null>(null);
+  const lastConflictRef = useRef(false);
 
   // Re-render every 10s so "Xm ago" stays fresh
   useEffect(() => {
@@ -100,6 +102,12 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
   }
 
   const now = Date.now();
+
+  const anyConflict = allOps.some(s => s.op_call !== myOpCall && s.band === currentBand && s.mode === currentMode);
+  if (anyConflict !== lastConflictRef.current) {
+    lastConflictRef.current = anyConflict;
+    onConflict?.(anyConflict);
+  }
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 light:border-zinc-200 light:bg-zinc-100/50">
