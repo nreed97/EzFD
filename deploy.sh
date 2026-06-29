@@ -191,10 +191,7 @@ https://apt.postgresql.org/pub/repos/apt ${DISTRO_CODENAME}-pgdg main" \
   log "nginx $(nginx -v 2>&1 | awk -F/ '{print $2}')"
 
   # ── certbot ───────────────────────────────────────────────────────────────
-  # Install whenever a domain is set so the command is available even if
-  # SSL is deferred. Uses apt (python3-certbot-nginx) — more reliable than
-  # snap on fresh VMs where snapd may not be fully initialized.
-  if [[ -n "$DOMAIN" ]] && ! command -v certbot &>/dev/null; then
+  if ! command -v certbot &>/dev/null; then
     info "Installing certbot..."
     apt-get install -y -qq certbot python3-certbot-nginx >/dev/null
     log "certbot $(certbot --version 2>&1 | awk '{print $NF}')"
