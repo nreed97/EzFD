@@ -190,12 +190,6 @@ https://apt.postgresql.org/pub/repos/apt ${DISTRO_CODENAME}-pgdg main" \
   fi
   log "nginx $(nginx -v 2>&1 | awk -F/ '{print $2}')"
 
-  # ── certbot ───────────────────────────────────────────────────────────────
-  if ! command -v certbot &>/dev/null; then
-    info "Installing certbot..."
-    apt-get install -y -qq certbot python3-certbot-nginx >/dev/null
-    log "certbot $(certbot --version 2>&1 | awk '{print $NF}')"
-  fi
 
   # ── Firewall ──────────────────────────────────────────────────────────────
   info "Configuring UFW firewall..."
@@ -215,6 +209,19 @@ https://apt.postgresql.org/pub/repos/apt ${DISTRO_CODENAME}-pgdg main" \
             --create-home \
             "$APP_USER"
     log "System user '$APP_USER' created"
+  fi
+fi
+
+# ── certbot (runs every deploy — needed before SSL step below) ───────────────
+if [[ "$SETUP_SSL" == "true" ]]; then
+  if ! command -v certbot &>/dev/null; then
+    info "Installing certbot..."
+    export DEBIAN_FRONTEND=noninteractive
+    apt-get update -qq
+    apt-get install -y -qq certbot python3-certbot-nginx >/dev/null
+    log "certbot $(certbot --version 2>&1 | awk '{print $NF}')"
+  else
+    log "certbot already installed — $(certbot --version 2>&1 | awk '{print $NF}')"
   fi
 fi
 
