@@ -135,7 +135,7 @@ export default function NewEventPage() {
               <label className="flex flex-1 flex-col gap-1">
                 <span className="text-sm text-zinc-400">ARRL Section</span>
                 <select value={form.arrl_section} onChange={e => set('arrl_section', e.target.value)} className="input">
-                  {ARRL_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
+                  {[...ARRL_SECTIONS].sort().map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </label>
             </div>
