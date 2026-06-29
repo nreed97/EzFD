@@ -81,7 +81,7 @@ echo -e "${BOLD}Configuration${NC}"
 echo
 
 # Domain
-prompt DOMAIN "Domain name (e.g. fd.k3abc.org) — leave blank for IP-only access" ""
+prompt DOMAIN "Domain name (e.g. fd.w0ny.xyz) — leave blank for IP-only access" ""
 DOMAIN="${DOMAIN,,}"
 
 # SSL / Let's Encrypt
