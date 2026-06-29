@@ -71,7 +71,7 @@ menu_pick() {
     ((i++))
   done
   echo
-  local choice
+  local choice=""
   while true; do
     read -rp "$(echo -e "  ${BOLD}Choice [1-$(($#))]:${NC} ")" choice
     if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= $# )); then
@@ -196,7 +196,7 @@ view_event() {
   hr
   echo -e "  ${BOLD}Actions:${NC}"
   echo
-  local choice
+  local choice=""
   menu_pick choice \
     "Export QSOs to CSV  (/tmp/qsos_${code}.csv)" \
     "Export full backup (JSON → /tmp/ezfd_${code}_backup.json)" \
@@ -427,7 +427,7 @@ main_menu() {
     echo -e "  ${DIM}${tot_events} event(s)  ·  ${tot_qsos} QSO(s) on this server${NC}"
     echo
 
-    local choice
+    local choice=""
     menu_pick choice \
       "List / manage events" \
       "Server statistics" \
