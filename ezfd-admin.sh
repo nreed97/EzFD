@@ -71,11 +71,11 @@ menu_pick() {
     ((i++))
   done
   echo
-  local choice=""
+  local _input=""
   while true; do
-    read -rp "$(echo -e "  ${BOLD}Choice [1-$(($#))]:${NC} ")" choice
-    if [[ "$choice" =~ ^[0-9]+$ ]] && (( choice >= 1 && choice <= $# )); then
-      printf -v "$_var" '%s' "$choice"
+    read -rp "$(echo -e "  ${BOLD}Choice [1-$(($#))]:${NC} ")" _input
+    if [[ "$_input" =~ ^[0-9]+$ ]] && (( _input >= 1 && _input <= $# )); then
+      printf -v "$_var" '%s' "$_input"
       return
     fi
     warn "Enter a number between 1 and $#"
