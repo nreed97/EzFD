@@ -319,7 +319,7 @@ list_events() {
 
     menu_pick choice "${opts[@]}"
 
-    if (( choice <= ${#codes[@]} )); then
+    if [[ "$choice" -le "${#codes[@]}" ]]; then
       view_event "${codes[$((choice-1))]}"
     else
       return
