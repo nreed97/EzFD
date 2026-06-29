@@ -214,14 +214,17 @@ fi
 
 # ── certbot (runs every deploy — needed before SSL step below) ───────────────
 if [[ "$SETUP_SSL" == "true" ]]; then
-  if ! command -v certbot &>/dev/null; then
-    info "Installing certbot..."
+  NEED_CERTBOT=false
+  ! command -v certbot &>/dev/null && NEED_CERTBOT=true
+  ! dpkg -l python3-certbot-nginx 2>/dev/null | grep -q '^ii' && NEED_CERTBOT=true
+  if [[ "$NEED_CERTBOT" == "true" ]]; then
+    info "Installing certbot and nginx plugin..."
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y -qq certbot python3-certbot-nginx >/dev/null
     log "certbot $(certbot --version 2>&1 | awk '{print $NF}')"
   else
-    log "certbot already installed — $(certbot --version 2>&1 | awk '{print $NF}')"
+    log "certbot + nginx plugin already installed — $(certbot --version 2>&1 | awk '{print $NF}')"
   fi
 fi
 
