@@ -49,7 +49,9 @@ export default function QSOForm({
   const [lookingUp, setLookingUp] = useState(false);
   const [showQSY, setShowQSY] = useState(false);
   const [showExtra, setShowExtra] = useState(false);
-  const callRef = useRef<HTMLInputElement>(null);
+  const callRef    = useRef<HTMLInputElement>(null);
+  const classRef   = useRef<HTMLInputElement>(null);
+  const sectionRef = useRef<HTMLInputElement>(null);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { callRef.current?.focus(); }, []);
@@ -127,6 +129,12 @@ export default function QSOForm({
           ref={callRef}
           value={callsign}
           onChange={e => handleCallChange(e.target.value)}
+          onKeyDown={e => {
+            if (e.key === 'Enter' && callsign) {
+              e.preventDefault();
+              classRef.current?.focus();
+            }
+          }}
           placeholder="W0NY"
           className="input w-full font-mono text-xl tracking-widest"
           autoComplete="off"
@@ -157,8 +165,15 @@ export default function QSOForm({
         <div className="w-20">
           <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Rcvd Class</label>
           <input
+            ref={classRef}
             value={rcvdClass}
             onChange={e => setRcvdClass(e.target.value.toUpperCase())}
+            onKeyDown={e => {
+              if (e.key === 'Enter') {
+                e.preventDefault();
+                sectionRef.current?.focus();
+              }
+            }}
             placeholder="3A"
             className={`input w-full font-mono ${classInvalid ? 'border-orange-500' : ''}`}
             maxLength={6}
@@ -167,6 +182,7 @@ export default function QSOForm({
         <div className="flex-1">
           <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Rcvd Section</label>
           <input
+            ref={sectionRef}
             list="section-list"
             value={rcvdSection}
             onChange={e => setRcvdSection(e.target.value.toUpperCase())}
