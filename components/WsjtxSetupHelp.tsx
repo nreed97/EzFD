@@ -22,7 +22,7 @@ export default function WsjtxSetupHelp({ joinCode, operatorCall, stationNumber, 
 
   return (
     <div
-      className="fixed inset-0 z-50 flex items-start justify-center bg-black/75 p-4 overflow-y-auto"
+      className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/75 p-4 overflow-y-auto"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-900 shadow-2xl my-8">

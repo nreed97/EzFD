@@ -82,7 +82,7 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/75 p-4" onClick={onClose}>
       <div
         className="w-full max-w-sm rounded-xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl light:border-zinc-200 light:bg-white"
         onClick={e => e.stopPropagation()}

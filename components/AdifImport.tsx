@@ -63,7 +63,7 @@ export default function AdifImport({ eventId, operatorCall, stationNumber, onClo
   return (
     /* Backdrop */
     <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+      className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/70 p-4"
       onClick={e => { if (e.target === e.currentTarget) onClose(); }}
     >
       <div className="w-full max-w-lg rounded-xl border border-zinc-700 bg-zinc-900 p-5 shadow-2xl flex flex-col gap-4">

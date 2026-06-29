@@ -58,7 +58,7 @@ export default function SummarySheet({ event, score, bonuses, operators, onClose
         }
       `}</style>
 
-      <div className="fixed inset-0 z-50 flex items-start justify-center bg-black/75 p-4 overflow-y-auto">
+      <div className="fixed inset-0 z-[1000] flex items-start justify-center bg-black/75 p-4 overflow-y-auto">
         <div className="w-full max-w-xl my-8">
           <div id="fd-summary-sheet" className="rounded-xl border border-zinc-700 bg-zinc-900 text-zinc-200 light:border-zinc-200 light:bg-white light:text-zinc-900">
 
