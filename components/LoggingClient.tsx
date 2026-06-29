@@ -219,8 +219,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-2 flex-shrink-0 light:border-zinc-200 light:bg-zinc-50">
         <div className="flex items-center gap-3 min-w-0">
           <span className="font-bold text-amber-400 text-lg shrink-0">{event.club_call}</span>
-          <span className="text-zinc-600">|</span>
-          <span className="text-zinc-300 text-sm shrink-0">{event.class} · {event.arrl_section}</span>
+          <span className="text-zinc-600 hidden sm:inline">|</span>
+          <span className="text-zinc-300 text-sm shrink-0 hidden sm:inline">{event.class} · {event.arrl_section}</span>
           {event.location && (
             <span className="text-zinc-500 text-sm truncate hidden lg:block">{event.location}</span>
           )}
@@ -262,7 +262,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             <span className="text-zinc-500">⇄</span>
           </button>
 
-          <ThemeToggle />
+          {/* ThemeToggle hidden on mobile — moved to mobile tab bar */}
+          <span className="hidden sm:contents"><ThemeToggle /></span>
 
           <button onClick={toggleNight}
             title={nightMode ? 'Exit night mode' : 'Enter night mode (preserves dark adaptation)'}
@@ -275,7 +276,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           </button>
 
           <button onClick={() => router.push(`/event/${event.join_code}/dashboard`)}
-            className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
+            className="hidden sm:block rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
             Dashboard
           </button>
 
@@ -309,17 +310,26 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             <span className="text-zinc-600 mx-1">×</span>
             <span className="text-amber-400 font-bold">{score.total_score.toLocaleString()}</span>
           </span>
-          <button
-            onClick={() => {
-              sessionStorage.removeItem(`ezfd_op_${event.join_code}`);
-              router.push(`/event/${event.join_code}`);
-            }}
-            className="flex items-center gap-1.5 text-xs border border-zinc-700 rounded px-2 py-0.5 light:border-zinc-300 light:text-zinc-600"
-          >
-            <span className="text-zinc-500 light:text-zinc-400 text-[10px] font-semibold uppercase tracking-wide">Op On</span>
-            <span className="font-mono font-semibold text-zinc-300 light:text-zinc-700">{operatorCall}</span>
-            <span className="text-zinc-500">⇄</span>
-          </button>
+          <div className="flex items-center gap-2">
+            <ThemeToggle />
+            <button
+              onClick={() => router.push(`/event/${event.join_code}/dashboard`)}
+              className="rounded border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600"
+            >
+              Dashboard
+            </button>
+            <button
+              onClick={() => {
+                sessionStorage.removeItem(`ezfd_op_${event.join_code}`);
+                router.push(`/event/${event.join_code}`);
+              }}
+              className="flex items-center gap-1.5 text-xs border border-zinc-700 rounded px-2 py-0.5 light:border-zinc-300 light:text-zinc-600"
+            >
+              <span className="text-zinc-500 light:text-zinc-400 text-[10px] font-semibold uppercase tracking-wide">Op On</span>
+              <span className="font-mono font-semibold text-zinc-300 light:text-zinc-700">{operatorCall}</span>
+              <span className="text-zinc-500">⇄</span>
+            </button>
+          </div>
         </div>
         <div className="flex">
           <button
