@@ -41,7 +41,7 @@ export interface QSO {
   callsign: string;
   band: Band;
   mode: Mode;
-  datetime_utc: string;
+  datetime_utc: string | Date;
   sent_class: string | null;
   sent_section: string | null;
   rcvd_class: string | null;

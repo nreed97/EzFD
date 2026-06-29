@@ -151,7 +151,7 @@ export default function QSOForm({
             list="section-list"
             value={rcvdSection}
             onChange={e => setRcvdSection(e.target.value.toUpperCase())}
-            placeholder="EPA"
+            placeholder="MN"
             className="input w-full font-mono"
             maxLength={5}
           />

@@ -130,7 +130,7 @@ export default function SummarySheet({ event, score, bonuses, operators, onClose
                 <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">Score Calculation</h3>
                 <div className="flex flex-col gap-1 font-mono text-xs">
                   <ScoreRow label="QSO points" value={score.qso_points} />
-                  <ScoreRow label={`× Sections worked (${score.sections_worked})`} value={score.sections_worked} op="×" />
+                  <ScoreRow label={`Sections worked (${score.sections_worked})`} value={score.sections_worked} op="×" />
                   <ScoreRow label="Base score" value={score.total_score} bold />
 
                   {lineItems.length > 0 && (
@@ -158,7 +158,7 @@ export default function SummarySheet({ event, score, bonuses, operators, onClose
                     Sections Worked ({score.sections.length})
                   </h3>
                   <div className="flex flex-wrap gap-1">
-                    {score.sections.map(s => (
+                    {[...score.sections].sort().map(s => (
                       <span key={s} className="rounded bg-amber-400/10 px-1.5 py-0.5 font-mono text-xs text-amber-400 light:bg-amber-50 light:text-amber-700">
                         {s}
                       </span>

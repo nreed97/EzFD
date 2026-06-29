@@ -107,23 +107,23 @@ export default function NewEventPage() {
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
           <h2 className="mb-4 font-semibold text-zinc-300 light:text-zinc-700">Field Day Setup</h2>
           <div className="flex flex-col gap-3">
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <fieldset className="flex flex-1 flex-col gap-1">
                 <span className="text-sm text-zinc-400">FD Class</span>
-                <div className="flex gap-1">
+                <div className="flex">
                   <input
                     type="number"
                     min={1}
                     max={99}
                     value={classNum}
                     onChange={e => setClassNum(Math.max(1, parseInt(e.target.value) || 1))}
-                    className="input w-16 text-center font-mono"
+                    className="input w-16 rounded-r-none border-r-0 text-center font-mono"
                     aria-label="Number of transmitters"
                   />
                   <select
                     value={classLetter}
                     onChange={e => setClassLetter(e.target.value)}
-                    className="input flex-1"
+                    className="input flex-1 rounded-l-none"
                     aria-label="Class letter"
                   >
                     {FD_CLASS_LETTERS.map(({ value, label }) => (
@@ -131,7 +131,6 @@ export default function NewEventPage() {
                     ))}
                   </select>
                 </div>
-                <span className="text-xs text-zinc-500">Class: {classNum}{classLetter}</span>
               </fieldset>
               <label className="flex flex-1 flex-col gap-1">
                 <span className="text-sm text-zinc-400">ARRL Section</span>
@@ -156,7 +155,7 @@ export default function NewEventPage() {
           <h2 className="mb-1 font-semibold text-zinc-300 light:text-zinc-700">QRZ Lookup (optional)</h2>
           <p className="mb-4 text-xs text-zinc-500">Used to auto-fill callsign info for all operators in this event. Requires a QRZ.com XML subscription.</p>
           <div className="flex flex-col gap-3">
-            <div className="flex gap-3">
+            <div className="flex flex-col gap-3 sm:flex-row">
               <label className="flex flex-1 flex-col gap-1">
                 <span className="text-sm text-zinc-400">QRZ Username</span>
                 <input

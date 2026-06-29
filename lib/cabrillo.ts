@@ -14,12 +14,16 @@ function modeToCab(mode: string): string {
   return mode === 'PH' ? 'PH' : mode === 'DIG' ? 'DG' : 'CW';
 }
 
-function formatDate(iso: string): string {
-  return iso.slice(0, 10);
+function toIso(dt: string | Date): string {
+  return typeof dt === 'string' ? dt : dt.toISOString();
 }
 
-function formatTime(iso: string): string {
-  return iso.slice(11, 16).replace(':', '');
+function formatDate(dt: string | Date): string {
+  return toIso(dt).slice(0, 10);
+}
+
+function formatTime(dt: string | Date): string {
+  return toIso(dt).slice(11, 16).replace(':', '');
 }
 
 export function generateCabrillo(event: Event, qsos: QSO[]): string {

@@ -116,12 +116,16 @@ function adifField(tag: string, value: string): string {
   return `<${tag}:${value.length}>${value}`;
 }
 
-function formatDate(iso: string): string {
-  return iso.slice(0, 10).replace(/-/g, '');
+function toIso(dt: string | Date): string {
+  return typeof dt === 'string' ? dt : dt.toISOString();
 }
 
-function formatTime(iso: string): string {
-  return iso.slice(11, 16).replace(':', '');
+function formatDate(dt: string | Date): string {
+  return toIso(dt).slice(0, 10).replace(/-/g, '');
+}
+
+function formatTime(dt: string | Date): string {
+  return toIso(dt).slice(11, 16).replace(':', '');
 }
 
 function bandToFreq(band: string): string {
