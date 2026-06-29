@@ -252,9 +252,11 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
               router.push(`/event/${event.join_code}`);
             }}
             title="Change operator"
-            className="hidden md:inline-flex items-center gap-1 rounded border border-zinc-700 px-2 py-1 font-mono text-xs text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
+            className="hidden md:inline-flex items-center gap-1.5 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
           >
-            {operatorCall} <span className="text-zinc-500 light:text-zinc-400">⇄</span>
+            <span className="text-zinc-500 light:text-zinc-400 text-[10px] font-semibold uppercase tracking-wide">Op On</span>
+            <span className="font-mono font-semibold">{operatorCall}</span>
+            <span className="text-zinc-500">⇄</span>
           </button>
 
           <ThemeToggle />
@@ -309,9 +311,11 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
               sessionStorage.removeItem(`ezfd_op_${event.join_code}`);
               router.push(`/event/${event.join_code}`);
             }}
-            className="font-mono text-xs text-zinc-400 border border-zinc-700 rounded px-2 py-0.5 light:border-zinc-300 light:text-zinc-600"
+            className="flex items-center gap-1.5 text-xs border border-zinc-700 rounded px-2 py-0.5 light:border-zinc-300 light:text-zinc-600"
           >
-            {operatorCall} ⇄
+            <span className="text-zinc-500 light:text-zinc-400 text-[10px] font-semibold uppercase tracking-wide">Op On</span>
+            <span className="font-mono font-semibold text-zinc-300 light:text-zinc-700">{operatorCall}</span>
+            <span className="text-zinc-500">⇄</span>
           </button>
         </div>
         <div className="flex">
