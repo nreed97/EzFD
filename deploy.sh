@@ -190,13 +190,14 @@ https://apt.postgresql.org/pub/repos/apt ${DISTRO_CODENAME}-pgdg main" \
   fi
   log "nginx $(nginx -v 2>&1 | awk -F/ '{print $2}')"
 
-  # ── certbot (via snap) ────────────────────────────────────────────────────
-  if [[ "$SETUP_SSL" == "true" ]] && ! command -v certbot &>/dev/null; then
+  # ── certbot ───────────────────────────────────────────────────────────────
+  # Install whenever a domain is set so the command is available even if
+  # SSL is deferred. Uses apt (python3-certbot-nginx) — more reliable than
+  # snap on fresh VMs where snapd may not be fully initialized.
+  if [[ -n "$DOMAIN" ]] && ! command -v certbot &>/dev/null; then
     info "Installing certbot..."
-    apt-get install -y -qq snapd >/dev/null
-    snap install --classic certbot >/dev/null 2>&1
-    ln -sf /snap/bin/certbot /usr/bin/certbot
-    log "certbot $(certbot --version 2>&1 | awk '{print $2}')"
+    apt-get install -y -qq certbot python3-certbot-nginx >/dev/null
+    log "certbot $(certbot --version 2>&1 | awk '{print $NF}')"
   fi
 
   # ── Firewall ──────────────────────────────────────────────────────────────
@@ -275,6 +276,22 @@ apply_migration \
      WHERE table_name='events' AND column_name='bonuses'" \
   "ALTER TABLE events
      ADD COLUMN bonuses JSONB NOT NULL DEFAULT '{}'::jsonb"
+
+# ── v3: Winter Field Day support ──────────────────────────────────────────────
+apply_migration \
+  "events.event_type (FD/WFD)" \
+  "SELECT 1 FROM information_schema.columns
+     WHERE table_name='events' AND column_name='event_type'" \
+  "ALTER TABLE events
+     ADD COLUMN event_type TEXT NOT NULL DEFAULT 'FD'"
+
+# ── v4: power category ────────────────────────────────────────────────────────
+apply_migration \
+  "events.power (HIGH/LOW/QRP)" \
+  "SELECT 1 FROM information_schema.columns
+     WHERE table_name='events' AND column_name='power'" \
+  "ALTER TABLE events
+     ADD COLUMN power TEXT NOT NULL DEFAULT 'HIGH'"
 
 # ── add future migrations above this line ────────────────────────────────────
 
