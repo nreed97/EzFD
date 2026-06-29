@@ -1,7 +1,6 @@
 'use client';
 
 import type { Event, Score, Bonuses } from '@/lib/types';
-import { calculateBonusPoints } from '@/lib/scoring';
 
 const BOOL_LABELS: Partial<Record<keyof Bonuses, string>> = {
   emergency_power:   'Emergency power',
@@ -27,25 +26,26 @@ interface Props {
   onClose: () => void;
 }
 
-function bonusLineItems(bonuses: Bonuses, baseScore: number): { label: string; pts: number }[] {
+function bonusLineItems(bonuses: Bonuses, score: Score): { label: string; pts: number }[] {
   const items: { label: string; pts: number }[] = [];
   for (const [k, label] of Object.entries(BOOL_LABELS)) {
     if (bonuses[k as keyof Bonuses]) {
-      const pts = k === 'emergency_power' ? baseScore : k.endsWith('_official') || k === 'web_posting' || k === 'social_media' ? 50 : k === 'safety_officer' ? 25 : 100;
+      const pts = k === 'emergency_power' ? score.total_score : k.endsWith('_official') || k === 'web_posting' || k === 'social_media' ? 50 : k === 'safety_officer' ? 25 : 100;
       items.push({ label, pts });
     }
   }
-  if (bonuses.youth_ops) items.push({ label: `Youth operators (${bonuses.youth_ops})`, pts: bonuses.youth_ops * 20 });
-  if (bonuses.gota_qsos) items.push({ label: `GOTA QSOs (${bonuses.gota_qsos})`, pts: Math.min(bonuses.gota_qsos * 10, 1000) });
+  if (bonuses.youth_ops)    items.push({ label: `Youth operators (${bonuses.youth_ops})`,        pts: bonuses.youth_ops * 20 });
+  if (bonuses.gota_qsos)    items.push({ label: `GOTA QSOs (${bonuses.gota_qsos})`,              pts: Math.min(bonuses.gota_qsos * 10, 1000) });
   if (bonuses.served_agency) items.push({ label: `Served agency reps (${bonuses.served_agency})`, pts: Math.min(bonuses.served_agency * 10, 100) });
-  if (bonuses.nts_traffic) items.push({ label: `NTS messages (${bonuses.nts_traffic})`, pts: Math.min(bonuses.nts_traffic * 10, 100) });
+  if (bonuses.nts_traffic)  items.push({ label: `NTS messages (${bonuses.nts_traffic})`,          pts: Math.min(bonuses.nts_traffic * 10, 100) });
+  if (score.sections_worked >= 84) items.push({ label: 'Worked all 84 sections', pts: 100 });
   return items;
 }
 
 export default function SummarySheet({ event, score, bonuses, operators, onClose }: Props) {
-  const bonusPoints = calculateBonusPoints(bonuses, score.total_score);
-  const claimedScore = score.total_score + bonusPoints;
-  const lineItems = bonusLineItems(bonuses, score.total_score);
+  const bonusPoints = score.bonus_points;
+  const claimedScore = score.claimed_score;
+  const lineItems = bonusLineItems(bonuses, score);
   const now = new Date();
 
   return (
@@ -131,7 +131,7 @@ export default function SummarySheet({ event, score, bonuses, operators, onClose
                 <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">Score Calculation</h3>
                 <div className="flex flex-col gap-1 font-mono text-xs">
                   <ScoreRow label="QSO points" value={score.qso_points} />
-                  <ScoreRow label={`Sections worked (${score.sections_worked})`} value={score.sections_worked} op="×" />
+                  <ScoreRow label={`Power mult (×${score.power_multiplier})`} value={score.power_multiplier} op="×" />
                   <ScoreRow label="Base score" value={score.total_score} bold />
 
                   {lineItems.length > 0 && (

@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
-import { calculateScore, calculateBonusPoints } from '@/lib/scoring';
+import { calculateScore } from '@/lib/scoring';
 import type { Event, QSO, Bonuses } from '@/lib/types';
 import Scoreboard from './Scoreboard';
 import SectionGrid from './SectionGrid';
@@ -41,8 +41,7 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
     return () => es.close();
   }, [event.id]);
 
-  const score = calculateScore(qsos, bonuses);
-  const bonusPoints = calculateBonusPoints(bonuses, score.total_score);
+  const score = calculateScore(qsos, bonuses, event.power);
   const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
   const recentQSOs = qsos.filter(q => !q.is_dupe && (typeof q.datetime_utc === 'string' ? q.datetime_utc : q.datetime_utc.toISOString()) > oneHourAgo).length;
 
@@ -137,7 +136,7 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
             </div>
           </div>
 
-          <Scoreboard score={score} bonusPoints={bonusPoints} />
+          <Scoreboard score={score} bonusPoints={score.bonus_points} />
 
           <BonusTracker
             joinCode={event.join_code}

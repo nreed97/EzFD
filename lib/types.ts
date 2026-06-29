@@ -77,6 +77,7 @@ export interface Score {
   cw_qsos: number;
   digital_qsos: number;
   qso_points: number;
+  power_multiplier: number;
   sections_worked: number;
   total_score: number;
   bonus_points: number;

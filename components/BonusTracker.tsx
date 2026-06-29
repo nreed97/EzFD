@@ -80,7 +80,7 @@ export default function BonusTracker({ joinCode, initialBonuses, baseScore, onBo
     debounceRef.current = setTimeout(() => save(next), 600);
   }
 
-  const bonusPoints = calculateBonusPoints(bonuses, baseScore);
+  const bonusPoints = calculateBonusPoints(bonuses, baseScore, 0);
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-950 light:border-zinc-200 light:bg-white">

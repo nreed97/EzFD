@@ -212,7 +212,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     ...pendingQSOs,
     ...confirmedQSOs.map(q => q as DisplayQSO),
   ];
-  const score = calculateScore(confirmedQSOs);
+  const score = calculateScore(confirmedQSOs, {}, event.power);
 
   return (
     <div data-night={nightMode ? 'true' : undefined} className="night-scope flex h-screen flex-col overflow-hidden bg-zinc-950 light:bg-white">
