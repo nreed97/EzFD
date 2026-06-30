@@ -36,11 +36,13 @@ interface Props {
   submitError: string | null;
   onDigHelp: () => void;
   existingQSOs: QSO[];
+  bandOccupancy?: Partial<Record<Band, string[]>>;
 }
 
 export default function QSOForm({
   eventId, eventType, hasQRZ, band, mode, onBandChange, onModeChange,
   onSubmit, submitting, lastLogged, submitError, onDigHelp, existingQSOs,
+  bandOccupancy = {},
 }: Props) {
   const [callsign, setCallsign] = useState('');
   const [rcvdClass, setRcvdClass] = useState('');
@@ -272,40 +274,56 @@ export default function QSOForm({
         {showQSY && (
           <div className="mt-2 flex flex-col gap-2">
             <div className="grid grid-cols-3 gap-1">
-              {BAND_GRID.flat().map(b => (
-                <button
-                  key={b}
-                  type="button"
-                  tabIndex={-1}
-                  onClick={() => pickBand(b)}
-                  className={`rounded py-2.5 text-sm font-mono font-semibold transition-colors ${
-                    band === b
-                      ? 'bg-amber-400 text-zinc-900'
-                      : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-200 light:text-zinc-700 light:hover:bg-zinc-300'
-                  }`}
-                >
-                  {b}
-                </button>
-              ))}
-            </div>
-
-            {showExtra ? (
-              <div className="flex gap-1">
-                {EXTRA_BANDS.map(b => (
+              {BAND_GRID.flat().map(b => {
+                const ops = bandOccupancy[b] ?? [];
+                const occupied = ops.length > 0;
+                return (
                   <button
                     key={b}
                     type="button"
                     tabIndex={-1}
                     onClick={() => pickBand(b)}
-                    className={`flex-1 rounded py-2.5 text-sm font-mono font-semibold transition-colors ${
+                    title={occupied ? `Active: ${ops.join(', ')}` : undefined}
+                    className={`relative rounded py-2.5 text-sm font-mono font-semibold transition-colors ${
                       band === b
                         ? 'bg-amber-400 text-zinc-900'
                         : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-200 light:text-zinc-700 light:hover:bg-zinc-300'
                     }`}
                   >
                     {b}
+                    {occupied && band !== b && (
+                      <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400" />
+                    )}
                   </button>
-                ))}
+                );
+              })}
+            </div>
+
+            {showExtra ? (
+              <div className="flex gap-1">
+                {EXTRA_BANDS.map(b => {
+                  const ops = bandOccupancy[b] ?? [];
+                  const occupied = ops.length > 0;
+                  return (
+                    <button
+                      key={b}
+                      type="button"
+                      tabIndex={-1}
+                      onClick={() => pickBand(b)}
+                      title={occupied ? `Active: ${ops.join(', ')}` : undefined}
+                      className={`relative flex-1 rounded py-2.5 text-sm font-mono font-semibold transition-colors ${
+                        band === b
+                          ? 'bg-amber-400 text-zinc-900'
+                          : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-200 light:text-zinc-700 light:hover:bg-zinc-300'
+                      }`}
+                    >
+                      {b}
+                      {occupied && band !== b && (
+                        <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400" />
+                      )}
+                    </button>
+                  );
+                })}
                 <button
                   type="button"
                   tabIndex={-1}

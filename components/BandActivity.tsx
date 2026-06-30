@@ -19,6 +19,7 @@ interface Props {
   currentMode: Mode;
   qsos: DisplayQSO[];
   onConflict?: (conflicting: boolean) => void;
+  onBandOccupancy?: (occupied: Partial<Record<Band, string[]>>) => void;
 }
 
 const MODE_COLORS: Record<Mode, string> = {
@@ -38,26 +39,29 @@ function timeSince(iso: string): string {
   return `${Math.floor(s / 3600)}h`;
 }
 
-export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos, onConflict }: Props) {
+export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos, onConflict, onBandOccupancy }: Props) {
   const [stations, setStations] = useState<StationPresence[]>([]);
-  const [tick, setTick] = useState(0);
+  const [isQRT, setIsQRT] = useState(false);
   const lastBandRef = useRef<Band | null>(null);
   const lastModeRef = useRef<Mode | null>(null);
-  const lastConflictRef = useRef(false);
-
-  // Re-render every 10s so "Xm ago" stays fresh
-  useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), 10_000);
-    return () => clearInterval(id);
-  }, []);
+  const isQRTRef = useRef(false);
 
   const publishPresence = useCallback(async (band: Band, mode: Mode) => {
+    if (isQRTRef.current) return;
     await fetch('/api/presence', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ event_id: eventId, op_call: myOpCall, station: myStation, band, mode }),
     }).catch(() => {});
   }, [eventId, myOpCall, myStation]);
+
+  const removePresence = useCallback(async () => {
+    await fetch('/api/presence', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ event_id: eventId, op_call: myOpCall }),
+    }).catch(() => {});
+  }, [eventId, myOpCall]);
 
   const fetchPresence = useCallback(async () => {
     const res = await fetch(`/api/presence?event_id=${eventId}`).catch(() => null);
@@ -82,7 +86,22 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
     return () => clearInterval(id);
   }, [fetchPresence]);
 
+  function goQRT() {
+    isQRTRef.current = true;
+    setIsQRT(true);
+    removePresence();
+    // Remove self from local station list immediately
+    setStations(prev => prev.filter(s => s.op_call !== myOpCall));
+  }
+
+  function goOnAir() {
+    isQRTRef.current = false;
+    setIsQRT(false);
+    publishPresence(currentBand, currentMode);
+  }
+
   // Last QSO time per operator from the live QSO list
+  const now = Date.now();
   const lastQSOByOp: Record<string, string> = {};
   for (const q of qsos) {
     if (q.operator_call && !q._pending) {
@@ -101,30 +120,79 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
     }
   }
 
-  const now = Date.now();
-
-  const anyConflict = allOps.some(s => s.op_call !== myOpCall && s.band === currentBand && s.mode === currentMode);
-  if (anyConflict !== lastConflictRef.current) {
-    lastConflictRef.current = anyConflict;
-    onConflict?.(anyConflict);
+  // An op is active for conflict purposes only if they have a recent QSO (< INACTIVE_MS)
+  // or no QSOs at all (they're live in presence but haven't logged yet)
+  function isActiveForConflict(s: StationPresence): boolean {
+    if (s.op_call === myOpCall) return false;
+    const lastQSO = lastQSOByOp[s.op_call];
+    if (lastQSO && now - new Date(lastQSO).getTime() > INACTIVE_MS) return false;
+    return true;
   }
+
+  const anyConflict = allOps.some(s =>
+    isActiveForConflict(s) && s.band === currentBand && s.mode === currentMode
+  );
+
+  // Band occupancy for QSY tile indicators (other active ops only)
+  const occupied: Partial<Record<Band, string[]>> = {};
+  for (const s of allOps) {
+    if (!isActiveForConflict(s)) continue;
+    if (!occupied[s.band]) occupied[s.band] = [];
+    occupied[s.band]!.push(s.op_call);
+  }
+  const occupiedKey = JSON.stringify(occupied);
+
+  // Notify parent of conflict state changes
+  useEffect(() => {
+    onConflict?.(anyConflict);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anyConflict]);
+
+  // Notify parent of band occupancy changes
+  useEffect(() => {
+    onBandOccupancy?.(occupied);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [occupiedKey]);
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 light:border-zinc-200 light:bg-zinc-100/50">
-      <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
-        Operators
-      </h3>
+      <div className="flex items-center justify-between mb-2">
+        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+          Operators
+        </h3>
+        {isQRT ? (
+          <button
+            onClick={goOnAir}
+            className="text-[10px] font-semibold uppercase tracking-wide rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-green-400 hover:bg-green-900/50 transition-colors"
+          >
+            Back on Air
+          </button>
+        ) : (
+          <button
+            onClick={goQRT}
+            className="text-[10px] font-semibold uppercase tracking-wide rounded border border-zinc-700 px-2 py-0.5 text-zinc-500 hover:border-red-700 hover:bg-red-900/30 hover:text-red-400 transition-colors"
+          >
+            Go QRT
+          </button>
+        )}
+      </div>
+
+      {isQRT && (
+        <div className="mb-2 rounded border border-red-800 bg-red-900/20 px-2 py-1 text-[11px] text-red-400">
+          You are QRT — not shown to other operators
+        </div>
+      )}
+
       <div className="flex flex-col gap-1">
         {allOps.length === 0 && (
           <p className="text-[11px] text-zinc-600 light:text-zinc-400">No operators online yet.</p>
         )}
         {allOps
           .sort((a, b) => {
-            // Me first, then by last QSO recency
             if (a.op_call === myOpCall) return -1;
             if (b.op_call === myOpCall) return 1;
-            const aLast = typeof lastQSOByOp[a.op_call] === 'string' ? lastQSOByOp[a.op_call] : '';
-            const bLast = typeof lastQSOByOp[b.op_call] === 'string' ? lastQSOByOp[b.op_call] : '';
+            const aLast = lastQSOByOp[a.op_call] ?? '';
+            const bLast = lastQSOByOp[b.op_call] ?? '';
             return bLast > aLast ? -1 : bLast < aLast ? 1 : 0;
           })
           .map(s => {
@@ -132,8 +200,8 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
             const lastQSO = lastQSOByOp[s.op_call];
             const inactive = lastQSO
               ? now - new Date(lastQSO).getTime() > INACTIVE_MS
-              : true;
-            const conflict = !isMe && s.band === currentBand && s.mode === currentMode;
+              : false;
+            const conflict = !isMe && isActiveForConflict(s) && s.band === currentBand && s.mode === currentMode;
 
             return (
               <div

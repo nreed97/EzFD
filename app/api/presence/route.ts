@@ -21,6 +21,19 @@ export async function POST(request: Request) {
   return NextResponse.json({ ok: true });
 }
 
+export async function DELETE(request: Request) {
+  const { event_id, op_call } = await request.json();
+  if (!event_id || !op_call) {
+    return NextResponse.json({ error: 'Missing fields' }, { status: 400 });
+  }
+  const pool = getPool();
+  await pool.query(
+    `DELETE FROM presence WHERE event_id=$1 AND op_call=$2`,
+    [event_id, op_call.toUpperCase().trim()]
+  );
+  return NextResponse.json({ ok: true });
+}
+
 export async function GET(request: Request) {
   const eventId = new URL(request.url).searchParams.get('event_id');
   if (!eventId) return NextResponse.json({ error: 'event_id required' }, { status: 400 });

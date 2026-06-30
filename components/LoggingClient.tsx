@@ -92,6 +92,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [showWsjtxHelp, setShowWsjtxHelp] = useState(false);
   const [showNeeds, setShowNeeds] = useState(false);
   const [bandConflict, setBandConflict] = useState(false);
+  const [bandOccupancy, setBandOccupancy] = useState<Partial<Record<Band, string[]>>>({});
   const syncingRef = useRef(false);
 
   useEffect(() => {
@@ -377,6 +378,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             submitError={submitError}
             onDigHelp={() => setShowWsjtxHelp(true)}
             existingQSOs={confirmedQSOs}
+            bandOccupancy={bandOccupancy}
           />
           <BandActivity
             eventId={event.id}
@@ -386,6 +388,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             currentMode={currentMode}
             qsos={displayQSOs}
             onConflict={setBandConflict}
+            onBandOccupancy={setBandOccupancy}
           />
           <Scoreboard score={score} />
           <button
