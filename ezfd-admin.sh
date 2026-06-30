@@ -470,6 +470,82 @@ backup_all() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Update application (git pull → build → rsync → migrate → restart)
+# ─────────────────────────────────────────────────────────────────────────────
+update_app() {
+  banner
+  echo -e "  ${BOLD}Update Application${NC}"
+  echo
+  hr
+
+  local APP_DIR="/opt/ezfd"
+  local REPO_DIR=""
+  REPO_DIR="$(grep '^EZFD_REPO_DIR=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- || true)"
+
+  if [[ -z "$REPO_DIR" || ! -d "$REPO_DIR/.git" ]]; then
+    err "Cannot locate the source repository."
+    echo -e "  ${DIM}Expected EZFD_REPO_DIR in ${APP_DIR}/.env pointing to the cloned repo.${NC}"
+    echo -e "  ${DIM}Re-run deploy.sh once to set this up automatically.${NC}"
+    pause; return
+  fi
+
+  label "Repo:";    echo "$REPO_DIR"
+  label "App dir:"; echo "$APP_DIR"
+
+  local cur_commit; cur_commit=$(git -C "$REPO_DIR" log --oneline -1 2>/dev/null || echo "(unknown)")
+  label "Current:"; echo "$cur_commit"
+  echo
+
+  echo -e "  ${DIM}Fetching latest changes from remote…${NC}"
+  if ! git -C "$REPO_DIR" pull 2>&1 | sed 's/^/    /'; then
+    err "git pull failed — check your network or repo state."
+    pause; return
+  fi
+
+  local new_commit; new_commit=$(git -C "$REPO_DIR" log --oneline -1 2>/dev/null || echo "(unknown)")
+  label "Updated to:"; echo "$new_commit"
+  echo
+
+  if [[ "$cur_commit" == "$new_commit" ]]; then
+    warn "Already up to date — no rebuild needed."
+    pause; return
+  fi
+
+  echo -e "  ${DIM}Installing dependencies…${NC}"
+  if ! (cd "$REPO_DIR" && npm ci --silent 2>&1 | sed 's/^/    /'); then
+    err "npm ci failed."; pause; return
+  fi
+
+  echo -e "  ${DIM}Building…${NC}"
+  if ! (cd "$REPO_DIR" && npm run build 2>&1 | sed 's/^/    /'); then
+    err "Build failed."; pause; return
+  fi
+
+  echo -e "  ${DIM}Deploying files…${NC}"
+  rsync -a --delete "${REPO_DIR}/.next/standalone/"  "$APP_DIR/"
+  rsync -a --delete "${REPO_DIR}/.next/static/"      "$APP_DIR/.next/static/"
+  rsync -a --delete "${REPO_DIR}/public/"            "$APP_DIR/public/"
+  cp "$REPO_DIR/ezfd-admin.sh" "$APP_DIR/ezfd-admin.sh"
+  chmod +x "$APP_DIR/ezfd-admin.sh"
+
+  echo -e "  ${DIM}Applying database migrations…${NC}"
+  sudo -u postgres psql -d ezfd -f "$REPO_DIR/db/schema.sql" >/dev/null 2>&1 || true
+
+  echo -e "  ${DIM}Restarting service…${NC}"
+  systemctl restart ezfd
+  sleep 2
+  if systemctl is-active --quiet ezfd; then
+    log "Service restarted successfully."
+  else
+    err "Service failed to start — check: journalctl -u ezfd -n 30"
+  fi
+
+  echo
+  log "Update complete: ${new_commit}"
+  pause
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Main menu loop
 # ─────────────────────────────────────────────────────────────────────────────
 main_menu() {
@@ -490,13 +566,15 @@ main_menu() {
       "List / manage events" \
       "Server statistics" \
       "Full JSON backup (all events + QSOs)" \
+      "Update application (git pull + rebuild)" \
       "Exit"
 
     case "$choice" in
       1) list_events ;;
       2) server_stats ;;
       3) backup_all ;;
-      4) echo; exit 0 ;;
+      4) update_app ;;
+      5) echo; exit 0 ;;
     esac
   done
 }
