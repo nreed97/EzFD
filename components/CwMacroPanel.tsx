@@ -75,7 +75,6 @@ interface Store {
   sp: string[];
   wpm: number;
   opMode: OpMode;
-  autoCqEnabled: boolean;
   autoCqSeconds: number;
 }
 
@@ -110,6 +109,9 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
   const setMacros = opMode === 'RUN' ? setRunMacros : setSpMacros;
 
   // Load saved state
+  // Auto CQ is intentionally NOT restored from storage — it always starts
+  // OFF and must be manually enabled each session, even if it was left on
+  // in a previous one.
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -119,7 +121,6 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
         if (saved.sp?.length === 12) setSpMacros(saved.sp);
         if (saved.wpm) setWpm(saved.wpm);
         if (saved.opMode === 'RUN' || saved.opMode === 'S&P') setOpMode(saved.opMode);
-        if (typeof saved.autoCqEnabled === 'boolean') setAutoCqEnabled(saved.autoCqEnabled);
         if (saved.autoCqSeconds) setAutoCqSeconds(saved.autoCqSeconds);
       }
     } catch { /* ignore malformed storage */ }
@@ -127,10 +128,10 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
 
   const persist = useCallback((next: Partial<Store>) => {
     try {
-      const current: Store = { run: runMacros, sp: spMacros, wpm, opMode, autoCqEnabled, autoCqSeconds, ...next };
+      const current: Store = { run: runMacros, sp: spMacros, wpm, opMode, autoCqSeconds, ...next };
       localStorage.setItem(storageKey, JSON.stringify(current));
     } catch { /* ignore quota errors */ }
-  }, [storageKey, runMacros, spMacros, wpm, opMode, autoCqEnabled, autoCqSeconds]);
+  }, [storageKey, runMacros, spMacros, wpm, opMode, autoCqSeconds]);
 
   useEffect(() => { if (editMode) { firstEditRef.current?.focus(); firstEditRef.current?.select(); } }, [editMode]);
 
@@ -195,11 +196,7 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
   }), [opMode, fireIndex, scheduleAutoCq]);
 
   function toggleAutoCq() {
-    setAutoCqEnabled(prev => {
-      const next = !prev;
-      persist({ autoCqEnabled: next });
-      return next;
-    });
+    setAutoCqEnabled(prev => !prev);
   }
 
   function changeAutoCqSeconds(v: number) {
@@ -233,7 +230,9 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
   }
 
   // Space bar aborts sending (unless typing); Escape always aborts instantly,
-  // even mid-field, since it's never valid text input; F1-F12 fire macros.
+  // even mid-field, since it's never valid text input, and also fully turns
+  // off Auto CQ (not just a pause — requires a manual re-enable, same as a
+  // fresh session); F1-F12 fire macros.
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {
       const target = e.target as HTMLElement | null;
@@ -241,6 +240,7 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
       if (e.key === 'Escape') {
         e.preventDefault();
         onStop();
+        setAutoCqEnabled(false);
         return;
       }
       if (e.code === 'Space' && !typing) {

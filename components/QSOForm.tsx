@@ -53,12 +53,15 @@ interface Props {
   /** When set, the "Logged ✓" confirmation fades out and disappears this many
    * ms after each lastLogged change, instead of staying until replaced. */
   autoFadeLoggedMs?: number;
+  /** When set, the collapsed band/mode chip on the QSY button renders larger —
+   * used in the CW popout where it's the sole band/mode display. */
+  largeQsyChip?: boolean;
 }
 
 function QSOForm({
   eventId, eventType, hasQRZ, band, mode, onBandChange, onModeChange,
   onSubmit, submitting, lastLogged, submitError, onDigHelp, existingQSOs,
-  bandOccupancy = {}, esm, onEsmCall, onEsmLog, onCallsignInput, autoFadeLoggedMs,
+  bandOccupancy = {}, esm, onEsmCall, onEsmLog, onCallsignInput, autoFadeLoggedMs, largeQsyChip,
 }: Props, ref: React.Ref<QSOFormHandle>) {
   const [callsign, setCallsign] = useState('');
   const [rcvdClass, setRcvdClass] = useState('');
@@ -303,10 +306,10 @@ function QSOForm({
           className="flex w-full items-center justify-between rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-2.5 hover:border-zinc-500 hover:bg-zinc-750 transition-colors light:border-zinc-300 light:bg-zinc-100 light:hover:bg-zinc-200 light:hover:border-zinc-400"
         >
           <div className="flex items-center gap-2">
-            <span className="rounded border bg-amber-400/15 border-amber-400/40 px-2.5 py-1 font-mono text-sm font-bold text-amber-400 light:bg-amber-50 light:border-amber-600 light:text-amber-700">
+            <span className={`rounded border bg-amber-400/15 border-amber-400/40 px-2.5 py-1 font-mono font-bold text-amber-400 light:bg-amber-50 light:border-amber-600 light:text-amber-700 ${largeQsyChip ? 'text-xl tracking-wide' : 'text-sm'}`}>
               {band}
             </span>
-            <span className={`rounded border px-2.5 py-1 font-mono text-sm font-bold ${MODE_STYLE[mode]}`}>
+            <span className={`rounded border px-2.5 py-1 font-mono font-bold ${MODE_STYLE[mode]} ${largeQsyChip ? 'text-xl tracking-wide' : 'text-sm'}`}>
               {mode}
             </span>
           </div>

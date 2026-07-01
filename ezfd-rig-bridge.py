@@ -558,12 +558,19 @@ async def probe_cw_support(host: str, port: int) -> bool:
 
 # ── WebSocket server ──────────────────────────────────────────────────────────
 _clients: set = set()
+_last_state: dict = {}  # most recent freq/band/mode broadcast — sent to newly-joining clients
 
 async def ws_handler(websocket, rig: RigCtldClient, can_cw: bool):
     _clients.add(websocket)
     info(f"Browser connected  ({len(_clients)} client{'s' if len(_clients) != 1 else ''})")
     try:
         await websocket.send(json.dumps({"type": "caps", "can_cw": can_cw}))
+        # Give a newly-connected client the last known state immediately,
+        # rather than making it wait for the rig to actually change — the
+        # poll loop only broadcasts on change, so a client connecting while
+        # the VFO is parked would otherwise see nothing until it's tuned.
+        if _last_state:
+            await websocket.send(json.dumps(_last_state))
     except Exception:
         pass
 
@@ -617,6 +624,8 @@ async def poll_rig(rig: RigCtldClient):
 
             if current != last:
                 last = current
+                _last_state.clear()
+                _last_state.update(current)
                 payload = json.dumps(current)
                 if _clients:
                     results = await asyncio.gather(
