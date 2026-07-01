@@ -50,12 +50,15 @@ interface Props {
   /** Fired on every callsign field keystroke with the current value —
    * used to pause/resume an auto-CQ loop as soon as the operator starts typing. */
   onCallsignInput?: (value: string) => void;
+  /** When set, the "Logged ✓" confirmation fades out and disappears this many
+   * ms after each lastLogged change, instead of staying until replaced. */
+  autoFadeLoggedMs?: number;
 }
 
 function QSOForm({
   eventId, eventType, hasQRZ, band, mode, onBandChange, onModeChange,
   onSubmit, submitting, lastLogged, submitError, onDigHelp, existingQSOs,
-  bandOccupancy = {}, esm, onEsmCall, onEsmLog, onCallsignInput,
+  bandOccupancy = {}, esm, onEsmCall, onEsmLog, onCallsignInput, autoFadeLoggedMs,
 }: Props, ref: React.Ref<QSOFormHandle>) {
   const [callsign, setCallsign] = useState('');
   const [rcvdClass, setRcvdClass] = useState('');
@@ -66,6 +69,17 @@ function QSOForm({
   }), [callsign, rcvdClass, rcvdSection]);
   const [qrzInfo, setQrzInfo] = useState<{ name?: string; state?: string; country?: string } | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
+  const [loggedFading, setLoggedFading] = useState(false);
+  const [loggedHidden, setLoggedHidden] = useState(false);
+
+  useEffect(() => {
+    setLoggedFading(false);
+    setLoggedHidden(false);
+    if (!lastLogged || !autoFadeLoggedMs) return;
+    const fadeTimer = setTimeout(() => setLoggedFading(true), Math.max(0, autoFadeLoggedMs - 500));
+    const hideTimer = setTimeout(() => setLoggedHidden(true), autoFadeLoggedMs);
+    return () => { clearTimeout(fadeTimer); clearTimeout(hideTimer); };
+  }, [lastLogged, autoFadeLoggedMs]);
   const [showQSY, setShowQSY] = useState(false);
   const [showExtra, setShowExtra] = useState(false);
   const callRef    = useRef<HTMLInputElement>(null);
@@ -244,8 +258,8 @@ function QSOForm({
       )}
 
       {/* Post-log feedback */}
-      {lastLogged && (
-        <div className={`rounded-lg border px-3 py-2 ${
+      {lastLogged && !loggedHidden && (
+        <div className={`rounded-lg border px-3 py-2 transition-opacity duration-500 ${loggedFading ? 'opacity-0' : 'opacity-100'} ${
           lastLogged.is_dupe
             ? 'border-yellow-700 bg-yellow-900/30'
             : lastLogged._pending

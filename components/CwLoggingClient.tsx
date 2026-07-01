@@ -142,6 +142,7 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
           submitError={submitError}
           onDigHelp={() => {}}
           existingQSOs={confirmedQSOs}
+          autoFadeLoggedMs={4000}
           esm={rig.canCw && esm}
           onEsmCall={() => {
             const { callsign } = formRef.current?.getValues() ?? { callsign: '' };
