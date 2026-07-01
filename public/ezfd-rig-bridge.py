@@ -269,9 +269,19 @@ def port_open(port: int) -> bool:
     except OSError:
         return False
 
+# Rigs that connect over TCP/IP rather than a serial port.
+# For these, rigctld -r takes an IP address (optionally host:port) instead of /dev/ttyUSBx.
+NETWORK_RIG_KEYWORDS = ("smartsdr", "net rigctl", "remotehams", "rs-ba1", "sdrc")
+
+def is_network_rig(model_name: str) -> bool:
+    n = model_name.lower()
+    return any(kw in n for kw in NETWORK_RIG_KEYWORDS)
+
 def search_rig_models(query: str) -> list[tuple[str, str, str]]:
     """Run rigctld -l, parse output, return rows matching the query string.
-    Each row is (model_num, manufacturer, model_name)."""
+    Each row is (model_num, manufacturer, model_name).
+    rigctld -l columns: Rig#  Mfg  Model...  Version  Status
+    Version and Status are always the last two tokens; model is everything between."""
     try:
         out = subprocess.check_output(
             ["rigctld", "-l"], text=True, stderr=subprocess.DEVNULL, timeout=10
@@ -285,21 +295,22 @@ def search_rig_models(query: str) -> list[tuple[str, str, str]]:
         if not line or not line[0].isdigit():
             continue
         parts = line.split()
-        if len(parts) < 3:
+        if len(parts) < 4:
             continue
-        model_num = parts[0]
-        mfg       = parts[1]
-        model_name = " ".join(parts[2:4])
+        model_num  = parts[0]
+        mfg        = parts[1]
+        # Last token is status (Stable/Beta/…), second-to-last is version
+        model_name = " ".join(parts[2:-2])
         if query.lower() in line.lower():
             results.append((model_num, mfg, model_name))
     return results
 
-def pick_rig_model(saved_model: str) -> str:
-    """Interactive model selection: search by manufacturer or enter number directly."""
+def pick_rig_model(saved_model: str) -> tuple[str, str]:
+    """Interactive model selection. Returns (model_num, model_name)."""
     while True:
         print()
         print(f"  {B}Rig model — options:{NC}")
-        print(f"    {D}s{NC}  Search by manufacturer / model name  (e.g. 'icom', 'kenwood', 'ft-991')")
+        print(f"    {D}s{NC}  Search by manufacturer / model name  (e.g. 'icom', 'kenwood', 'flex')")
         if saved_model:
             print(f"    {D}↵{NC}  Keep current model  [{saved_model}]")
         print(f"    {D}#  {NC}Enter model number directly")
@@ -307,7 +318,7 @@ def pick_rig_model(saved_model: str) -> str:
         ans = input("  Choice [s / number]: ").strip()
 
         if not ans and saved_model:
-            return saved_model
+            return saved_model, ""
 
         if ans.lower() == "s" or (ans and not ans.isdigit()):
             query = ans if ans.lower() != "s" else input("  Search (manufacturer or model name): ").strip()
@@ -315,25 +326,26 @@ def pick_rig_model(saved_model: str) -> str:
                 continue
             results = search_rig_models(query)
             if not results:
-                warn(f"No rigs matching '{query}'. Try a shorter term (e.g. 'IC-' or 'FT-').")
+                warn(f"No rigs matching '{query}'. Try a shorter term.")
                 continue
             print()
-            print(f"  {B}{'#':<5} {'Mfg':<14} Model{NC}")
-            print(f"  {D}{'─'*45}{NC}")
+            print(f"  {B}{'#':<5} {'Mfg':<18} Model{NC}")
+            print(f"  {D}{'─'*55}{NC}")
             for i, (num, mfg, name) in enumerate(results[:20], 1):
-                print(f"  {C}{i:<3}{NC}  {num:<5} {mfg:<14} {name}")
+                net_tag = f"  {D}[network]{NC}" if is_network_rig(name) else ""
+                print(f"  {C}{i:<3}{NC}  {num:<6} {mfg:<18} {name}{net_tag}")
             if len(results) > 20:
                 print(f"  {D}  … {len(results)-20} more — refine your search to narrow results{NC}")
             print()
-            sel = input(f"  Pick a number [1-{min(len(results),20)}], or press Enter to search again: ").strip()
+            sel = input(f"  Pick a number [1-{min(len(results),20)}], or Enter to search again: ").strip()
             if sel.isdigit():
                 idx = int(sel) - 1
                 if 0 <= idx < min(len(results), 20):
-                    chosen = results[idx][0]
-                    ok(f"Selected model {chosen}  ({results[idx][1]} {results[idx][2]})")
-                    return chosen
+                    num, mfg, name = results[idx]
+                    ok(f"Selected model {num}  ({mfg} {name})")
+                    return num, name
         elif ans.isdigit():
-            return ans
+            return ans, ""
 
 def prompt_rig_config(cfg: dict, rigctld_port: int) -> dict | None:
     """Interactively collect rig settings, start rigctld, return updated cfg."""
@@ -341,30 +353,37 @@ def prompt_rig_config(cfg: dict, rigctld_port: int) -> dict | None:
     info("rigctld is not running. Let's configure your rig.")
 
     saved_model = cfg.get("model", "")
-    saved_port  = cfg.get("serial_port", "COM3" if platform.system() == "Windows" else "/dev/ttyUSB0")
     saved_baud  = str(cfg.get("baud", "19200"))
 
-    model = pick_rig_model(saved_model)
+    model, model_name = pick_rig_model(saved_model)
     if not model:
         err("No rig model provided.")
         return None
 
     print()
-    serial_port = input(f"  Serial / USB port [{saved_port}]: ").strip() or saved_port
-    baud        = input(f"  Baud rate         [{saved_baud}]: ").strip() or saved_baud
+    network = is_network_rig(model_name)
+
+    if network:
+        saved_port = cfg.get("serial_port", "192.168.1.1")
+        info("This rig connects over the network — enter its IP address, not a COM port.")
+        info("For FlexRadio SmartSDR the IP is shown in SmartSDR under Radio → Settings.")
+        serial_port = input(f"  Radio IP address [{saved_port}]: ").strip() or saved_port
+        # Network rigs don't use a baud rate
+        baud = cfg.get("baud", "0")
+    else:
+        default_port = "COM3" if platform.system() == "Windows" else "/dev/ttyUSB0"
+        saved_port   = cfg.get("serial_port", default_port)
+        serial_port  = input(f"  Serial / USB port [{saved_port}]: ").strip() or saved_port
+        baud         = input(f"  Baud rate         [{saved_baud}]: ").strip() or saved_baud
 
     cfg.update({"model": model, "serial_port": serial_port, "baud": baud})
     save_config(cfg)
     return cfg
 
 def start_rigctld(cfg: dict, rigctld_port: int) -> "subprocess.Popen | None":
-    cmd = [
-        "rigctld",
-        "-m", cfg["model"],
-        "-r", cfg["serial_port"],
-        "-s", cfg["baud"],
-        "-t", str(rigctld_port),
-    ]
+    cmd = ["rigctld", "-m", cfg["model"], "-r", cfg["serial_port"], "-t", str(rigctld_port)]
+    if str(cfg.get("baud", "0")) not in ("0", ""):
+        cmd += ["-s", str(cfg["baud"])]
     info("Starting:  " + " ".join(cmd))
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
