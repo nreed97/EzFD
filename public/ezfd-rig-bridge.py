@@ -8,6 +8,8 @@ Quick start
   1. Connect your rig via USB / serial
   2. python3 ezfd-rig-bridge.py
   3. Open EzFD — band and mode will follow the VFO automatically
+  4. If your rig supports CAT-based CW keying, a "Pop out CW Window" button
+     appears in EzFD's header — F1-F12 macros, speed control, live keying
 
 Browser connects to: ws://localhost:4575
 rigctld listens on:  localhost:4532  (default Hamlib port)
@@ -20,6 +22,7 @@ Options
 
 import sys
 import os
+import re
 import subprocess
 import platform
 import shutil
@@ -428,6 +431,7 @@ class RigCtldClient:
         self.port   = port
         self.reader: asyncio.StreamReader | None = None
         self.writer: asyncio.StreamWriter | None = None
+        self.lock   = asyncio.Lock()  # serializes all request/response cycles on this connection
 
     async def connect(self):
         self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
@@ -445,17 +449,75 @@ class RigCtldClient:
             raise RigError(text)
         return text
 
+    async def _raw_readline(self, timeout: float = 2.0) -> str:
+        """Like _readline but never raises on RPRT — caller inspects it directly."""
+        assert self.reader
+        line = await asyncio.wait_for(self.reader.readline(), timeout=timeout)
+        return line.decode().strip()
+
+    async def _read_rprt(self, timeout: float = 3.0):
+        """Read a single RPRT <code> response line (void/set-style commands).
+        Raises RigError if the code is non-zero or the line is malformed."""
+        text = await self._raw_readline(timeout)
+        if not text.startswith("RPRT"):
+            raise RigError(f"Unexpected response: {text}")
+        parts = text.split()
+        code = parts[-1] if len(parts) > 1 else "?"
+        if code != "0":
+            raise RigError(text)
+
     async def get_freq(self) -> int:
         """Returns VFO frequency in Hz."""
-        await self._send("f")
-        return int(await self._readline())
+        async with self.lock:
+            await self._send("f")
+            return int(await self._readline())
 
     async def get_mode(self) -> str:
         """Returns Hamlib mode string (e.g. 'USB', 'CW', 'RTTY')."""
-        await self._send("m")
-        mode = await self._readline()
-        await self._readline()  # discard passband width line
-        return mode
+        async with self.lock:
+            await self._send("m")
+            mode = await self._readline()
+            await self._readline()  # discard passband width line
+            return mode
+
+    async def get_caps_text(self) -> str:
+        """Runs \\dump_caps and accumulates output until the stream goes quiet."""
+        async with self.lock:
+            await self._send("\\dump_caps")
+            lines = []
+            try:
+                while True:
+                    line = await self._raw_readline(timeout=0.5)
+                    if not line:
+                        break
+                    lines.append(line)
+            except asyncio.TimeoutError:
+                pass
+            return "\n".join(lines)
+
+    async def send_morse(self, text: str):
+        """Sends text as CW via the rig's CAT-controlled keyer. Requires a rig
+        backend with Morse-send support (checked ahead of time via get_caps_text)."""
+        # Strip anything that could break the single-line protocol framing or
+        # inject additional rigctld commands (newlines, carriage returns).
+        clean = "".join(ch for ch in text if ch.isprintable()).strip()
+        if not clean:
+            return
+        async with self.lock:
+            await self._send(f"\\send_morse VFO {clean}")
+            await self._read_rprt()
+
+    async def stop_morse(self):
+        async with self.lock:
+            await self._send("\\stop_morse VFO")
+            await self._read_rprt()
+
+    async def set_cw_speed(self, wpm: int):
+        """Sets CW keyer speed in WPM. Not all rigs support the KEYSPD level —
+        failures here are non-fatal, callers should catch and ignore."""
+        async with self.lock:
+            await self._send(f"\\set_level KEYSPD {int(wpm)}")
+            await self._read_rprt()
 
     async def close(self):
         if self.writer:
@@ -468,12 +530,42 @@ class RigCtldClient:
 # ── WebSocket server ──────────────────────────────────────────────────────────
 _clients: set = set()
 
-async def ws_handler(websocket):
+async def ws_handler(websocket, rig: RigCtldClient, can_cw: bool):
     _clients.add(websocket)
-    client_info = websocket.remote_address if hasattr(websocket, "remote_address") else "browser"
     info(f"Browser connected  ({len(_clients)} client{'s' if len(_clients) != 1 else ''})")
     try:
-        await websocket.wait_closed()
+        await websocket.send(json.dumps({"type": "caps", "can_cw": can_cw}))
+    except Exception:
+        pass
+
+    try:
+        async for raw in websocket:
+            try:
+                msg = json.loads(raw)
+            except Exception:
+                continue
+
+            mtype = msg.get("type")
+            if mtype == "send_cw" and can_cw:
+                try:
+                    wpm = msg.get("wpm")
+                    if wpm:
+                        try:
+                            await rig.set_cw_speed(wpm)
+                        except Exception:
+                            pass  # KEYSPD not supported on this rig — keep sending at current speed
+                    await rig.send_morse(str(msg.get("text", "")))
+                except Exception as exc:
+                    warn(f"send_morse failed: {exc}")
+                    try:
+                        await websocket.send(json.dumps({"type": "cw_error", "error": str(exc)}))
+                    except Exception:
+                        pass
+            elif mtype == "stop_cw" and can_cw:
+                try:
+                    await rig.stop_morse()
+                except Exception as exc:
+                    warn(f"stop_morse failed: {exc}")
     finally:
         _clients.discard(websocket)
         info(f"Browser disconnected  ({len(_clients)} client{'s' if len(_clients) != 1 else ''})")
@@ -537,13 +629,25 @@ async def run_bridge(rigctld_host: str, rigctld_port: int, ws_port: int):
     info(f"Connecting to rigctld at {rigctld_host}:{rigctld_port}…")
     await rig.connect()
     ok("Connected to rigctld")
+
+    info("Checking rig capabilities…")
+    caps_text = await rig.get_caps_text()
+    can_cw = bool(re.search(r"Can\s+Send\s+Morse:\s*Y", caps_text, re.IGNORECASE))
+    if can_cw:
+        ok("Rig supports CW keying via CAT — CW macro panel available in EzFD.")
+    else:
+        info("Rig does not report CAT CW-send support — CW macro panel will stay hidden.")
+
     print()
     ok(f"WebSocket server:  {B}ws://localhost:{ws_port}{NC}")
     info("Open EzFD — band and mode will follow your rig automatically.")
     info("Press Ctrl+C to stop.")
     print()
 
-    async with websockets.serve(ws_handler, "localhost", ws_port):
+    async def handler(websocket):
+        await ws_handler(websocket, rig, can_cw)
+
+    async with websockets.serve(handler, "localhost", ws_port):
         await poll_rig(rig)
 
 def main():

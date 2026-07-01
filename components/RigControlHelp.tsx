@@ -4,6 +4,7 @@ import { useState } from 'react';
 
 interface Props {
   rigConnected: boolean;
+  canCw?: boolean;
   onClose: () => void;
 }
 
@@ -24,8 +25,9 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
   );
 }
 
-export default function RigControlHelp({ rigConnected, onClose }: Props) {
+export default function RigControlHelp({ rigConnected, canCw, onClose }: Props) {
   const [showPlatform, setShowPlatform] = useState<'win' | 'mac' | 'linux'>('win');
+  const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
   const runCmd = showPlatform === 'win' ? 'python ezfd-rig-bridge.py' : 'python3 ezfd-rig-bridge.py';
 
@@ -139,9 +141,10 @@ export default function RigControlHelp({ rigConnected, onClose }: Props) {
             </div>
 
             <Step n={4}>
-              When prompted, enter your <strong className="text-zinc-200 light:text-zinc-800">rig model number</strong>.
-              Not sure? Run <Code>rigctld --list</Code> in a terminal after Hamlib is installed
-              and search for your rig by name.
+              When prompted for a <strong className="text-zinc-200 light:text-zinc-800">rig model</strong>, type{' '}
+              <Code>s</Code> to search — enter your manufacturer or model name (e.g.{' '}
+              <Code>icom</Code>, <Code>kenwood</Code>, <Code>ft-991</Code>, <Code>flex</Code>) and pick
+              from a numbered list. Already know your model number? Type it directly instead.
             </Step>
 
             <Step n={5}>
@@ -162,16 +165,93 @@ export default function RigControlHelp({ rigConnected, onClose }: Props) {
             </div>
 
             <Step n={6}>
+              If your model can connect either way (e.g. FlexRadio SmartSDR), you&apos;ll be
+              asked to choose <strong className="text-zinc-200 light:text-zinc-800">serial/USB or network IP</strong>.
+              A SmartCAT virtual COM port counts as serial — pick serial and use the{' '}
+              <strong className="text-zinc-200 light:text-zinc-800">Kenwood TS-2000</strong> model
+              instead of the FlexRadio-specific one, since SmartCAT emulates Kenwood CAT.
+            </Step>
+
+            <Step n={7}>
               Leave the terminal window open. EzFD will connect automatically —
               look for the <span className="text-green-400 font-semibold">● RIG</span> badge in the header.
               Settings are saved to <Code>~/.ezfd-rig.json</Code> so future runs need no prompts.
             </Step>
           </div>
 
+          {/* CW keying */}
+          <div className="rounded-lg border border-zinc-700 bg-zinc-800/40 p-4 flex flex-col gap-2 light:border-zinc-200 light:bg-zinc-50">
+            <div className="flex items-center justify-between">
+              <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">CW Macros &amp; Keying</p>
+              {rigConnected && (
+                <span className={`text-[10px] font-bold rounded px-1.5 py-0.5 ${
+                  canCw
+                    ? 'bg-green-900/40 text-green-400 light:bg-green-100 light:text-green-700'
+                    : 'bg-zinc-700 text-zinc-400 light:bg-zinc-200 light:text-zinc-600'
+                }`}>
+                  {canCw ? 'AVAILABLE' : 'NOT SUPPORTED'}
+                </span>
+              )}
+            </div>
+            <p className="text-sm text-zinc-300 light:text-zinc-700">
+              If your rig supports CAT-based CW sending, the bridge script detects it automatically
+              at startup and a{' '}
+              <span className="text-amber-400 font-semibold">⚡ CW</span> button appears in EzFD&apos;s
+              header. Click it to pop out a separate keying window — sized and positioned like an
+              N1MM entry window — with its own callsign/exchange fields, F1–F12 macro buttons, a
+              speed control, and full QSO logging.
+            </p>
+            <ul className="text-xs text-zinc-400 light:text-zinc-600 list-disc pl-4 flex flex-col gap-1">
+              <li>Double-click any macro button to edit it — saved per operator in this browser</li>
+              <li>Placeholders: <Code>{'{call}'}</Code> worked station, <Code>{'{class}'}</Code>/<Code>{'{section}'}</Code> their exchange, <Code>{'{mycall}'}</Code>, <Code>{'{exch}'}</Code> your own class+section</li>
+              <li>F1–F12 keys on your keyboard fire the matching macro; <strong>Space bar</strong> aborts mid-send</li>
+              <li>Not all rigs expose CAT CW sending — Icom, Elecraft, Yaesu (most models), and FlexRadio
+                  generally support it; older or CAT-only interfaces often don&apos;t. If your rig doesn&apos;t
+                  support it, band/mode auto-follow and logging still work fine — you&apos;ll just key by hand.</li>
+            </ul>
+          </div>
+
           <p className="text-xs text-zinc-600 light:text-zinc-500">
             Rig control is completely optional. Operators without it can set band and mode manually as usual.
             The bridge script only runs on your local machine and never sends data to the EzFD server.
           </p>
+
+          {/* Troubleshooting */}
+          <div className="rounded-lg border border-zinc-800 bg-zinc-800/20 p-4 flex flex-col gap-2">
+            <button
+              type="button"
+              onClick={() => setShowTroubleshoot(v => !v)}
+              className="flex items-center justify-between w-full text-left"
+            >
+              <span className="text-zinc-500 text-sm">Troubleshooting</span>
+              <span className="text-zinc-600 text-sm shrink-0 ml-2">{showTroubleshoot ? '▲' : '▼'}</span>
+            </button>
+            {showTroubleshoot && (
+              <div className="flex flex-col gap-2 pt-1 text-xs text-zinc-500">
+                <p>
+                  <strong className="text-zinc-300">Rig connects but band/mode never update:</strong>{' '}
+                  the port opened but the rig isn&apos;t responding. Run rigctld directly with{' '}
+                  <Code>-vvvvv</Code> to see the raw traffic — a repeating <Code>write_block failed</Code>{' '}
+                  error usually means hardware handshake is enabled on a virtual port that doesn&apos;t
+                  support it. The bridge script now disables handshake by default for serial connections,
+                  so this mainly affects configs saved before that fix — delete{' '}
+                  <Code>~/.ezfd-rig.json</Code> and reconfigure to pick it up.
+                </p>
+                <p>
+                  <strong className="text-zinc-300">Wrong model picked from search:</strong>{' '}
+                  some manufacturer-specific models (e.g. FlexRadio&apos;s native models) only work over
+                  the network, never a COM port, regardless of what port you give them. If serial doesn&apos;t
+                  work, try the Kenwood TS-2000 emulation instead — many virtual CAT ports speak that
+                  protocol even for other-brand radios.
+                </p>
+                <p>
+                  <strong className="text-zinc-300">CW macro panel doesn&apos;t appear:</strong>{' '}
+                  the bridge checks CW support once at startup and prints whether it found it. Check the
+                  terminal running the bridge script for a line saying whether CW keying is available.
+                </p>
+              </div>
+            )}
+          </div>
 
         </div>
 

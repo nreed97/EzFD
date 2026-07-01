@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
+import { useRigBridge } from '@/lib/useRigBridge';
 import { enqueue, dequeue, loadQueue, type PendingQSO } from '@/lib/offline-queue';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
 import QSOForm from './QSOForm';
@@ -94,10 +95,12 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [showNeeds, setShowNeeds] = useState(false);
   const [bandConflict, setBandConflict] = useState(false);
   const [bandOccupancy, setBandOccupancy] = useState<Partial<Record<Band, string[]>>>({});
-  const [rigConnected, setRigConnected] = useState(false);
-  const [rigFreq, setRigFreq] = useState<number | null>(null);
   const [showRigHelp, setShowRigHelp] = useState(false);
   const syncingRef = useRef(false);
+
+  const rig = useRigBridge({ onBand: setCurrentBand, onMode: setCurrentMode });
+  const rigConnected = rig.connected;
+  const rigFreq = rig.freq;
 
   useEffect(() => {
     setNightMode(localStorage.getItem('ezfd_night') === '1');
@@ -141,44 +144,6 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
     return () => es.close();
   }, [event.id]);
-
-  // Rig control — silently try to connect to a local ezfd-rig-bridge instance.
-  // No-op if the bridge isn't running; operators without rig control are unaffected.
-  useEffect(() => {
-    const RIG_WS = 'ws://localhost:4575';
-    let ws: WebSocket | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
-
-    function connect() {
-      ws = new WebSocket(RIG_WS);
-
-      ws.onopen = () => setRigConnected(true);
-
-      ws.onmessage = (e) => {
-        try {
-          const { band, mode, freq } = JSON.parse(e.data) as { band: Band | null; mode: string; freq: number };
-          if (band) setCurrentBand(band);
-          if (mode === 'PH' || mode === 'CW' || mode === 'DIG') setCurrentMode(mode);
-          if (freq) setRigFreq(freq);
-        } catch { /* ignore malformed frames */ }
-      };
-
-      ws.onclose = () => {
-        setRigConnected(false);
-        setRigFreq(null);
-        // Retry every 10 s so the rig can be plugged in mid-session
-        retryTimer = setTimeout(connect, 10_000);
-      };
-
-      ws.onerror = () => ws?.close();
-    }
-
-    connect();
-    return () => {
-      if (retryTimer) clearTimeout(retryTimer);
-      ws?.close();
-    };
-  }, []);
 
   const flushQueue = useCallback(async () => {
     if (syncingRef.current) return;
@@ -283,6 +248,18 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
                   {(rigFreq / 1e6).toFixed(3)}
                 </span>
               )}
+            </button>
+          )}
+          {rigConnected && rig.canCw && (
+            <button
+              onClick={() => window.open(
+                `/event/${event.join_code}/cw?op=${encodeURIComponent(operatorCall)}`,
+                `ezfd_cw_${event.join_code}`,
+                'width=520,height=880,noopener'
+              )}
+              title="Open the CW macro + keying window"
+              className="hidden sm:inline-flex items-center gap-1 rounded border border-amber-700 bg-amber-900/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400 hover:bg-amber-900/40 transition-colors">
+              ⚡ CW
             </button>
           )}
           <span className="text-zinc-600 hidden sm:inline">|</span>
@@ -484,6 +461,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       {showRigHelp && (
         <RigControlHelp
           rigConnected={rigConnected}
+          canCw={rig.canCw}
           onClose={() => setShowRigHelp(false)}
         />
       )}

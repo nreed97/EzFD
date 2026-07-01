@@ -1,8 +1,12 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import type { Band, Mode, DisplayQSO, QSO } from '@/lib/types';
 import { ARRL_SECTIONS } from '@/lib/types';
+
+export interface QSOFormHandle {
+  getValues: () => { callsign: string; rcvdClass: string; rcvdSection: string };
+}
 
 const BAND_GRID: Band[][] = [
   ['160m', '80m',  '40m'],
@@ -39,14 +43,18 @@ interface Props {
   bandOccupancy?: Partial<Record<Band, string[]>>;
 }
 
-export default function QSOForm({
+function QSOForm({
   eventId, eventType, hasQRZ, band, mode, onBandChange, onModeChange,
   onSubmit, submitting, lastLogged, submitError, onDigHelp, existingQSOs,
   bandOccupancy = {},
-}: Props) {
+}: Props, ref: React.Ref<QSOFormHandle>) {
   const [callsign, setCallsign] = useState('');
   const [rcvdClass, setRcvdClass] = useState('');
   const [rcvdSection, setRcvdSection] = useState('');
+
+  useImperativeHandle(ref, () => ({
+    getValues: () => ({ callsign, rcvdClass, rcvdSection }),
+  }), [callsign, rcvdClass, rcvdSection]);
   const [qrzInfo, setQrzInfo] = useState<{ name?: string; state?: string; country?: string } | null>(null);
   const [lookingUp, setLookingUp] = useState(false);
   const [showQSY, setShowQSY] = useState(false);
@@ -379,3 +387,5 @@ export default function QSOForm({
     </form>
   );
 }
+
+export default forwardRef(QSOForm);
