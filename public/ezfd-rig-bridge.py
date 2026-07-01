@@ -321,7 +321,7 @@ def pick_rig_model(saved_model: str) -> str:
             print(f"  {B}{'#':<5} {'Mfg':<14} Model{NC}")
             print(f"  {D}{'─'*45}{NC}")
             for i, (num, mfg, name) in enumerate(results[:20], 1):
-                print(f"  {CYAN}{i:<3}{NC}  {num:<5} {mfg:<14} {name}")
+                print(f"  {C}{i:<3}{NC}  {num:<5} {mfg:<14} {name}")
             if len(results) > 20:
                 print(f"  {D}  … {len(results)-20} more — refine your search to narrow results{NC}")
             print()
