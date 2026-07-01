@@ -202,7 +202,9 @@ export default function RigControlHelp({ rigConnected, canCw, onClose }: Props) 
               speed control, and full QSO logging.
             </p>
             <ul className="text-xs text-zinc-400 light:text-zinc-600 list-disc pl-4 flex flex-col gap-1">
-              <li>Double-click any macro button to edit it — saved per operator in this browser</li>
+              <li><strong className="text-zinc-300 light:text-zinc-700">RUN / S&amp;P toggle</strong> — separate macro sets for calling CQ versus hunting for stations; each remembers its own F1–F12</li>
+              <li><strong className="text-zinc-300 light:text-zinc-700">ESM</strong> (Enter Sends Message, N1MM-style) — with an empty callsign, Enter sends CQ (RUN mode); with a callsign but no exchange yet, Enter sends your call/exchange macro; once the exchange fields are filled, Enter sends TU and logs the QSO in one keystroke</li>
+              <li>Click EDIT to open all 12 macro slots at once — SAVE or CANCEL when done, saved per operator in this browser</li>
               <li>Placeholders: <Code>{'{call}'}</Code> worked station, <Code>{'{class}'}</Code>/<Code>{'{section}'}</Code> their exchange, <Code>{'{mycall}'}</Code> the event/club callsign, <Code>{'{exch}'}</Code> your own class+section</li>
               <li>F1–F12 keys on your keyboard fire the matching macro; <strong>Space bar</strong> aborts mid-send</li>
               <li>Not all rigs expose CAT CW sending — Icom, Elecraft, Yaesu (most models), and FlexRadio

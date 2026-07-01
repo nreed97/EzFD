@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useRigBridge } from '@/lib/useRigBridge';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
 import QSOForm, { type QSOFormHandle } from './QSOForm';
-import CwMacroPanel from './CwMacroPanel';
+import CwMacroPanel, { type CwMacroPanelHandle } from './CwMacroPanel';
 
 interface Props {
   event: Event;
@@ -20,7 +20,23 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [lastLogged, setLastLogged] = useState<DisplayQSO | null>(null);
+  const [esm, setEsm] = useState(true);
   const formRef = useRef<QSOFormHandle>(null);
+  const macroPanelRef = useRef<CwMacroPanelHandle>(null);
+
+  const esmStorageKey = `ezfd_cw_esm_${event.id}_${operatorCall}`;
+  useEffect(() => {
+    const saved = localStorage.getItem(esmStorageKey);
+    if (saved !== null) setEsm(saved === '1');
+  }, [esmStorageKey]);
+
+  function toggleEsm() {
+    setEsm(prev => {
+      const next = !prev;
+      localStorage.setItem(esmStorageKey, next ? '1' : '0');
+      return next;
+    });
+  }
 
   const rig = useRigBridge({ onBand: setCurrentBand, onMode: setCurrentMode });
 
@@ -126,10 +142,17 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
           submitError={submitError}
           onDigHelp={() => {}}
           existingQSOs={confirmedQSOs}
+          esm={rig.canCw && esm}
+          onEsmCall={() => {
+            const { callsign } = formRef.current?.getValues() ?? { callsign: '' };
+            macroPanelRef.current?.fireEsm(callsign ? 'call' : 'cq');
+          }}
+          onEsmLog={() => macroPanelRef.current?.fireEsm('log')}
         />
 
         {rig.canCw && (
           <CwMacroPanel
+            ref={macroPanelRef}
             onSend={rig.sendCw}
             onStop={rig.stopCw}
             cwError={rig.cwError}
@@ -138,6 +161,8 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
             eventClass={event.class}
             eventSection={event.arrl_section}
             storageKey={`ezfd_cw_macros_${event.id}_${operatorCall}`}
+            esm={esm}
+            onToggleEsm={toggleEsm}
           />
         )}
       </div>

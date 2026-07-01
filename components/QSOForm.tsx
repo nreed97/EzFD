@@ -41,12 +41,18 @@ interface Props {
   onDigHelp: () => void;
   existingQSOs: QSO[];
   bandOccupancy?: Partial<Record<Band, string[]>>;
+  /** Enter Sends Message (N1MM-style) — when set, Enter in the callsign field
+   * fires onEsmCall instead of just moving focus, and Enter/submit fires
+   * onEsmLog before the QSO is logged. Focus navigation still happens as usual. */
+  esm?: boolean;
+  onEsmCall?: () => void;
+  onEsmLog?: () => void;
 }
 
 function QSOForm({
   eventId, eventType, hasQRZ, band, mode, onBandChange, onModeChange,
   onSubmit, submitting, lastLogged, submitError, onDigHelp, existingQSOs,
-  bandOccupancy = {},
+  bandOccupancy = {}, esm, onEsmCall, onEsmLog,
 }: Props, ref: React.Ref<QSOFormHandle>) {
   const [callsign, setCallsign] = useState('');
   const [rcvdClass, setRcvdClass] = useState('');
@@ -93,6 +99,7 @@ function QSOForm({
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     if (!callsign || submitting) return;
+    if (esm) onEsmLog?.();
     await onSubmit({ callsign, band, mode, rcvd_class: rcvdClass, rcvd_section: rcvdSection });
     setCallsign('');
     setRcvdClass('');
@@ -140,9 +147,17 @@ function QSOForm({
           value={callsign}
           onChange={e => handleCallChange(e.target.value)}
           onKeyDown={e => {
-            if (e.key === 'Enter' && callsign) {
-              e.preventDefault();
-              classRef.current?.focus();
+            if (e.key === 'Enter') {
+              if (esm) {
+                e.preventDefault();
+                onEsmCall?.();
+                if (callsign) classRef.current?.focus();
+                return;
+              }
+              if (callsign) {
+                e.preventDefault();
+                classRef.current?.focus();
+              }
             }
           }}
           placeholder="W0NY"
