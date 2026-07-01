@@ -230,6 +230,12 @@ function QSOForm({
             list="section-list"
             value={rcvdSection}
             onChange={e => setRcvdSection(e.target.value.toUpperCase())}
+            onKeyDown={e => {
+              if (e.key === 'Tab' && !e.shiftKey) {
+                e.preventDefault();
+                callRef.current?.focus();
+              }
+            }}
             placeholder="MN"
             className={`input w-full font-mono ${sectionInvalid ? 'border-orange-500' : ''}`}
             maxLength={5}
