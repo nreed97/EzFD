@@ -482,19 +482,21 @@ class RigCtldClient:
 
     async def send_morse(self, text: str):
         """Sends text as CW via the rig's CAT-controlled keyer. Requires a rig
-        backend with Morse-send support (checked ahead of time via probe_cw_support)."""
-        # Strip anything that could break the single-line protocol framing or
-        # inject additional rigctld commands (newlines, carriage returns).
+        backend with Morse-send support (checked ahead of time via probe_cw_support).
+
+        No VFO argument is passed — rigctld only expects one when started
+        with --vfo, which this bridge never does. Passing one anyway sends
+        the literal word "VFO" as part of the CW text instead of a parameter."""
         clean = "".join(ch for ch in text if ch.isprintable()).strip()
         if not clean:
             return
         async with self.lock:
-            await self._send(f"\\send_morse VFO {clean}")
+            await self._send(f"\\send_morse {clean}")
             await self._read_rprt()
 
     async def stop_morse(self):
         async with self.lock:
-            await self._send("\\stop_morse VFO")
+            await self._send("\\stop_morse")
             await self._read_rprt()
 
     async def set_cw_speed(self, wpm: int):
