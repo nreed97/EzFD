@@ -12,6 +12,7 @@ import BandActivity from './BandActivity';
 import UTCClock from './UTCClock';
 import AdifImport from './AdifImport';
 import WsjtxSetupHelp from './WsjtxSetupHelp';
+import RigControlHelp from './RigControlHelp';
 import SectionsNeeded from './SectionsNeeded';
 import ThemeToggle from './ThemeToggle';
 
@@ -94,6 +95,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [bandConflict, setBandConflict] = useState(false);
   const [bandOccupancy, setBandOccupancy] = useState<Partial<Record<Band, string[]>>>({});
   const [rigConnected, setRigConnected] = useState(false);
+  const [showRigHelp, setShowRigHelp] = useState(false);
   const syncingRef = useRef(false);
 
   useEffect(() => {
@@ -267,11 +269,13 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
         <div className="flex items-center gap-2 text-sm flex-shrink-0">
           <UTCClock />
           {rigConnected && (
-            <span title="Rig control active — band and mode following VFO"
-              className="hidden sm:inline-flex items-center gap-1 rounded border border-green-700 bg-green-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-400">
+            <button
+              onClick={() => setShowRigHelp(true)}
+              title="Rig control active — click for details"
+              className="hidden sm:inline-flex items-center gap-1 rounded border border-green-700 bg-green-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-400 hover:bg-green-900/50 transition-colors">
               <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
               RIG
-            </span>
+            </button>
           )}
           <span className="text-zinc-600 hidden sm:inline">|</span>
           <span className="text-zinc-400 hidden sm:inline light:text-zinc-500">
@@ -433,6 +437,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             qsos={displayQSOs}
             onConflict={setBandConflict}
             onBandOccupancy={setBandOccupancy}
+            rigConnected={rigConnected}
+            onRigHelp={() => setShowRigHelp(true)}
           />
           <Scoreboard score={score} />
           <button
@@ -464,6 +470,13 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           operatorCall={operatorCall}
           stationNumber={stationNumber}
           onClose={() => setShowWsjtxHelp(false)}
+        />
+      )}
+
+      {showRigHelp && (
+        <RigControlHelp
+          rigConnected={rigConnected}
+          onClose={() => setShowRigHelp(false)}
         />
       )}
 

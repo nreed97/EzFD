@@ -20,6 +20,8 @@ interface Props {
   qsos: DisplayQSO[];
   onConflict?: (conflicting: boolean) => void;
   onBandOccupancy?: (occupied: Partial<Record<Band, string[]>>) => void;
+  rigConnected?: boolean;
+  onRigHelp?: () => void;
 }
 
 const MODE_COLORS: Record<Mode, string> = {
@@ -39,7 +41,7 @@ function timeSince(iso: string): string {
   return `${Math.floor(s / 3600)}h`;
 }
 
-export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos, onConflict, onBandOccupancy }: Props) {
+export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos, onConflict, onBandOccupancy, rigConnected, onRigHelp }: Props) {
   const [stations, setStations] = useState<StationPresence[]>([]);
   const [isQRT, setIsQRT] = useState(false);
   const lastBandRef = useRef<Band | null>(null);
@@ -160,21 +162,37 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
         <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
           Operators
         </h3>
-        {isQRT ? (
+        <div className="flex items-center gap-1.5">
+          {/* Rig control button */}
           <button
-            onClick={goOnAir}
-            className="text-[10px] font-semibold uppercase tracking-wide rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-green-400 hover:bg-green-900/50 transition-colors"
+            onClick={onRigHelp}
+            title={rigConnected ? 'Rig control active — click for details' : 'Set up rig control'}
+            className={`text-[10px] font-semibold uppercase tracking-wide rounded border px-2 py-0.5 transition-colors ${
+              rigConnected
+                ? 'border-green-700 bg-green-900/20 text-green-400 hover:bg-green-900/40'
+                : 'border-zinc-700 text-zinc-600 hover:border-zinc-500 hover:text-zinc-400'
+            }`}
           >
-            Back on Air
+            {rigConnected ? '● RIG' : 'Rig'}
           </button>
-        ) : (
-          <button
-            onClick={goQRT}
-            className="text-[10px] font-semibold uppercase tracking-wide rounded border border-zinc-700 px-2 py-0.5 text-zinc-500 hover:border-red-700 hover:bg-red-900/30 hover:text-red-400 transition-colors"
-          >
-            Go QRT
-          </button>
-        )}
+
+          {/* QRT toggle */}
+          {isQRT ? (
+            <button
+              onClick={goOnAir}
+              className="text-[10px] font-semibold uppercase tracking-wide rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-green-400 hover:bg-green-900/50 transition-colors"
+            >
+              Back on Air
+            </button>
+          ) : (
+            <button
+              onClick={goQRT}
+              className="text-[10px] font-semibold uppercase tracking-wide rounded border border-zinc-700 px-2 py-0.5 text-zinc-500 hover:border-red-700 hover:bg-red-900/30 hover:text-red-400 transition-colors"
+            >
+              Go QRT
+            </button>
+          )}
+        </div>
       </div>
 
       {isQRT && (
