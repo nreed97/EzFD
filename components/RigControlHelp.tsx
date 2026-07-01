@@ -203,7 +203,7 @@ export default function RigControlHelp({ rigConnected, canCw, onClose }: Props) 
             </p>
             <ul className="text-xs text-zinc-400 light:text-zinc-600 list-disc pl-4 flex flex-col gap-1">
               <li>Double-click any macro button to edit it — saved per operator in this browser</li>
-              <li>Placeholders: <Code>{'{call}'}</Code> worked station, <Code>{'{class}'}</Code>/<Code>{'{section}'}</Code> their exchange, <Code>{'{mycall}'}</Code>, <Code>{'{exch}'}</Code> your own class+section</li>
+              <li>Placeholders: <Code>{'{call}'}</Code> worked station, <Code>{'{class}'}</Code>/<Code>{'{section}'}</Code> their exchange, <Code>{'{mycall}'}</Code> the event/club callsign, <Code>{'{exch}'}</Code> your own class+section</li>
               <li>F1–F12 keys on your keyboard fire the matching macro; <strong>Space bar</strong> aborts mid-send</li>
               <li>Not all rigs expose CAT CW sending — Icom, Elecraft, Yaesu (most models), and FlexRadio
                   generally support it; older or CAT-only interfaces often don&apos;t. If your rig doesn&apos;t

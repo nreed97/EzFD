@@ -134,7 +134,7 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
             onStop={rig.stopCw}
             cwError={rig.cwError}
             getFormValues={() => formRef.current?.getValues() ?? { callsign: '', rcvdClass: '', rcvdSection: '' }}
-            myCall={operatorCall}
+            myCall={event.club_call}
             eventClass={event.class}
             eventSection={event.arrl_section}
             storageKey={`ezfd_cw_macros_${event.id}_${operatorCall}`}
