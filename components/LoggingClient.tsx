@@ -93,6 +93,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [showNeeds, setShowNeeds] = useState(false);
   const [bandConflict, setBandConflict] = useState(false);
   const [bandOccupancy, setBandOccupancy] = useState<Partial<Record<Band, string[]>>>({});
+  const [rigConnected, setRigConnected] = useState(false);
   const syncingRef = useRef(false);
 
   useEffect(() => {
@@ -137,6 +138,42 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
     return () => es.close();
   }, [event.id]);
+
+  // Rig control — silently try to connect to a local ezfd-rig-bridge instance.
+  // No-op if the bridge isn't running; operators without rig control are unaffected.
+  useEffect(() => {
+    const RIG_WS = 'ws://localhost:4575';
+    let ws: WebSocket | null = null;
+    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+    function connect() {
+      ws = new WebSocket(RIG_WS);
+
+      ws.onopen = () => setRigConnected(true);
+
+      ws.onmessage = (e) => {
+        try {
+          const { band, mode } = JSON.parse(e.data) as { band: Band | null; mode: string };
+          if (band) setCurrentBand(band);
+          if (mode === 'PH' || mode === 'CW' || mode === 'DIG') setCurrentMode(mode);
+        } catch { /* ignore malformed frames */ }
+      };
+
+      ws.onclose = () => {
+        setRigConnected(false);
+        // Retry every 10 s so the rig can be plugged in mid-session
+        retryTimer = setTimeout(connect, 10_000);
+      };
+
+      ws.onerror = () => ws?.close();
+    }
+
+    connect();
+    return () => {
+      if (retryTimer) clearTimeout(retryTimer);
+      ws?.close();
+    };
+  }, []);
 
   const flushQueue = useCallback(async () => {
     if (syncingRef.current) return;
@@ -229,6 +266,13 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
         <div className="flex items-center gap-2 text-sm flex-shrink-0">
           <UTCClock />
+          {rigConnected && (
+            <span title="Rig control active — band and mode following VFO"
+              className="hidden sm:inline-flex items-center gap-1 rounded border border-green-700 bg-green-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-400">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
+              RIG
+            </span>
+          )}
           <span className="text-zinc-600 hidden sm:inline">|</span>
           <span className="text-zinc-400 hidden sm:inline light:text-zinc-500">
             <span className="text-zinc-200 font-mono font-bold light:text-zinc-800">{score.valid_qsos}</span>
