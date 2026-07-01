@@ -269,24 +269,87 @@ def port_open(port: int) -> bool:
     except OSError:
         return False
 
+def search_rig_models(query: str) -> list[tuple[str, str, str]]:
+    """Run rigctld -l, parse output, return rows matching the query string.
+    Each row is (model_num, manufacturer, model_name)."""
+    try:
+        out = subprocess.check_output(
+            ["rigctld", "-l"], text=True, stderr=subprocess.DEVNULL, timeout=10
+        )
+    except Exception:
+        return []
+
+    results = []
+    for line in out.splitlines():
+        line = line.strip()
+        if not line or not line[0].isdigit():
+            continue
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        model_num = parts[0]
+        mfg       = parts[1]
+        model_name = " ".join(parts[2:4])
+        if query.lower() in line.lower():
+            results.append((model_num, mfg, model_name))
+    return results
+
+def pick_rig_model(saved_model: str) -> str:
+    """Interactive model selection: search by manufacturer or enter number directly."""
+    while True:
+        print()
+        print(f"  {B}Rig model — options:{NC}")
+        print(f"    {D}s{NC}  Search by manufacturer / model name  (e.g. 'icom', 'kenwood', 'ft-991')")
+        if saved_model:
+            print(f"    {D}↵{NC}  Keep current model  [{saved_model}]")
+        print(f"    {D}#  {NC}Enter model number directly")
+        print()
+        ans = input("  Choice [s / number]: ").strip()
+
+        if not ans and saved_model:
+            return saved_model
+
+        if ans.lower() == "s" or (ans and not ans.isdigit()):
+            query = ans if ans.lower() != "s" else input("  Search (manufacturer or model name): ").strip()
+            if not query:
+                continue
+            results = search_rig_models(query)
+            if not results:
+                warn(f"No rigs matching '{query}'. Try a shorter term (e.g. 'IC-' or 'FT-').")
+                continue
+            print()
+            print(f"  {B}{'#':<5} {'Mfg':<14} Model{NC}")
+            print(f"  {D}{'─'*45}{NC}")
+            for i, (num, mfg, name) in enumerate(results[:20], 1):
+                print(f"  {CYAN}{i:<3}{NC}  {num:<5} {mfg:<14} {name}")
+            if len(results) > 20:
+                print(f"  {D}  … {len(results)-20} more — refine your search to narrow results{NC}")
+            print()
+            sel = input(f"  Pick a number [1-{min(len(results),20)}], or press Enter to search again: ").strip()
+            if sel.isdigit():
+                idx = int(sel) - 1
+                if 0 <= idx < min(len(results), 20):
+                    chosen = results[idx][0]
+                    ok(f"Selected model {chosen}  ({results[idx][1]} {results[idx][2]})")
+                    return chosen
+        elif ans.isdigit():
+            return ans
+
 def prompt_rig_config(cfg: dict, rigctld_port: int) -> dict | None:
     """Interactively collect rig settings, start rigctld, return updated cfg."""
     print()
     info("rigctld is not running. Let's configure your rig.")
-    print()
-    info(f"Tip: run  {B}rigctld --list{NC}  to find your rig's model number.")
-    print()
 
-    saved_model  = cfg.get("model", "")
-    saved_port   = cfg.get("serial_port", "COM3" if platform.system() == "Windows" else "/dev/ttyUSB0")
-    saved_baud   = str(cfg.get("baud", "19200"))
+    saved_model = cfg.get("model", "")
+    saved_port  = cfg.get("serial_port", "COM3" if platform.system() == "Windows" else "/dev/ttyUSB0")
+    saved_baud  = str(cfg.get("baud", "19200"))
 
-    hint_model = f" [{saved_model}]" if saved_model else " (e.g. 229=IC-7300, 122=TS-2000, 1035=FT-991)"
-    model = input(f"  Rig model number{hint_model}: ").strip() or saved_model
+    model = pick_rig_model(saved_model)
     if not model:
         err("No rig model provided.")
         return None
 
+    print()
     serial_port = input(f"  Serial / USB port [{saved_port}]: ").strip() or saved_port
     baud        = input(f"  Baud rate         [{saved_baud}]: ").strip() or saved_baud
 
@@ -317,6 +380,9 @@ def start_rigctld(cfg: dict, rigctld_port: int) -> "subprocess.Popen | None":
         return None
 
 # ── rigctld async client ──────────────────────────────────────────────────────
+class RigError(Exception):
+    """Rig returned an RPRT error code — rigctld is alive but the rig isn't responding."""
+
 class RigCtldClient:
     """Minimal async client for rigctld's simple (non-extended) protocol."""
 
@@ -337,7 +403,10 @@ class RigCtldClient:
     async def _readline(self) -> str:
         assert self.reader
         line = await asyncio.wait_for(self.reader.readline(), timeout=2.0)
-        return line.decode().strip()
+        text = line.decode().strip()
+        if text.startswith("RPRT"):
+            raise RigError(text)
+        return text
 
     async def get_freq(self) -> int:
         """Returns VFO frequency in Hz."""
@@ -401,10 +470,19 @@ async def poll_rig(rig: RigCtldClient):
 
             fail_streak = 0
 
-        except Exception as exc:
+        except RigError as exc:
+            # rigctld is alive but the rig isn't responding (wrong model, rig off, etc.)
             fail_streak += 1
             if fail_streak == 1:
-                warn(f"rigctld read error: {exc}")
+                warn(f"Rig not responding ({exc}) — check power, cable, and model number.")
+            # Back off polling to 2 s while the rig is unresponsive; no reconnect needed
+            await asyncio.sleep(2)
+
+        except Exception as exc:
+            # Connection-level error — rigctld itself went away
+            fail_streak += 1
+            if fail_streak == 1:
+                warn(f"Lost connection to rigctld ({exc})")
             if fail_streak >= 3:
                 warn("Reconnecting to rigctld…")
                 await rig.close()
