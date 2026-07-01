@@ -361,16 +361,28 @@ def prompt_rig_config(cfg: dict, rigctld_port: int) -> dict | None:
         return None
 
     print()
-    network = is_network_rig(model_name)
+    suggests_network = is_network_rig(model_name)
+
+    if suggests_network:
+        info("This model is typically used over the network, but some setups expose a")
+        info("virtual serial port instead — e.g. FlexRadio's SmartCAT emulates Kenwood CAT.")
+        default_choice = "n"
+    else:
+        default_choice = "s"
+
+    ans = input(f"  Connect via [s]erial/USB port or [n]etwork IP? [{default_choice}]: ").strip().lower() or default_choice
+    network = ans.startswith("n")
 
     if network:
         saved_port = cfg.get("serial_port", "192.168.1.1")
-        info("This rig connects over the network — enter its IP address, not a COM port.")
         info("For FlexRadio SmartSDR the IP is shown in SmartSDR under Radio → Settings.")
         serial_port = input(f"  Radio IP address [{saved_port}]: ").strip() or saved_port
         # Network rigs don't use a baud rate
         baud = cfg.get("baud", "0")
     else:
+        if suggests_network:
+            warn("If this is a FlexRadio SmartCAT virtual port, use the Kenwood TS-2000")
+            warn("model (2014) instead of the FlexRadio model — SmartCAT emulates Kenwood CAT.")
         default_port = "COM3" if platform.system() == "Windows" else "/dev/ttyUSB0"
         saved_port   = cfg.get("serial_port", default_port)
         serial_port  = input(f"  Serial / USB port [{saved_port}]: ").strip() or saved_port
