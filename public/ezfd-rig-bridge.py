@@ -481,16 +481,21 @@ class RigCtldClient:
             return mode
 
     async def get_caps_text(self) -> str:
-        """Runs \\dump_caps and accumulates output until the stream goes quiet."""
+        """Runs \\dump_caps and reads until Hamlib's known terminator line
+        ("Overall backend warnings: N"), so no trailing dump_caps output is
+        left sitting in the stream to desync the next command's response
+        (which previously caused get_freq/get_mode to read stale caps lines)."""
         async with self.lock:
             await self._send("\\dump_caps")
             lines = []
             try:
-                while True:
-                    line = await self._raw_readline(timeout=0.5)
+                for _ in range(1000):  # hard cap in case the terminator format ever changes
+                    line = await self._raw_readline(timeout=2.0)
                     if not line:
                         break
                     lines.append(line)
+                    if line.lower().startswith("overall backend warnings"):
+                        break
             except asyncio.TimeoutError:
                 pass
             return "\n".join(lines)
