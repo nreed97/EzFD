@@ -47,12 +47,15 @@ interface Props {
   esm?: boolean;
   onEsmCall?: () => void;
   onEsmLog?: () => void;
+  /** Fired on every callsign field keystroke with the current value —
+   * used to pause/resume an auto-CQ loop as soon as the operator starts typing. */
+  onCallsignInput?: (value: string) => void;
 }
 
 function QSOForm({
   eventId, eventType, hasQRZ, band, mode, onBandChange, onModeChange,
   onSubmit, submitting, lastLogged, submitError, onDigHelp, existingQSOs,
-  bandOccupancy = {}, esm, onEsmCall, onEsmLog,
+  bandOccupancy = {}, esm, onEsmCall, onEsmLog, onCallsignInput,
 }: Props, ref: React.Ref<QSOFormHandle>) {
   const [callsign, setCallsign] = useState('');
   const [rcvdClass, setRcvdClass] = useState('');
@@ -89,6 +92,7 @@ function QSOForm({
   function handleCallChange(val: string) {
     const upper = val.toUpperCase().replace(/[^A-Z0-9/]/g, '');
     setCallsign(upper);
+    onCallsignInput?.(upper);
     setQrzInfo(null);
     if (lookupTimer.current) clearTimeout(lookupTimer.current);
     if (upper.length >= 3) {
@@ -102,6 +106,7 @@ function QSOForm({
     if (esm) onEsmLog?.();
     await onSubmit({ callsign, band, mode, rcvd_class: rcvdClass, rcvd_section: rcvdSection });
     setCallsign('');
+    onCallsignInput?.('');
     setRcvdClass('');
     setRcvdSection('');
     setQrzInfo(null);

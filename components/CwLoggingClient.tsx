@@ -148,6 +148,7 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
             macroPanelRef.current?.fireEsm(callsign ? 'call' : 'cq');
           }}
           onEsmLog={() => macroPanelRef.current?.fireEsm('log')}
+          onCallsignInput={(value) => macroPanelRef.current?.setAutoCqActive(!value)}
         />
 
         {rig.canCw && (

@@ -14,6 +14,9 @@ export interface CwMacroPanelHandle {
   /** Fires the macro mapped to an ESM stage for the current Run/S&P mode.
    * 'cq' only does anything in RUN mode (S&P has nothing to call yet). */
   fireEsm: (stage: 'cq' | 'call' | 'log') => void;
+  /** Pauses/resumes the auto-CQ repeat loop — call with false as soon as the
+   * operator starts typing a callsign, true once the field is empty again. */
+  setAutoCqActive: (active: boolean) => void;
 }
 
 interface Props {
@@ -65,12 +68,15 @@ const ROLE_LABELS: Record<OpMode, [string, string, string]> = {
 };
 
 const DEFAULT_WPM = 20;
+const DEFAULT_AUTO_CQ_SECONDS = 8;
 
 interface Store {
   run: string[];
   sp: string[];
   wpm: number;
   opMode: OpMode;
+  autoCqEnabled: boolean;
+  autoCqSeconds: number;
 }
 
 function expand(text: string, values: FormValues, myCall: string, eventClass: string, eventSection: string): string {
@@ -93,7 +99,11 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
   const [draft, setDraft] = useState<string[]>(RUN_DEFAULTS);
   const [manualText, setManualText] = useState('');
   const [lastSent, setLastSent] = useState<string | null>(null);
+  const [autoCqEnabled, setAutoCqEnabled] = useState(false);
+  const [autoCqSeconds, setAutoCqSeconds] = useState(DEFAULT_AUTO_CQ_SECONDS);
   const firstEditRef = useRef<HTMLInputElement>(null);
+  const autoCqTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const autoCqPausedRef = useRef(false); // true while operator is typing a callsign
 
   const macros = opMode === 'RUN' ? runMacros : spMacros;
   const setMacros = opMode === 'RUN' ? setRunMacros : setSpMacros;
@@ -108,16 +118,18 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
         if (saved.sp?.length === 12) setSpMacros(saved.sp);
         if (saved.wpm) setWpm(saved.wpm);
         if (saved.opMode === 'RUN' || saved.opMode === 'S&P') setOpMode(saved.opMode);
+        if (typeof saved.autoCqEnabled === 'boolean') setAutoCqEnabled(saved.autoCqEnabled);
+        if (saved.autoCqSeconds) setAutoCqSeconds(saved.autoCqSeconds);
       }
     } catch { /* ignore malformed storage */ }
   }, [storageKey]);
 
   const persist = useCallback((next: Partial<Store>) => {
     try {
-      const current: Store = { run: runMacros, sp: spMacros, wpm, opMode, ...next };
+      const current: Store = { run: runMacros, sp: spMacros, wpm, opMode, autoCqEnabled, autoCqSeconds, ...next };
       localStorage.setItem(storageKey, JSON.stringify(current));
     } catch { /* ignore quota errors */ }
-  }, [storageKey, runMacros, spMacros, wpm, opMode]);
+  }, [storageKey, runMacros, spMacros, wpm, opMode, autoCqEnabled, autoCqSeconds]);
 
   useEffect(() => { if (editMode) { firstEditRef.current?.focus(); firstEditRef.current?.select(); } }, [editMode]);
 
@@ -131,6 +143,22 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
     setLastSent(expanded);
     onSend(expanded, wpm);
   }, [editMode, macros, getFormValues, myCall, eventClass, eventSection, onSend, wpm]);
+
+  // Auto-CQ repeat loop — reschedules itself via setTimeout (not setInterval)
+  // so pausing genuinely cancels the pending fire rather than just skipping a tick.
+  const scheduleAutoCq = useCallback(() => {
+    if (autoCqTimerRef.current) clearTimeout(autoCqTimerRef.current);
+    if (!autoCqEnabled || opMode !== 'RUN' || autoCqPausedRef.current) return;
+    autoCqTimerRef.current = setTimeout(() => {
+      fireIndex(0);
+      scheduleAutoCq();
+    }, autoCqSeconds * 1000);
+  }, [autoCqEnabled, opMode, autoCqSeconds, fireIndex]);
+
+  useEffect(() => {
+    scheduleAutoCq();
+    return () => { if (autoCqTimerRef.current) clearTimeout(autoCqTimerRef.current); };
+  }, [scheduleAutoCq]);
 
   useImperativeHandle(ref, () => ({
     fireEsm(stage) {
@@ -146,7 +174,25 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
         fireIndex(2);
       }
     },
-  }), [opMode, fireIndex]);
+    setAutoCqActive(active) {
+      autoCqPausedRef.current = !active;
+      if (active) scheduleAutoCq();
+      else if (autoCqTimerRef.current) clearTimeout(autoCqTimerRef.current);
+    },
+  }), [opMode, fireIndex, scheduleAutoCq]);
+
+  function toggleAutoCq() {
+    setAutoCqEnabled(prev => {
+      const next = !prev;
+      persist({ autoCqEnabled: next });
+      return next;
+    });
+  }
+
+  function changeAutoCqSeconds(v: number) {
+    setAutoCqSeconds(v);
+    persist({ autoCqSeconds: v });
+  }
 
   function switchMode(next: OpMode) {
     setOpMode(next);
@@ -263,6 +309,31 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
           )}
         </div>
       </div>
+
+      {opMode === 'RUN' && (
+        <div className="flex items-center gap-1.5">
+          <button type="button" onClick={toggleAutoCq}
+            title="Repeat the CQ macro automatically until you start typing a callsign"
+            className={`rounded border px-2 py-0.5 text-[10px] font-bold transition-colors ${
+              autoCqEnabled
+                ? 'border-amber-600 bg-amber-900/20 text-amber-400'
+                : 'border-zinc-700 text-zinc-500 hover:text-zinc-300'
+            }`}>
+            AUTO CQ {autoCqEnabled ? 'ON' : 'OFF'}
+          </button>
+          <input
+            type="number" min={2} max={60} step={1}
+            value={autoCqSeconds}
+            onChange={e => changeAutoCqSeconds(Math.max(2, Math.min(60, parseInt(e.target.value, 10) || DEFAULT_AUTO_CQ_SECONDS)))}
+            disabled={!autoCqEnabled}
+            className="input w-12 h-6 px-1 py-0 text-center text-xs font-mono disabled:opacity-40"
+          />
+          <span className="text-[10px] text-zinc-500">sec</span>
+          {autoCqEnabled && (
+            <span className="text-[9px] text-zinc-600">— pauses the moment you start typing a callsign</span>
+          )}
+        </div>
+      )}
 
       {esm && (
         <p className="text-[9px] text-blue-400/80 -mt-1">
