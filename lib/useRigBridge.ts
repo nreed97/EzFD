@@ -14,6 +14,7 @@ export function useRigBridge({ onBand, onMode }: Options = {}) {
   const [connected, setConnected] = useState(false);
   const [freq, setFreq] = useState<number | null>(null);
   const [canCw, setCanCw] = useState(false);
+  const [cwError, setCwError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
   const onBandRef = useRef(onBand);
   const onModeRef = useRef(onMode);
@@ -34,7 +35,7 @@ export function useRigBridge({ onBand, onMode }: Options = {}) {
         try {
           const msg = JSON.parse(e.data);
           if (msg.type === 'caps') { setCanCw(!!msg.can_cw); return; }
-          if (msg.type === 'cw_error') { return; }
+          if (msg.type === 'cw_error') { setCwError(String(msg.error ?? 'Unknown CW send error')); return; }
           const { band, mode, freq: f } = msg as { band?: Band; mode?: string; freq?: number };
           if (band) onBandRef.current?.(band);
           if (mode === 'PH' || mode === 'CW' || mode === 'DIG') onModeRef.current?.(mode);
@@ -61,8 +62,11 @@ export function useRigBridge({ onBand, onMode }: Options = {}) {
   }, []);
 
   const sendCw = useCallback((text: string, wpm: number) => {
+    setCwError(null);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'send_cw', text, wpm }));
+    } else {
+      setCwError('Not connected to the rig bridge');
     }
   }, []);
 
@@ -72,5 +76,5 @@ export function useRigBridge({ onBand, onMode }: Options = {}) {
     }
   }, []);
 
-  return { connected, freq, canCw, sendCw, stopCw };
+  return { connected, freq, canCw, cwError, sendCw, stopCw };
 }

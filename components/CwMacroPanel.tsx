@@ -16,6 +16,7 @@ interface Props {
   eventClass: string;
   eventSection: string;
   storageKey: string;
+  cwError?: string | null;
 }
 
 const DEFAULT_MACROS = [
@@ -46,14 +47,14 @@ function expand(text: string, values: FormValues, myCall: string, eventClass: st
     .replace(/\{exch\}/gi, `${eventClass} ${eventSection}`.trim());
 }
 
-export default function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, eventSection, storageKey }: Props) {
+export default function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, eventSection, storageKey, cwError }: Props) {
   const [macros, setMacros] = useState<string[]>(DEFAULT_MACROS);
   const [wpm, setWpm] = useState(DEFAULT_WPM);
-  const [editingIndex, setEditingIndex] = useState<number | null>(null);
-  const [editText, setEditText] = useState('');
+  const [editMode, setEditMode] = useState(false);
+  const [draft, setDraft] = useState<string[]>(DEFAULT_MACROS);
   const [manualText, setManualText] = useState('');
   const [lastSent, setLastSent] = useState<string | null>(null);
-  const editInputRef = useRef<HTMLInputElement>(null);
+  const firstEditRef = useRef<HTMLInputElement>(null);
 
   // Load saved macros/wpm
   useEffect(() => {
@@ -61,7 +62,7 @@ export default function CwMacroPanel({ onSend, onStop, getFormValues, myCall, ev
       const raw = localStorage.getItem(storageKey);
       if (raw) {
         const saved = JSON.parse(raw) as { macros?: string[]; wpm?: number };
-        if (saved.macros && saved.macros.length === 12) setMacros(saved.macros);
+        if (saved.macros && saved.macros.length === 12) { setMacros(saved.macros); setDraft(saved.macros); }
         if (saved.wpm) setWpm(saved.wpm);
       }
     } catch { /* ignore malformed storage */ }
@@ -73,10 +74,10 @@ export default function CwMacroPanel({ onSend, onStop, getFormValues, myCall, ev
     } catch { /* ignore quota errors */ }
   }, [storageKey]);
 
-  useEffect(() => { editInputRef.current?.focus(); editInputRef.current?.select(); }, [editingIndex]);
+  useEffect(() => { if (editMode) { firstEditRef.current?.focus(); firstEditRef.current?.select(); } }, [editMode]);
 
   function fireMacro(i: number) {
-    if (editingIndex !== null) return;
+    if (editMode) return;
     const values = getFormValues();
     const text = expand(macros[i], values, myCall, eventClass, eventSection);
     if (!text.trim()) return;
@@ -84,18 +85,19 @@ export default function CwMacroPanel({ onSend, onStop, getFormValues, myCall, ev
     onSend(text, wpm);
   }
 
-  function startEdit(i: number) {
-    setEditingIndex(i);
-    setEditText(macros[i]);
+  function openEdit() {
+    setDraft(macros);
+    setEditMode(true);
   }
 
   function saveEdit() {
-    if (editingIndex === null) return;
-    const next = [...macros];
-    next[editingIndex] = editText;
-    setMacros(next);
-    persist(next, wpm);
-    setEditingIndex(null);
+    setMacros(draft);
+    persist(draft, wpm);
+    setEditMode(false);
+  }
+
+  function cancelEdit() {
+    setEditMode(false);
   }
 
   function changeWpm(v: number) {
@@ -112,9 +114,8 @@ export default function CwMacroPanel({ onSend, onStop, getFormValues, myCall, ev
         e.preventDefault();
         onStop();
       }
-      // F1-F12 as global shortcuts
       const fMatch = e.key.match(/^F(\d{1,2})$/);
-      if (fMatch && !typing) {
+      if (fMatch && !typing && !editMode) {
         const idx = parseInt(fMatch[1], 10) - 1;
         if (idx >= 0 && idx < 12) {
           e.preventDefault();
@@ -125,7 +126,7 @@ export default function CwMacroPanel({ onSend, onStop, getFormValues, myCall, ev
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [macros, wpm, myCall, eventClass, eventSection]);
+  }, [macros, wpm, myCall, eventClass, eventSection, editMode]);
 
   function sendManual() {
     if (!manualText.trim()) return;
@@ -135,76 +136,93 @@ export default function CwMacroPanel({ onSend, onStop, getFormValues, myCall, ev
   }
 
   return (
-    <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 light:border-zinc-200 light:bg-zinc-100/50 flex flex-col gap-3">
+    <div className="rounded-lg border border-zinc-800 bg-zinc-900/50 p-2.5 light:border-zinc-200 light:bg-zinc-100/50 flex flex-col gap-2">
       <div className="flex items-center justify-between">
         <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">CW Macros</h3>
-        <button
-          type="button"
-          onClick={onStop}
-          title="Stop sending (Space bar)"
-          className="rounded border border-red-700 bg-red-900/30 px-2.5 py-1 text-xs font-bold text-red-400 hover:bg-red-900/50 transition-colors"
-        >
-          ■ STOP
-        </button>
-      </div>
-
-      {/* Speed control */}
-      <div className="flex items-center gap-2">
-        <label className="text-xs text-zinc-500 shrink-0">Speed</label>
-        <input
-          type="range" min={10} max={40} step={1}
-          value={wpm}
-          onChange={e => changeWpm(parseInt(e.target.value, 10))}
-          className="flex-1 accent-amber-400"
-        />
-        <span className="font-mono text-xs text-amber-400 w-14 text-right">{wpm} wpm</span>
-      </div>
-
-      {/* Macro buttons */}
-      <div className="grid grid-cols-3 gap-1.5">
-        {macros.map((m, i) => (
-          <div key={i} className="relative group">
-            {editingIndex === i ? (
-              <input
-                ref={editInputRef}
-                value={editText}
-                onChange={e => setEditText(e.target.value.toUpperCase())}
-                onKeyDown={e => {
-                  if (e.key === 'Enter') { e.preventDefault(); saveEdit(); }
-                  if (e.key === 'Escape') { e.preventDefault(); setEditingIndex(null); }
-                }}
-                onBlur={saveEdit}
-                className="input w-full h-14 text-[10px] font-mono px-1.5 py-1"
-              />
-            ) : (
-              <button
-                type="button"
-                onClick={() => fireMacro(i)}
-                onDoubleClick={() => startEdit(i)}
-                title={`${macros[i]}  —  double-click to edit`}
-                className="w-full h-14 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-left hover:border-amber-500 hover:bg-zinc-750 transition-colors light:border-zinc-300 light:bg-zinc-50 light:hover:border-amber-500"
-              >
-                <div className="text-[10px] font-bold text-amber-400">F{i + 1}</div>
-                <div className="text-[9px] text-zinc-400 leading-tight line-clamp-2 break-all light:text-zinc-600">
-                  {macros[i] || <span className="text-zinc-600">(empty)</span>}
-                </div>
+        <div className="flex items-center gap-1.5">
+          <label className="text-[10px] text-zinc-500">WPM</label>
+          <input
+            type="number" min={5} max={45} step={1}
+            value={wpm}
+            onChange={e => changeWpm(Math.max(5, Math.min(45, parseInt(e.target.value, 10) || DEFAULT_WPM)))}
+            className="input w-12 h-6 px-1 py-0 text-center text-xs font-mono"
+          />
+          {editMode ? (
+            <>
+              <button type="button" onClick={saveEdit}
+                className="rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-[10px] font-bold text-green-400 hover:bg-green-900/50">
+                SAVE
               </button>
-            )}
-          </div>
+              <button type="button" onClick={cancelEdit}
+                className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] font-semibold text-zinc-400 hover:bg-zinc-800">
+                CANCEL
+              </button>
+            </>
+          ) : (
+            <>
+              <button type="button" onClick={openEdit}
+                title="Edit macros"
+                className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] font-semibold text-zinc-400 hover:border-amber-500 hover:text-amber-400">
+                EDIT
+              </button>
+              <button type="button" onClick={onStop} title="Stop sending (Space bar)"
+                className="rounded border border-red-700 bg-red-900/30 px-2 py-0.5 text-[10px] font-bold text-red-400 hover:bg-red-900/50">
+                ■ STOP
+              </button>
+            </>
+          )}
+        </div>
+      </div>
+
+      {cwError && (
+        <div className="rounded border border-red-800 bg-red-900/30 px-2 py-1 text-[10px] text-red-400">
+          CW error: {cwError}
+        </div>
+      )}
+
+      {/* Macro buttons / edit grid */}
+      <div className="grid grid-cols-4 gap-1">
+        {(editMode ? draft : macros).map((m, i) => (
+          editMode ? (
+            <input
+              key={i}
+              ref={i === 0 ? firstEditRef : undefined}
+              value={m}
+              onChange={e => setDraft(d => d.map((x, j) => j === i ? e.target.value.toUpperCase() : x))}
+              onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); saveEdit(); } if (e.key === 'Escape') { e.preventDefault(); cancelEdit(); } }}
+              placeholder={`F${i + 1}`}
+              className="input h-8 text-[9px] font-mono px-1 py-0.5"
+            />
+          ) : (
+            <button
+              key={i}
+              type="button"
+              onClick={() => fireMacro(i)}
+              title={macros[i] || '(empty)'}
+              className="h-8 rounded border border-zinc-700 bg-zinc-800 px-1 text-left hover:border-amber-500 hover:bg-zinc-750 transition-colors light:border-zinc-300 light:bg-zinc-50 light:hover:border-amber-500 overflow-hidden"
+            >
+              <div className="text-[9px] font-bold text-amber-400 leading-tight">F{i + 1}</div>
+              <div className="text-[8px] text-zinc-400 leading-tight truncate light:text-zinc-600">
+                {macros[i] || <span className="text-zinc-600">empty</span>}
+              </div>
+            </button>
+          )
         ))}
       </div>
-      <p className="text-[10px] text-zinc-600 light:text-zinc-500 -mt-1">
-        Click to send · double-click to edit · F1-F12 keys work too · Space bar stops
+      <p className="text-[9px] text-zinc-600 light:text-zinc-500">
+        {editMode
+          ? 'Editing — placeholders: {call} {class} {section} {mycall} {exch}'
+          : 'Click or press F1-F12 to send · Space bar stops'}
       </p>
 
       {/* Manual send */}
-      <div className="flex gap-1.5 border-t border-zinc-800 pt-2 light:border-zinc-200">
+      <div className="flex gap-1.5">
         <input
           value={manualText}
           onChange={e => setManualText(e.target.value.toUpperCase())}
           onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); sendManual(); } }}
           placeholder="Free-text CW…"
-          className="input flex-1 font-mono text-xs"
+          className="input flex-1 h-7 text-xs font-mono px-2 py-0"
         />
         <button
           type="button"
@@ -216,7 +234,7 @@ export default function CwMacroPanel({ onSend, onStop, getFormValues, myCall, ev
       </div>
 
       {lastSent && (
-        <p className="text-[10px] text-zinc-500 font-mono truncate">Last: {lastSent}</p>
+        <p className="text-[9px] text-zinc-500 font-mono truncate">Last: {lastSent}</p>
       )}
     </div>
   );

@@ -1,12 +1,10 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { calculateScore } from '@/lib/scoring';
 import { useRigBridge } from '@/lib/useRigBridge';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
 import QSOForm, { type QSOFormHandle } from './QSOForm';
 import CwMacroPanel from './CwMacroPanel';
-import Scoreboard from './Scoreboard';
 
 interface Props {
   event: Event;
@@ -80,11 +78,9 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
     }
   }, [event.id, operatorCall, stationNumber]);
 
-  const score = calculateScore(confirmedQSOs, {}, event.power);
-
   return (
     <div className="night-scope flex h-screen flex-col overflow-hidden bg-zinc-950 text-zinc-100">
-      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-3 py-2 shrink-0">
+      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-3 py-1.5 shrink-0">
         <div className="flex items-center gap-2 min-w-0">
           <span className="font-bold text-amber-400 text-sm shrink-0">{event.club_call}</span>
           <span className="text-zinc-600">|</span>
@@ -104,19 +100,17 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
       </header>
 
       {!rig.connected && (
-        <div className="shrink-0 border-b border-yellow-800 bg-yellow-900/20 px-3 py-2 text-xs text-yellow-400">
-          Lost connection to the rig bridge. Reconnecting… band/mode and CW keying are paused
-          until it comes back. Keep this window open — no need to reopen it.
+        <div className="shrink-0 border-b border-yellow-800 bg-yellow-900/20 px-3 py-1.5 text-xs text-yellow-400">
+          Lost connection to the rig bridge. Reconnecting… keep this window open.
         </div>
       )}
       {rig.connected && !rig.canCw && (
-        <div className="shrink-0 border-b border-zinc-800 bg-zinc-900/60 px-3 py-2 text-xs text-zinc-400">
-          This rig doesn&apos;t report CAT CW-keying support, so the macro panel is unavailable.
-          Band/mode auto-follow and logging still work normally.
+        <div className="shrink-0 border-b border-zinc-800 bg-zinc-900/60 px-3 py-1.5 text-xs text-zinc-400">
+          This rig doesn&apos;t report CAT CW-keying support — macro panel unavailable.
         </div>
       )}
 
-      <div className="flex-1 overflow-y-auto p-3 flex flex-col gap-3">
+      <div className="flex-1 overflow-y-auto p-2.5 flex flex-col gap-2.5">
         <QSOForm
           ref={formRef}
           eventId={event.id}
@@ -138,6 +132,7 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
           <CwMacroPanel
             onSend={rig.sendCw}
             onStop={rig.stopCw}
+            cwError={rig.cwError}
             getFormValues={() => formRef.current?.getValues() ?? { callsign: '', rcvdClass: '', rcvdSection: '' }}
             myCall={operatorCall}
             eventClass={event.class}
@@ -145,8 +140,6 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
             storageKey={`ezfd_cw_macros_${event.id}_${operatorCall}`}
           />
         )}
-
-        <Scoreboard score={score} />
       </div>
     </div>
   );

@@ -492,7 +492,9 @@ class RigCtldClient:
             return
         async with self.lock:
             await self._send(f"\\send_morse {clean}")
-            await self._read_rprt()
+            # Some backends take a moment to acknowledge queuing a send —
+            # give this more headroom than the default 3s used elsewhere.
+            await self._read_rprt(timeout=6.0)
 
     async def stop_morse(self):
         async with self.lock:
