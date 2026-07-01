@@ -144,16 +144,24 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
     onSend(expanded, wpm);
   }, [editMode, macros, getFormValues, myCall, eventClass, eventSection, onSend, wpm]);
 
+  // fireIndex changes identity whenever the parent re-renders (e.g. every rig
+  // freq tick), since getFormValues is a fresh closure each time. Reading it
+  // via a ref keeps scheduleAutoCq's own identity stable across those renders,
+  // so the auto-CQ timer isn't cleared/restarted from scratch several times a
+  // second — which previously kept it from ever reaching its full interval.
+  const fireIndexRef = useRef(fireIndex);
+  useEffect(() => { fireIndexRef.current = fireIndex; }, [fireIndex]);
+
   // Auto-CQ repeat loop — reschedules itself via setTimeout (not setInterval)
   // so pausing genuinely cancels the pending fire rather than just skipping a tick.
   const scheduleAutoCq = useCallback(() => {
     if (autoCqTimerRef.current) clearTimeout(autoCqTimerRef.current);
     if (!autoCqEnabled || opMode !== 'RUN' || autoCqPausedRef.current) return;
     autoCqTimerRef.current = setTimeout(() => {
-      fireIndex(0);
+      fireIndexRef.current(0);
       scheduleAutoCq();
     }, autoCqSeconds * 1000);
-  }, [autoCqEnabled, opMode, autoCqSeconds, fireIndex]);
+  }, [autoCqEnabled, opMode, autoCqSeconds]);
 
   useEffect(() => {
     scheduleAutoCq();

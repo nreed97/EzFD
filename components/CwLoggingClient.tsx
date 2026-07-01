@@ -40,6 +40,11 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
 
   const rig = useRigBridge({ onBand: setCurrentBand, onMode: setCurrentMode });
 
+  const getFormValues = useCallback(
+    () => formRef.current?.getValues() ?? { callsign: '', rcvdClass: '', rcvdSection: '' },
+    []
+  );
+
   // SSE subscription — keeps this window's dupe checks and score current with
   // QSOs logged from the main tab (or any other operator on the event).
   useEffect(() => {
@@ -158,7 +163,7 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
             onSend={rig.sendCw}
             onStop={rig.stopCw}
             cwError={rig.cwError}
-            getFormValues={() => formRef.current?.getValues() ?? { callsign: '', rcvdClass: '', rcvdSection: '' }}
+            getFormValues={getFormValues}
             myCall={event.club_call}
             eventClass={event.class}
             eventSection={event.arrl_section}
