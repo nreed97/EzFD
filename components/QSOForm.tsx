@@ -127,10 +127,6 @@ function QSOForm({
     callRef.current?.focus();
   }
 
-  // TODO: CAT control — integrate Hamlib/flrig via a local relay to auto-populate
-  // band and mode from the radio. Also explore CW keying via PTT/serial keyer.
-  // The relay could expose a small WebSocket or HTTP endpoint on localhost that
-  // the logging page polls, similar to the WSJT-X UDP relay already in place.
   function pickBand(b: Band) {
     onBandChange(b);
     setShowQSY(false);
