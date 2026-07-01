@@ -149,10 +149,16 @@ export default function RigControlHelp({ rigConnected, onClose }: Props) {
               Common values:
             </Step>
 
-            <div className="rounded border border-zinc-800 bg-zinc-900 p-2.5 text-xs text-zinc-500 flex flex-col gap-1 light:border-zinc-200 light:bg-zinc-50">
-              <div><span className="text-zinc-400 font-semibold w-16 inline-block">Windows:</span> <Code>COM3</Code> <Code>COM4</Code> <Code>COM5</Code> <span className="text-zinc-600">(check Device Manager)</span></div>
-              <div><span className="text-zinc-400 font-semibold w-16 inline-block">macOS:</span> <Code>/dev/cu.usbserial-*</Code> or <Code>/dev/cu.SLAB_USBtoUART</Code></div>
-              <div><span className="text-zinc-400 font-semibold w-16 inline-block">Linux:</span> <Code>/dev/ttyUSB0</Code> or <Code>/dev/ttyACM0</Code></div>
+            <div className="rounded border border-zinc-800 bg-zinc-900 p-2.5 text-xs text-zinc-500 light:border-zinc-200 light:bg-zinc-50">
+              {showPlatform === 'win' && (
+                <p><Code>COM3</Code> <Code>COM4</Code> <Code>COM5</Code> <span className="text-zinc-600 ml-1">— check Device Manager if unsure which port</span></p>
+              )}
+              {showPlatform === 'mac' && (
+                <p><Code>/dev/cu.usbserial-*</Code> <span className="text-zinc-600 mx-1">or</span> <Code>/dev/cu.SLAB_USBtoUART</Code> <span className="text-zinc-600 ml-1">— run <code className="text-zinc-400">ls /dev/cu.*</code> to list available ports</span></p>
+              )}
+              {showPlatform === 'linux' && (
+                <p><Code>/dev/ttyUSB0</Code> <span className="text-zinc-600 mx-1">or</span> <Code>/dev/ttyACM0</Code> <span className="text-zinc-600 ml-1">— run <code className="text-zinc-400">ls /dev/tty{'{USB,ACM}'}*</code> to list available ports</span></p>
+              )}
             </div>
 
             <Step n={6}>
