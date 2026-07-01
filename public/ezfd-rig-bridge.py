@@ -481,23 +481,27 @@ class RigCtldClient:
             return mode
 
     async def get_caps_text(self) -> str:
-        """Runs \\dump_caps and reads until Hamlib's known terminator line
-        ("Overall backend warnings: N"), so no trailing dump_caps output is
-        left sitting in the stream to desync the next command's response
-        (which previously caused get_freq/get_mode to read stale caps lines)."""
+        """Runs \\dump_caps and drains every line rigctld sends back.
+
+        dump_caps is a purely local text dump (no rig round-trip), so its
+        entire output arrives essentially at once. Rather than guessing at
+        a terminator line (format varies by Hamlib version/backend, and
+        guessing wrong leaves stale lines in the stream that desync every
+        get_freq/get_mode call afterward — the actual bug hit here), give
+        it a moment to fully arrive, then drain with short per-line
+        timeouts until the buffer is genuinely empty."""
         async with self.lock:
             await self._send("\\dump_caps")
+            await asyncio.sleep(0.5)  # let the full (already-generated) response land
             lines = []
-            try:
-                for _ in range(1000):  # hard cap in case the terminator format ever changes
-                    line = await self._raw_readline(timeout=2.0)
-                    if not line:
-                        break
-                    lines.append(line)
-                    if line.lower().startswith("overall backend warnings"):
-                        break
-            except asyncio.TimeoutError:
-                pass
+            for _ in range(2000):  # hard cap so a pathological stream can't hang forever
+                try:
+                    line = await self._raw_readline(timeout=0.3)
+                except asyncio.TimeoutError:
+                    break
+                if not line:
+                    break
+                lines.append(line)
             return "\n".join(lines)
 
     async def send_morse(self, text: str):
