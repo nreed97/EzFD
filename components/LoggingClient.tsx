@@ -95,6 +95,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [bandConflict, setBandConflict] = useState(false);
   const [bandOccupancy, setBandOccupancy] = useState<Partial<Record<Band, string[]>>>({});
   const [rigConnected, setRigConnected] = useState(false);
+  const [rigFreq, setRigFreq] = useState<number | null>(null);
   const [showRigHelp, setShowRigHelp] = useState(false);
   const syncingRef = useRef(false);
 
@@ -155,14 +156,16 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
       ws.onmessage = (e) => {
         try {
-          const { band, mode } = JSON.parse(e.data) as { band: Band | null; mode: string };
+          const { band, mode, freq } = JSON.parse(e.data) as { band: Band | null; mode: string; freq: number };
           if (band) setCurrentBand(band);
           if (mode === 'PH' || mode === 'CW' || mode === 'DIG') setCurrentMode(mode);
+          if (freq) setRigFreq(freq);
         } catch { /* ignore malformed frames */ }
       };
 
       ws.onclose = () => {
         setRigConnected(false);
+        setRigFreq(null);
         // Retry every 10 s so the rig can be plugged in mid-session
         retryTimer = setTimeout(connect, 10_000);
       };
@@ -272,9 +275,14 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             <button
               onClick={() => setShowRigHelp(true)}
               title="Rig control active — click for details"
-              className="hidden sm:inline-flex items-center gap-1 rounded border border-green-700 bg-green-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-400 hover:bg-green-900/50 transition-colors">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse" />
-              RIG
+              className="hidden sm:inline-flex items-center gap-1.5 rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-400 hover:bg-green-900/50 transition-colors">
+              <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
+              <span className="uppercase tracking-wide">RIG</span>
+              {rigFreq && (
+                <span className="font-mono font-normal text-green-300 tracking-tight">
+                  {(rigFreq / 1e6).toFixed(3)}
+                </span>
+              )}
             </button>
           )}
           <span className="text-zinc-600 hidden sm:inline">|</span>
