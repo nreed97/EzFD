@@ -120,6 +120,24 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
         )}
       </header>
 
+      <div className="flex items-center justify-center gap-3 border-b border-zinc-800 bg-zinc-900/60 py-2 shrink-0">
+        <span className="rounded-lg border border-amber-600/60 bg-amber-400/10 px-4 py-1 font-mono text-2xl font-bold tracking-widest text-amber-400">
+          {currentBand}
+        </span>
+        <span className={`rounded-lg border px-4 py-1 font-mono text-2xl font-bold tracking-widest ${
+          currentMode === 'CW'
+            ? 'border-yellow-600/60 bg-yellow-400/10 text-yellow-400'
+            : currentMode === 'DIG'
+              ? 'border-green-600/60 bg-green-400/10 text-green-400'
+              : 'border-blue-600/60 bg-blue-400/10 text-blue-400'
+        }`}>
+          {currentMode}
+        </span>
+        {rig.connected && (
+          <span className="text-xs text-zinc-500">following VFO</span>
+        )}
+      </div>
+
       {!rig.connected && (
         <div className="shrink-0 border-b border-yellow-800 bg-yellow-900/20 px-3 py-1.5 text-xs text-yellow-400">
           Lost connection to the rig bridge. Reconnecting… keep this window open.
