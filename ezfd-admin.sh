@@ -522,11 +522,18 @@ update_app() {
   fi
 
   echo -e "  ${DIM}Deploying files…${NC}"
-  rsync -a --delete "${REPO_DIR}/.next/standalone/"  "$APP_DIR/"
+  # --exclude='.env' prevents rsync --delete from removing the live secrets file,
+  # which lives in $APP_DIR but is not part of the standalone build output.
+  rsync -a --delete --exclude='.env' "${REPO_DIR}/.next/standalone/"  "$APP_DIR/"
   rsync -a --delete "${REPO_DIR}/.next/static/"      "$APP_DIR/.next/static/"
   rsync -a --delete "${REPO_DIR}/public/"            "$APP_DIR/public/"
   cp "$REPO_DIR/ezfd-admin.sh" "$APP_DIR/ezfd-admin.sh"
   chmod +x "$APP_DIR/ezfd-admin.sh"
+
+  if [[ ! -f "$APP_DIR/.env" ]]; then
+    err ".env is missing from $APP_DIR — run deploy.sh to recreate it before restarting."
+    pause; return
+  fi
 
   echo -e "  ${DIM}Applying database migrations…${NC}"
   sudo -u postgres psql -d ezfd -f "$REPO_DIR/db/schema.sql" >/dev/null 2>&1 || true
