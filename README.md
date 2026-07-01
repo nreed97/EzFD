@@ -119,7 +119,7 @@ A real-time, multi-operator ARRL Field Day and Winter Field Day logging applicat
 
 **1 — Provision the server**
 
-Spin up any Ubuntu 22.04/24.04 or Debian 12 VPS. A $6/month instance (1 vCPU, 1 GB RAM) is plenty for a Field Day event.
+Spin up any Ubuntu 22.04/24.04 or Debian 12 VPS. A $6/month instance (1 vCPU, 1 GB RAM) is plenty for a Field Day event. `deploy.sh` automatically adds a 2GB swap file on instances with less than 2GB RAM and no existing swap, since `npm ci`/`next build` can otherwise get OOM-killed on the smallest droplets.
 
 If you want a domain name (e.g. `fd.w0ny.xyz`), create an **A record** pointing to the server's IP before running the script.
 

@@ -310,6 +310,28 @@ else
   log "Migrations: all ${MIGRATIONS_SKIPPED} up to date"
 fi
 
+# ── Swap file (prevents npm ci / next build from getting OOM-killed on ──────
+# ── low-RAM VPS instances, e.g. the 1GB droplets this is commonly deployed on)
+TOTAL_MEM_MB="$(free -m | awk '/^Mem:/{print $2}')"
+SWAP_MB="$(free -m | awk '/^Swap:/{print $2}')"
+if [[ "$SWAP_MB" -eq 0 && "$TOTAL_MEM_MB" -lt 2048 ]]; then
+  info "Low RAM (${TOTAL_MEM_MB}MB) with no swap — adding a 2GB swap file so the build can't get OOM-killed..."
+  if [[ -f /swapfile ]]; then
+    swapon /swapfile 2>/dev/null || true
+    log "Swap file already present"
+  elif fallocate -l 2G /swapfile 2>/dev/null || dd if=/dev/zero of=/swapfile bs=1M count=2048 2>/dev/null; then
+    chmod 600 /swapfile
+    mkswap /swapfile >/dev/null 2>&1
+    swapon /swapfile 2>/dev/null || true
+    grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+    log "Swap file active ($(free -m | awk '/^Swap:/{print $2}')MB)"
+  else
+    warn "Could not create a swap file — if the build below gets 'Killed', add swap manually and re-run."
+  fi
+else
+  log "Memory OK (${TOTAL_MEM_MB}MB RAM, ${SWAP_MB}MB swap)"
+fi
+
 # ── Build ─────────────────────────────────────────────────────────────────────
 info "Building application (this takes ~60 seconds)..."
 cd "$REPO_DIR"
