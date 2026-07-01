@@ -101,6 +101,7 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
   const [lastSent, setLastSent] = useState<string | null>(null);
   const [autoCqEnabled, setAutoCqEnabled] = useState(false);
   const [autoCqSeconds, setAutoCqSeconds] = useState(DEFAULT_AUTO_CQ_SECONDS);
+  const [autoCqPausedDisplay, setAutoCqPausedDisplay] = useState(false);
   const firstEditRef = useRef<HTMLInputElement>(null);
   const autoCqTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const autoCqPausedRef = useRef(false); // true while operator is typing a callsign
@@ -158,6 +159,9 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
     if (autoCqTimerRef.current) clearTimeout(autoCqTimerRef.current);
     if (!autoCqEnabled || opMode !== 'RUN' || autoCqPausedRef.current) return;
     autoCqTimerRef.current = setTimeout(() => {
+      // Re-check paused/enabled state right before firing too, as a second
+      // guard in case something raced the clearTimeout above.
+      if (autoCqPausedRef.current || !autoCqEnabled || opMode !== 'RUN') return;
       fireIndexRef.current(0);
       scheduleAutoCq();
     }, autoCqSeconds * 1000);
@@ -184,6 +188,7 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
     },
     setAutoCqActive(active) {
       autoCqPausedRef.current = !active;
+      setAutoCqPausedDisplay(!active);
       if (active) scheduleAutoCq();
       else if (autoCqTimerRef.current) clearTimeout(autoCqTimerRef.current);
     },
@@ -338,7 +343,9 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
           />
           <span className="text-[10px] text-zinc-500">sec</span>
           {autoCqEnabled && (
-            <span className="text-[9px] text-zinc-600">— pauses the moment you start typing a callsign</span>
+            autoCqPausedDisplay
+              ? <span className="text-[9px] font-bold text-yellow-400">⏸ PAUSED (typing)</span>
+              : <span className="text-[9px] text-zinc-600">— pauses the moment you start typing a callsign</span>
           )}
         </div>
       )}
