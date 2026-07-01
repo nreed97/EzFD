@@ -12,10 +12,14 @@ A real-time, multi-operator ARRL Field Day and Winter Field Day logging applicat
 |---|---|
 | **Multi-op, real-time log** | Every QSO appears on all connected devices within milliseconds via PostgreSQL `pg_notify` + Server-Sent Events |
 | **Offline tolerance** | QSOs are written to `localStorage` first and synced when connectivity restores — nothing is lost on a flaky WiFi link |
-| **ESM-style Enter navigation** | Enter in Callsign → focuses Rcvd Class → focuses Rcvd Section → logs QSO; matches N1MM+/ESM workflow |
+| **ESM-style Enter navigation** | Enter in Callsign → focuses Rcvd Class → focuses Rcvd Section → logs QSO; matches N1MM+/ESM workflow. Tab loops Section back to Callsign instead of continuing into other controls |
 | **Field Day + Winter Field Day** | Supports both ARRL FD (classes A–F) and Winter Field Day (classes H/O/I); class letters validated per event type |
 | **Power category** | Events configured as HIGH / LOW (≤150 W) / QRP (≤5 W); affects scoring multiplier (×1 / ×2 / ×5) |
-| **Band activity panel** | See which band/mode each station is currently using; conflict banner when two stations select the same band/mode |
+| **Band activity panel** | See which band/mode each station is currently using; conflict banner when two stations select the same band/mode. Inactive operators (idle >15 min) are excluded from conflict checks and greyed out |
+| **Go QRT** | Manually remove yourself from the presence list — the band opens back up for others immediately instead of waiting for the inactivity timeout |
+| **QSY tile indicators** | The band-picker drawer shows a dot on any band another active operator currently occupies, with a hover tooltip listing who |
+| **Rig control (CAT)** | Optional local bridge script connects any Hamlib-supported rig to EzFD via `rigctld` — band and mode auto-follow the radio's VFO, no manual QSY needed. Fully opt-in; nothing changes for operators who don't use it |
+| **CW macro keying** | If the connected rig supports CAT-based Morse sending, a popout keying window (N1MM-style) offers F1–F12 macros, Run/S&P mode-specific macro sets, adjustable-speed auto-CQ, and ESM (Enter Sends Message) |
 | **WSJT-X / JTDX relay** | Download a self-contained `.bat` file that watches your ADIF log and auto-submits new digital QSOs to the server — no manual entry |
 | **ADIF import** | Bulk-import QSOs from any `.adi` file; dupes are detected and flagged automatically |
 | **Exchange validation** | Rcvd Class validated against contest rules (number + correct letter set for FD/WFD); Rcvd Section validated against all 81 ARRL/RAC sections |
@@ -38,7 +42,7 @@ A real-time, multi-operator ARRL Field Day and Winter Field Day logging applicat
 | **Light/Dark theme** | Toggle between light and dark UI themes; preference is saved across sessions |
 | **PWA / installable** | Add to home screen on Android/iOS or install as a desktop app via Chrome — works offline for the logging UI |
 | **ADIF + Cabrillo export** | Download standard `.adi` or Cabrillo 3.0 `.log` for ARRL submission or LoTW upload |
-| **Admin console** | `ezfd-admin.sh` — interactive server-side tool to view events, export QSOs, change join codes, delete events, and take JSON backups |
+| **Admin console** | `ezfd-admin.sh` — interactive server-side tool to view events, edit event settings, export QSOs, change join codes, delete events, take JSON backups, and update the running app in place (`git pull` + rebuild + restart) |
 | **One-command deploy** | `deploy.sh` installs all dependencies, generates secrets, configures systemd + nginx, and provisions SSL on any Ubuntu/Debian VPS |
 
 ---
@@ -79,9 +83,18 @@ A real-time, multi-operator ARRL Field Day and Winter Field Day logging applicat
   │  ezfd-wsjt-relay.bat (FileSystemWatcher)         │
   │      → POST /api/qso  (join_code auth)           │
   └──────────────────────────────────────────────────┘
+
+  Operator's PC (optional — rig control)
+  ┌──────────────────────────────────────────────────┐
+  │  Rig (USB/serial) → rigctld (Hamlib)              │
+  │  ezfd-rig-bridge.py                               │
+  │      ↕ ws://localhost:4575 → Logger UI / CW window│
+  └──────────────────────────────────────────────────┘
 ```
 
 **Real-time flow:** When any operator logs a QSO, the server inserts the row. A PostgreSQL trigger immediately calls `pg_notify`. The SSE endpoint (`/api/realtime/[eventId]`) has an active `LISTEN` connection to the database and pushes the payload to every connected browser as an `event: qso` message. No polling, no third-party realtime service.
+
+**Rig control flow:** `ezfd-rig-bridge.py` runs locally on the operating PC, connects to Hamlib's `rigctld` (starting it if needed), and exposes a local WebSocket at `ws://localhost:4575`. The browser connects to that WebSocket directly — band/mode/frequency updates flow one way (rig → browser); CW macro text flows the other way (browser → bridge → `rigctld` → rig) when the rig supports CAT-based Morse sending. This is entirely local to the operator's machine; the EzFD server is never involved and the bridge works the same whether the app is self-hosted or accessed over the internet.
 
 **Offline flow:** The browser always writes to `localStorage` first. If the server POST succeeds immediately, the entry is removed from the queue. If it fails (or the device is offline), the QSO stays in the queue and is shown in the log with a `↑ sync` indicator. When `navigator.online` fires, the queue is flushed in submission order.
 
@@ -186,7 +199,35 @@ On mobile, the tab bar shows the current score and your operator callsign. Tap *
 
 ### Band Activity Panel
 
-The sidebar shows every active operator's current band and mode (updated in real-time). A **red row with `!`** means that station is on the same band and mode as you — a potential source of interference. A yellow banner also appears at the top of the form when a conflict is detected. Operators inactive for more than 15 minutes are greyed out.
+The sidebar shows every active operator's current band and mode (updated in real-time). A **red row with `!`** means that station is on the same band and mode as you — a potential source of interference. A yellow banner also appears at the top of the form when a conflict is detected.
+
+Operators idle for more than 15 minutes (no QSOs logged) are excluded from conflict checks and greyed out — the band opens back up for others automatically. If you're stepping away sooner than that, click **Go QRT** to remove yourself from the presence list immediately; click **Back on Air** to resume. In the QSY drawer, any band another active operator currently occupies shows a small dot — hover it to see who.
+
+### Rig Control (CAT)
+
+EzFD can auto-follow your radio's VFO — band and mode update in the logger as you tune, no manual QSY needed. This is entirely optional and local to your machine; nothing changes for operators who skip it.
+
+1. In the logger, click the **Rig Control** button (or the header badge once connected) to open setup instructions.
+2. Click **Download `ezfd-rig-bridge.py`**.
+3. Run it: `python ezfd-rig-bridge.py` (Windows) or `python3 ezfd-rig-bridge.py` (Mac/Linux).
+4. The script checks for [Hamlib](https://hamlib.github.io) and offers to install it if missing (`apt`/`dnf`/`pacman` on Linux, `brew` on macOS, a GitHub release download on Windows).
+5. If `rigctld` isn't already running, you'll be prompted for a rig model — type `s` to search by manufacturer/model name instead of memorizing a number — then a serial port or network IP, and a baud rate.
+6. Leave the script running. EzFD connects automatically; look for the **● RIG** badge (with live frequency) in the header.
+
+Settings are saved to `~/.ezfd-rig.json` so future runs need no prompts. Serial connections default to disabling hardware handshake, since virtual/software CAT ports (e.g. FlexRadio SmartCAT) commonly don't implement it — physical CAT interfaces don't need it either, so this is safe by default. For a SmartCAT-style virtual COM port, use the **Kenwood TS-2000** model rather than a radio-specific one, since SmartCAT emulates Kenwood CAT.
+
+### CW Macro Keying
+
+If your connected rig supports CAT-based Morse sending (checked automatically at bridge startup), a **⚡ CW** button appears in the header. It opens a separate popout window — sized and positioned like an N1MM entry window — with its own callsign/exchange fields and full QSO logging, plus:
+
+- **F1–F12 macro buttons**, click **EDIT** to open all twelve at once, **SAVE** or **CANCEL** when done. Saved per operator in the browser.
+- **Placeholders**: `{call}` worked station, `{class}`/`{section}` their exchange, `{mycall}` the event/club callsign, `{exch}` your own class + section.
+- **RUN / S&P toggle** — separate macro sets for calling CQ versus hunting stations; each remembers its own twelve macros.
+- **ESM** (Enter Sends Message, N1MM-style) — with an empty callsign, Enter sends CQ (RUN mode); with a callsign but no exchange yet, Enter sends your call/exchange macro; once the exchange fields are filled, Enter sends TU and logs the QSO in one keystroke.
+- **Auto CQ** (RUN mode only) — repeats your CQ macro on an adjustable timer (2–60s); pauses the instant you start typing a callsign and resumes once the field is empty again.
+- **Space bar or Escape** stops transmission instantly.
+
+Not all rigs expose CAT CW sending — Icom, Elecraft, Yaesu (most models), and FlexRadio generally support it; older or CAT-only interfaces often don't. If yours doesn't, band/mode auto-follow and logging still work fine; you just key by hand.
 
 ### WSJT-X / JTDX Relay
 
@@ -266,6 +307,7 @@ sudo bash ezfd-admin.sh
 - **List / manage events** — table of all events with QSO/dupe/operator counts; select any event to drill in
 - **Server statistics** — totals, top operators across all events, QSOs by event type, database size
 - **Full JSON backup** — timestamped dump of all events + QSOs to `/tmp/`
+- **Update application** — `git pull`, rebuild, redeploy, and restart the service in one step (see below)
 - **Exit**
 
 ### Per-event actions
@@ -276,11 +318,16 @@ sudo bash ezfd-admin.sh
 | Export QSOs to CSV | Writes `/tmp/qsos_CODE.csv` via `psql \COPY` |
 | Export JSON backup | Full event + QSO backup to `/tmp/ezfd_CODE_backup.json` |
 | Change join code | Update the join code — useful for recovery or resharing |
+| Edit event settings | Change power category, class, or ARRL section after creation |
 | Clear all dupes | Resets `is_dupe=false` on all QSOs in the event |
 | Delete all QSOs | Permanently removes all QSOs; event shell is kept |
 | Delete event | Permanently removes event and all QSOs |
 
 Destructive actions require typing `YES` in all caps to confirm.
+
+### Update application
+
+Pulls the latest code, rebuilds, redeploys the standalone output to `/opt/ezfd`, applies any new database migrations, and restarts the service — all from the admin console instead of SSHing in separately. Requires `EZFD_REPO_DIR` in `/opt/ezfd/.env`, which `deploy.sh` writes automatically; if it's missing (e.g. from an install predating this feature), re-run `deploy.sh` once to set it. The redeploy step excludes `.env` from the file sync, so secrets and config survive the update.
 
 ### Non-interactive JSON dump
 
@@ -308,6 +355,7 @@ sudo systemctl restart ezfd
 | `EZFD_ADMIN_KEY` | No | If set, this key must be submitted when creating a new event. Prevents unauthorised event creation on public servers. |
 | `EZFD_DOMAIN` | No | Domain name saved by `deploy.sh` for use as a default on the next update run. |
 | `EZFD_CERT_EMAIL` | No | Let's Encrypt email saved by `deploy.sh` for use as a default on the next update run. |
+| `EZFD_REPO_DIR` | No | Path to the cloned repo, saved by `deploy.sh`. Lets `ezfd-admin.sh`'s "Update application" action find the source to `git pull` and rebuild from. |
 | `NODE_ENV` | Yes | Always `production` in deployed installs |
 | `PORT` | Yes | App port (default `3000`; nginx proxies from 80/443) |
 | `HOSTNAME` | Yes | Bind address — `127.0.0.1` so the app is only reachable via nginx |
@@ -375,6 +423,7 @@ EzFD/
 │   │   └── [code]/
 │   │       ├── page.tsx                # Operator sign-in gate
 │   │       ├── log/page.tsx            # Main logging view (server → LoggingClient)
+│   │       ├── cw/page.tsx             # CW keying popout (server → CwLoggingClient)
 │   │       └── dashboard/page.tsx      # Metrics + map (server → DashboardClient)
 │   └── api/
 │       ├── events/
@@ -395,11 +444,14 @@ EzFD/
 │           └── wsjtx-bridge/route.ts   # GET Node.js bridge script (alternative relay)
 ├── components/
 │   ├── LoggingClient.tsx               # Full logging UI (client component)
+│   ├── CwLoggingClient.tsx             # CW keying popout UI — logging + macro panel (client component)
 │   ├── DashboardClient.tsx             # Dashboard UI with 5-tab view (client component)
-│   ├── QSOForm.tsx                     # QSO entry form — ESM Enter nav, callsign/exchange validation, QSY drawer
+│   ├── QSOForm.tsx                     # QSO entry form — ESM Enter nav, Tab loop, callsign/exchange validation, QSY drawer
 │   ├── QSOTable.tsx                    # Real-time log table with inline edit + delete
 │   ├── Scoreboard.tsx                  # Score breakdown (base score, bonuses, claimed score)
-│   ├── BandActivity.tsx                # Other-station band/mode conflict panel + conflict callback
+│   ├── BandActivity.tsx                # Other-station band/mode conflict panel; QRT toggle, QSY occupancy callback
+│   ├── CwMacroPanel.tsx                # F1-F12 CW macros, Run/S&P modes, ESM, auto-CQ, editing
+│   ├── RigControlHelp.tsx              # Rig control setup modal — download, install steps, troubleshooting
 │   ├── BonusTracker.tsx                # 17-category ARRL bonus tracker with PATCH save
 │   ├── RateChart.tsx                   # Hourly QSO rate bar chart (pure CSS)
 │   ├── BandBreakdown.tsx               # Band × PH/CW/DIG matrix sorted by points
@@ -421,16 +473,19 @@ EzFD/
 │   ├── cabrillo.ts                     # Cabrillo 3.0 file generation (handles pg Date objects)
 │   ├── offline-queue.ts                # localStorage QSO queue for offline tolerance
 │   ├── qrz.ts                          # QRZ XML API client with session caching + decryption
-│   └── sections.ts                     # ARRL/RAC section names + map coordinates
+│   ├── sections.ts                     # ARRL/RAC section names + map coordinates
+│   └── useRigBridge.ts                 # Shared WebSocket hook — rig band/mode/freq/CW send, used by both windows
 ├── db/
 │   └── schema.sql                      # Schema, indexes, pg_notify trigger, idempotent migrations
 │                                       # Migrations: bonuses (v2), event_type (v3), power (v4)
 ├── public/
 │   ├── manifest.json                   # PWA manifest (standalone display, amber theme)
 │   ├── sw.js                           # Service worker (cache-first static, network-first pages)
+│   ├── ezfd-rig-bridge.py              # Static copy of the rig bridge, served for direct browser download
 │   └── icons/icon.svg                  # App icon (amber rounded rect, "FD" text)
 ├── deploy.sh                           # VPS deployment script (Ubuntu/Debian); idempotent update support
-└── ezfd-admin.sh                       # Interactive server-side admin console (events, exports, backups)
+├── ezfd-admin.sh                       # Interactive server-side admin console (events, exports, backups, updates)
+└── ezfd-rig-bridge.py                  # Local rig control bridge — rigctld ↔ WebSocket ↔ browser, CW keying
 ```
 
 ---
