@@ -480,33 +480,9 @@ class RigCtldClient:
             await self._readline()  # discard passband width line
             return mode
 
-    async def get_caps_text(self) -> str:
-        """Runs \\dump_caps and drains every line rigctld sends back.
-
-        dump_caps is a purely local text dump (no rig round-trip), so its
-        entire output arrives essentially at once. Rather than guessing at
-        a terminator line (format varies by Hamlib version/backend, and
-        guessing wrong leaves stale lines in the stream that desync every
-        get_freq/get_mode call afterward — the actual bug hit here), give
-        it a moment to fully arrive, then drain with short per-line
-        timeouts until the buffer is genuinely empty."""
-        async with self.lock:
-            await self._send("\\dump_caps")
-            await asyncio.sleep(0.5)  # let the full (already-generated) response land
-            lines = []
-            for _ in range(2000):  # hard cap so a pathological stream can't hang forever
-                try:
-                    line = await self._raw_readline(timeout=0.3)
-                except asyncio.TimeoutError:
-                    break
-                if not line:
-                    break
-                lines.append(line)
-            return "\n".join(lines)
-
     async def send_morse(self, text: str):
         """Sends text as CW via the rig's CAT-controlled keyer. Requires a rig
-        backend with Morse-send support (checked ahead of time via get_caps_text)."""
+        backend with Morse-send support (checked ahead of time via probe_cw_support)."""
         # Strip anything that could break the single-line protocol framing or
         # inject additional rigctld commands (newlines, carriage returns).
         clean = "".join(ch for ch in text if ch.isprintable()).strip()
@@ -535,6 +511,46 @@ class RigCtldClient:
                 await self.writer.wait_closed()
             except Exception:
                 pass
+
+async def probe_cw_support(host: str, port: int) -> bool:
+    """Checks whether the rig supports CAT-based CW sending, via \\dump_caps.
+
+    dump_caps doesn't just print static struct fields — it actually exercises
+    many of the rig's CAT functions live (get_level, get_powerstat, etc.) over
+    the real serial link, so its output can trickle in over several seconds
+    with gaps between chunks larger than any reasonable idle-timeout. Rather
+    than trying to precisely frame that response, this runs on a completely
+    separate, disposable connection — so no matter how imperfectly it's
+    drained, it can never leave stray bytes to desync the main polling
+    connection used for get_freq/get_mode/send_morse."""
+    try:
+        reader, writer = await asyncio.open_connection(host, port)
+    except Exception:
+        return False
+    try:
+        writer.write(b"\\dump_caps\n")
+        await writer.drain()
+        lines = []
+        loop = asyncio.get_event_loop()
+        deadline = loop.time() + 8.0  # dump_caps can take a while over slow serial links
+        while loop.time() < deadline:
+            try:
+                line = await asyncio.wait_for(reader.readline(), timeout=1.5)
+            except asyncio.TimeoutError:
+                break
+            if not line:
+                break
+            lines.append(line.decode(errors="replace"))
+        text = "".join(lines)
+        return bool(re.search(r"Can\s+Send\s+Morse:\s*Y", text, re.IGNORECASE))
+    except Exception:
+        return False
+    finally:
+        try:
+            writer.close()
+            await writer.wait_closed()
+        except Exception:
+            pass
 
 # ── WebSocket server ──────────────────────────────────────────────────────────
 _clients: set = set()
@@ -639,9 +655,8 @@ async def run_bridge(rigctld_host: str, rigctld_port: int, ws_port: int):
     await rig.connect()
     ok("Connected to rigctld")
 
-    info("Checking rig capabilities…")
-    caps_text = await rig.get_caps_text()
-    can_cw = bool(re.search(r"Can\s+Send\s+Morse:\s*Y", caps_text, re.IGNORECASE))
+    info("Checking rig capabilities (this can take a few seconds over slow serial links)…")
+    can_cw = await probe_cw_support(rigctld_host, rigctld_port)
     if can_cw:
         ok("Rig supports CW keying via CAT — CW macro panel available in EzFD.")
     else:
