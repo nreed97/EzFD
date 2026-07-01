@@ -388,7 +388,7 @@ def prompt_rig_config(cfg: dict, rigctld_port: int) -> dict | None:
         serial_port  = input(f"  Serial / USB port [{saved_port}]: ").strip() or saved_port
         baud         = input(f"  Baud rate         [{saved_baud}]: ").strip() or saved_baud
 
-    cfg.update({"model": model, "serial_port": serial_port, "baud": baud})
+    cfg.update({"model": model, "serial_port": serial_port, "baud": baud, "network": network})
     save_config(cfg)
     return cfg
 
@@ -396,6 +396,12 @@ def start_rigctld(cfg: dict, rigctld_port: int) -> "subprocess.Popen | None":
     cmd = ["rigctld", "-m", cfg["model"], "-r", cfg["serial_port"], "-t", str(rigctld_port)]
     if str(cfg.get("baud", "0")) not in ("0", ""):
         cmd += ["-s", str(cfg["baud"])]
+    if not cfg.get("network"):
+        # Most CAT interfaces (physical and virtual) don't wire up RTS/CTS hardware
+        # handshake. Hamlib's Kenwood/etc. backends default to requiring it, which
+        # makes writes silently fail on virtual ports (e.g. FlexRadio SmartCAT) that
+        # never assert CTS. Disabling it is safe for real hardware too.
+        cmd += ["--set-conf=serial_handshake=None"]
     info("Starting:  " + " ".join(cmd))
     try:
         proc = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE)
