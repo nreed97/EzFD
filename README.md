@@ -224,7 +224,7 @@ If your connected rig supports CAT-based Morse sending (checked automatically at
 - **Placeholders**: `{call}` worked station, `{class}`/`{section}` their exchange, `{mycall}` the event/club callsign, `{exch}` your own class + section.
 - **RUN / S&P toggle** — separate macro sets for calling CQ versus hunting stations; each remembers its own twelve macros.
 - **ESM** (Enter Sends Message, N1MM-style) — with an empty callsign, Enter sends CQ (RUN mode); with a callsign but no exchange yet, Enter sends your call/exchange macro; once the exchange fields are filled, Enter sends TU and logs the QSO in one keystroke.
-- **Auto CQ** (RUN mode only) — repeats your CQ macro on an adjustable timer (2–60s); pauses the instant you start typing a callsign and resumes once the field is empty again.
+- **Auto CQ** (RUN mode only) — N1MM-style: toggling it ON only arms it, nothing transmits until you send CQ yourself (click, F1, or Enter). Once sent, it repeats on an adjustable timer (2–60s) until you start typing a callsign (pauses, resumes when the field clears) or hit Escape (stops the chain entirely, requiring a manual restart).
 - **Space bar or Escape** stops transmission instantly.
 
 Not all rigs expose CAT CW sending — Icom, Elecraft, Yaesu (most models), and FlexRadio generally support it; older or CAT-only interfaces often don't. If yours doesn't, band/mode auto-follow and logging still work fine; you just key by hand.
