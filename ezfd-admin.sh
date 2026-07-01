@@ -137,7 +137,7 @@ view_event() {
   label "Class / Section:"; echo "${class}  ·  ${section}"
   label "Year / Created:"; echo "${year}  ·  ${created}"
   [[ -n "$location" ]] && { label "Location:"; echo "$location"; }
-  label "Event UUID:";     echo "${DIM}${uuid}${NC}"
+  label "Event UUID:";     echo -e "${DIM}${uuid}${NC}"
   echo
 
   # Stats
