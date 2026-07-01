@@ -107,6 +107,95 @@ def save_config(cfg: dict):
 def rigctld_in_path() -> bool:
     return shutil.which("rigctld") is not None
 
+def _install_hamlib_windows() -> bool:
+    """Download the latest Hamlib Windows release from GitHub, extract it,
+    and add the bin directory to the current process PATH."""
+    import urllib.request
+    import zipfile as zf_mod
+    import json as json_mod
+    import tempfile
+
+    api_url = "https://api.github.com/repos/Hamlib/Hamlib/releases/latest"
+    info("Fetching latest release info from GitHub…")
+    try:
+        req = urllib.request.Request(api_url, headers={"User-Agent": "ezfd-rig-bridge"})
+        with urllib.request.urlopen(req, timeout=15) as resp:
+            release = json_mod.loads(resp.read())
+    except Exception as e:
+        err(f"Could not reach GitHub: {e}")
+        print(f"  Download manually from: {C}https://github.com/Hamlib/Hamlib/releases/latest{NC}")
+        return False
+
+    # Find the Windows 64-bit ZIP asset
+    asset_url = asset_name = None
+    for asset in release.get("assets", []):
+        name = asset["name"]
+        if "w64" in name and name.endswith(".zip"):
+            asset_url = asset["browser_download_url"]
+            asset_name = name
+            break
+
+    if not asset_url:
+        err("No Windows 64-bit ZIP found in latest release.")
+        print(f"  Download manually from: {C}https://github.com/Hamlib/Hamlib/releases/latest{NC}")
+        return False
+
+    info(f"Downloading {asset_name} ({release.get('tag_name', '')})…")
+    install_dir = Path.home() / "hamlib"
+    zip_path    = Path(tempfile.gettempdir()) / asset_name
+
+    try:
+        def _progress(block, block_size, total):
+            if total > 0:
+                pct = min(100, block * block_size * 100 // total)
+                print(f"\r  {D}Progress: {pct}%{NC}", end="", flush=True)
+        urllib.request.urlretrieve(asset_url, zip_path, reporthook=_progress)
+        print()  # newline after progress
+    except Exception as e:
+        err(f"Download failed: {e}")
+        return False
+
+    info(f"Extracting to {install_dir}…")
+    try:
+        install_dir.mkdir(parents=True, exist_ok=True)
+        with zf_mod.ZipFile(zip_path, "r") as zf:
+            zf.extractall(install_dir)
+        zip_path.unlink(missing_ok=True)
+    except Exception as e:
+        err(f"Extraction failed: {e}")
+        return False
+
+    # Locate the bin directory (may be nested inside a versioned subfolder)
+    bin_candidates = sorted(install_dir.glob("*/bin")) + sorted(install_dir.glob("bin"))
+    if not bin_candidates:
+        err("Could not find a bin\\ directory in the extracted archive.")
+        return False
+    bin_dir = str(bin_candidates[0])
+
+    # Make rigctld available in this process immediately
+    os.environ["PATH"] = bin_dir + os.pathsep + os.environ["PATH"]
+    ok(f"Hamlib extracted — bin dir added to PATH for this session.")
+
+    # Offer permanent PATH update via setx
+    print()
+    ans = input(f"  Add to PATH permanently so you don't need to repeat this? [y/N]: ").strip().lower()
+    if ans == "y":
+        try:
+            current = subprocess.check_output(
+                ["reg", "query", r"HKCU\Environment", "/v", "PATH"],
+                stderr=subprocess.DEVNULL, text=True
+            ).strip().split()[-1]
+        except Exception:
+            current = ""
+        if bin_dir.lower() not in current.lower():
+            new_path = (current + os.pathsep + bin_dir).lstrip(os.pathsep)
+            subprocess.call(["setx", "PATH", new_path], stdout=subprocess.DEVNULL)
+            ok("PATH updated permanently (new terminals will pick it up).")
+        else:
+            ok("Already in your permanent PATH.")
+
+    return rigctld_in_path()
+
 def offer_install_rigctld() -> bool:
     """Print platform-specific install instructions and optionally run them.
     Returns True if rigctld ends up installed."""
@@ -160,17 +249,11 @@ def offer_install_rigctld() -> bool:
                     err("brew install failed — check Homebrew output above.")
 
     elif sys_os == "Windows":
-        print(f"  Option 1:  {B}winget install Hamlib.Hamlib{NC}")
-        print(f"  Option 2:  Download ZIP from {C}https://hamlib.github.io{NC}")
-        print(f"             Extract and add the bin\\ folder to your PATH.")
-        ans = input(f"\n  Attempt install via winget? [y/N]: ").strip().lower()
+        # Hamlib is not in winget. Download the latest release ZIP from GitHub.
+        print(f"  Hamlib will be downloaded from GitHub and extracted to {B}%USERPROFILE%\\hamlib{NC}.")
+        ans = input(f"\n  Download and install now? [y/N]: ").strip().lower()
         if ans == "y":
-            try:
-                subprocess.check_call(["winget", "install", "Hamlib.Hamlib"])
-                ok("Hamlib installed. You may need to restart this script for PATH to update.")
-                return rigctld_in_path()
-            except Exception:
-                err("winget install failed — please install manually.")
+            return _install_hamlib_windows()
     else:
         print(f"  See: {C}https://hamlib.github.io{NC}")
 
