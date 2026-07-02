@@ -30,7 +30,14 @@ import socket
 import asyncio
 import json
 import argparse
+import logging
 from pathlib import Path
+
+# The websockets library logs a full traceback every time something opens a
+# TCP connection to our port and closes it without completing a WebSocket
+# handshake (port scanners, antivirus probes, browser speculative connects,
+# etc.) — harmless noise, not an actual failure. Quiet it to just CRITICAL.
+logging.getLogger("websockets").setLevel(logging.CRITICAL)
 
 # ── Auto-install websockets if missing ────────────────────────────────────────
 try:
