@@ -45,9 +45,10 @@ interface Props {
   initialBonuses: Bonuses;
   baseScore: number;
   onBonusesChange?: (b: Bonuses) => void;
+  readOnly?: boolean;
 }
 
-export default function BonusTracker({ joinCode, initialBonuses, baseScore, onBonusesChange }: Props) {
+export default function BonusTracker({ joinCode, initialBonuses, baseScore, onBonusesChange, readOnly = false }: Props) {
   const [bonuses, setBonuses] = useState<Bonuses>(initialBonuses);
   const [saving, setSaving] = useState(false);
   const [open, setOpen] = useState(false);
@@ -68,12 +69,14 @@ export default function BonusTracker({ joinCode, initialBonuses, baseScore, onBo
   }, [joinCode, onBonusesChange]);
 
   function toggleBool(key: keyof Bonuses) {
+    if (readOnly) return;
     const next = { ...bonuses, [key]: !bonuses[key as keyof Bonuses] };
     setBonuses(next);
     save(next);
   }
 
   function setNum(key: keyof Bonuses, value: number) {
+    if (readOnly) return;
     const next = { ...bonuses, [key]: value };
     setBonuses(next);
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -110,7 +113,8 @@ export default function BonusTracker({ joinCode, initialBonuses, baseScore, onBo
                     type="checkbox"
                     checked={!!bonuses[def.key]}
                     onChange={() => toggleBool(def.key)}
-                    className="accent-amber-400 shrink-0"
+                    disabled={readOnly}
+                    className="accent-amber-400 shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 ) : (
                   <input
@@ -119,7 +123,8 @@ export default function BonusTracker({ joinCode, initialBonuses, baseScore, onBo
                     max={(def as NumDef).max}
                     value={(bonuses[def.key] as number | undefined) ?? 0}
                     onChange={e => setNum(def.key, Math.max(0, parseInt(e.target.value) || 0))}
-                    className="w-12 rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-center font-mono text-xs text-zinc-200 light:border-zinc-300 light:bg-white light:text-zinc-800"
+                    disabled={readOnly}
+                    className="w-12 rounded border border-zinc-700 bg-zinc-900 px-1 py-0.5 text-center font-mono text-xs text-zinc-200 light:border-zinc-300 light:bg-white light:text-zinc-800 disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 )}
                 <span className="truncate text-xs text-zinc-300 light:text-zinc-700">{def.label}</span>

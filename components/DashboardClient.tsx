@@ -22,9 +22,10 @@ type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed';
 interface Props {
   event: Event;
   initialQSOs: QSO[];
+  isVisitor?: boolean;
 }
 
-export default function DashboardClient({ event, initialQSOs }: Props) {
+export default function DashboardClient({ event, initialQSOs, isVisitor = false }: Props) {
   const [qsos, setQSOs] = useState<QSO[]>(initialQSOs);
   const [mainView, setMainView] = useState<MainView>('map');
   const [bonuses, setBonuses] = useState<Bonuses>(event.bonuses ?? {});
@@ -76,6 +77,14 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
           <span className="font-bold text-amber-400 text-xl">{event.club_call}</span>
           <span className="text-zinc-400 text-sm light:text-zinc-600">{event.club_name}</span>
           <span className="text-zinc-600 text-sm light:text-zinc-400">{event.class} · {event.arrl_section}</span>
+          {isVisitor && (
+            <span
+              title="Read-only visitor mode — no sign-in, no logging, no operator actions"
+              className="rounded border border-sky-700 bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-400"
+            >
+              Visitor
+            </span>
+          )}
         </div>
         <div className="flex items-center gap-2 text-sm flex-wrap">
           <UTCClock />
@@ -104,16 +113,20 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
           </button>
           <Link href={`/event/${event.join_code}`}
             className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
-            ← Logger
+            {isVisitor ? '← Exit' : '← Logger'}
           </Link>
-          <a href={`/api/export/${event.join_code}`}
-            className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10 light:border-amber-600 light:text-amber-700">
-            ADIF
-          </a>
-          <a href={`/api/export/${event.join_code}?format=cabrillo`}
-            className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10 light:border-amber-600 light:text-amber-700">
-            Cabrillo
-          </a>
+          {!isVisitor && (
+            <>
+              <a href={`/api/export/${event.join_code}`}
+                className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10 light:border-amber-600 light:text-amber-700">
+                ADIF
+              </a>
+              <a href={`/api/export/${event.join_code}?format=cabrillo`}
+                className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10 light:border-amber-600 light:text-amber-700">
+                Cabrillo
+              </a>
+            </>
+          )}
           <ThemeToggle />
         </div>
       </header>
@@ -143,6 +156,7 @@ export default function DashboardClient({ event, initialQSOs }: Props) {
             initialBonuses={bonuses}
             baseScore={score.total_score}
             onBonusesChange={setBonuses}
+            readOnly={isVisitor}
           />
 
           {score.sections.length > 0 && (

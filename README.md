@@ -36,6 +36,7 @@ A real-time, multi-operator ARRL Field Day and Winter Field Day logging applicat
 | **Dashboard — Sections Needed** | Unworked sections grouped by call district with worked ones struck through — the hunt list |
 | **Dashboard — Rate chart** | Hourly QSO rate bar chart; zero hours shown as hairlines so contest gaps are visible |
 | **Dashboard — Band breakdown** | Band × PH/CW/DIG matrix sorted by points |
+| **Visitor mode** | Read-only join option — no callsign, no logging, no bonus editing — for a dedicated stats-viewing station or a lobby display showing live event stats |
 | **Summary sheet** | Printable ARRL-style summary with QSO table, score calculation (power multiplier row), active bonus line items, sections worked, and operator list |
 | **Operator stats** | Per-operator QSO count, Q/hr (over their operating window), and PH/CW/DIG mode split |
 | **Night mode** | One-click dim (35% brightness + warm tone) to preserve dark adaptation during nighttime operations |
@@ -183,6 +184,15 @@ Share the join code with your operators. Each operator:
 
 No account or password is required for operators.
 
+### Visitor Mode
+
+For a stats-only display — a lobby monitor, a dedicated scoring station, anything that shouldn't log QSOs — skip operator sign-in entirely:
+
+1. Open the join page (`http://<server-ip>/event/<code>`) same as an operator would.
+2. Click **View Live Stats (Visitor)** instead of entering a callsign.
+
+This opens the same real-time [Dashboard](#dashboard) an operator sees (map, sections, rate, band breakdown, live score), marked with a **VISITOR** badge in the header. There's no callsign prompt, no QSO logging, and the Bonus Tracker is view-only (checkboxes and counters are disabled). ADIF/Cabrillo export links are also hidden, since those are operator/organizer actions. Visitors can leave and rejoin the dashboard at any time — nothing is tied to a session.
+
 ### Logging QSOs
 
 The logging screen is laid out for speed using ESM-style Enter navigation:
@@ -249,7 +259,7 @@ To bulk-import QSOs from WSJT-X, JTDX, or any other logger:
 
 ### Dashboard
 
-Click **Dashboard** from the logger to open the metrics view. Five tabs:
+Click **Dashboard** from the logger to open the metrics view (or enter via [Visitor Mode](#visitor-mode) for read-only access with no sign-in). Five tabs:
 
 | Tab | Contents |
 |---|---|

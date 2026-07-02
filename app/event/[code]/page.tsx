@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import Link from 'next/link';
 import type { Event } from '@/lib/types';
 
 export default function EventJoinPage() {
@@ -80,6 +81,19 @@ export default function EventJoinPage() {
               Enter Logger
             </button>
           </form>
+        </div>
+
+        <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6 light:border-zinc-200 light:bg-zinc-50">
+          <h2 className="mb-2 font-semibold text-zinc-200 light:text-zinc-800">Just Watching?</h2>
+          <p className="mb-4 text-sm text-zinc-400 light:text-zinc-600">
+            Visitor mode shows live stats — score, map, rate, sections — with no sign-in and no logging. Good for a stats-only station or a lobby display.
+          </p>
+          <Link
+            href={`/event/${code}/dashboard?visitor=1`}
+            className="block w-full rounded-lg border border-zinc-700 py-2 text-center font-semibold text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
+          >
+            View Live Stats (Visitor)
+          </Link>
         </div>
       </div>
     </main>
