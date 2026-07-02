@@ -317,6 +317,7 @@ sudo bash ezfd-admin.sh
 - **List / manage events** — table of all events with QSO/dupe/operator counts; select any event to drill in
 - **Server statistics** — totals, top operators across all events, QSOs by event type, database size
 - **Full JSON backup** — timestamped dump of all events + QSOs to `/tmp/`
+- **Restore from JSON backup** — recreate event(s) + QSOs from a backup file (see below)
 - **Update application** — `git pull`, rebuild, redeploy, and restart the service in one step (see below)
 - **Exit**
 
@@ -338,6 +339,14 @@ Destructive actions require typing `YES` in all caps to confirm.
 ### Update application
 
 Pulls the latest code, rebuilds, redeploys the standalone output to `/opt/ezfd`, applies any new database migrations, and restarts the service — all from the admin console instead of SSHing in separately. Requires `EZFD_REPO_DIR` in `/opt/ezfd/.env`, which `deploy.sh` writes automatically; if it's missing (e.g. from an install predating this feature), re-run `deploy.sh` once to set it. The redeploy step excludes `.env` from the file sync, so secrets and config survive the update.
+
+### Restore from JSON backup
+
+Restores event(s) + QSOs from a backup produced by either JSON export option (per-event or full server backup). Picks up files sitting in `/tmp/`, or accepts a custom path — useful if you've `scp`'d a backup back onto a fresh server for recovery. The file is read directly by PostgreSQL server-side (`pg_read_file`), so no shell quoting or size limits come into play.
+
+Restored event(s) always get a **brand-new join code and UUID** — restoring never overwrites or merges into an existing event, so it's always safe to try, even more than once. The new join code(s) are printed after restoring; share them with operators to resume logging.
+
+QRZ credentials in a restored event remain encrypted with whatever `EZFD_ENCRYPTION_KEY` was active on the server that created the backup. If restoring onto a different server (different key), QRZ auto-lookup for that event won't decrypt correctly until the credentials are re-entered via event settings.
 
 ### Non-interactive JSON dump
 

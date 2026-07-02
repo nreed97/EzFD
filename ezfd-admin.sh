@@ -470,6 +470,163 @@ backup_all() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Restore from JSON backup
+# ─────────────────────────────────────────────────────────────────────────────
+restore_from_json() {
+  banner
+  echo -e "  ${BOLD}Restore from JSON Backup${NC}"
+  echo -e "  ${DIM}Restores event(s) + QSOs from a backup made by the JSON export${NC}"
+  echo -e "  ${DIM}options in this script. Always creates NEW event(s) with fresh${NC}"
+  echo -e "  ${DIM}join codes — never overwrites or merges into an existing event,${NC}"
+  echo -e "  ${DIM}so restoring is always safe to try, even more than once.${NC}"
+  echo
+
+  warn "QRZ credentials in the backup are stored encrypted with the ENCRYPTION"
+  warn "KEY active when the backup was made. If restoring onto a different"
+  warn "server/key, QRZ auto-lookup for that event may not work until re-entered."
+  echo
+  hr
+
+  # Offer a pick-list of backup files in /tmp, or a custom path
+  local -a files=()
+  while IFS= read -r f; do files+=("$f"); done < <(ls -t /tmp/ezfd_*.json 2>/dev/null)
+
+  local json_file=""
+  if [[ ${#files[@]} -gt 0 ]]; then
+    local -a opts=()
+    local f size
+    for f in "${files[@]}"; do
+      size=$(du -h "$f" 2>/dev/null | cut -f1)
+      opts+=("$(basename "$f")  (${size})")
+    done
+    opts+=("Enter a custom path")
+    local choice=""
+    menu_pick choice "${opts[@]}"
+    if [[ "$choice" -le "${#files[@]}" ]]; then
+      json_file="${files[$((choice-1))]}"
+    fi
+  fi
+
+  if [[ -z "$json_file" ]]; then
+    echo
+    read -rp "$(echo -e "  Path to JSON backup file: ")" json_file
+  fi
+
+  if [[ ! -f "$json_file" ]]; then
+    err "File not found: $json_file"; pause; return
+  fi
+
+  # Postgres reads the file server-side (pg_read_file) so the JSON content
+  # never has to pass through shell/psql -c string interpolation — only the
+  # file path does.
+  local preview
+  preview=$(PG -c "
+    SELECT jsonb_array_length(
+      CASE WHEN jsonb_typeof(d) = 'array' THEN d ELSE jsonb_build_array(d) END
+    )
+    FROM (SELECT pg_read_file('$json_file')::jsonb AS d) t;" 2>&1)
+
+  if [[ ! "$preview" =~ ^[0-9]+$ ]]; then
+    err "Could not read/parse that file as JSON on the server:"
+    echo "$preview" >&2
+    pause; return
+  fi
+
+  echo
+  label "File:";          echo "$json_file"
+  label "Events found:";  echo "$preview"
+  echo
+  read -rp "$(echo -e "  ${BOLD}Restore ${preview} event(s) as new event(s)? [y/N]:${NC} ")" ans
+  if [[ "${ans,,}" != "y" ]]; then
+    warn "Cancelled."; pause; return
+  fi
+
+  echo
+  echo -e "  ${DIM}Restoring…${NC}"
+
+  local result
+  result=$(PG -c "
+    CREATE TEMP TABLE _restore_summary (orig_code text, new_code text, qso_count int);
+
+    DO \$\$
+    DECLARE
+      raw jsonb;
+      ev  jsonb;
+      qso jsonb;
+      new_id uuid;
+      new_code text;
+      n int;
+    BEGIN
+      raw := pg_read_file('$json_file')::jsonb;
+      IF jsonb_typeof(raw) = 'object' THEN
+        raw := jsonb_build_array(raw);
+      END IF;
+
+      FOR ev IN SELECT * FROM jsonb_array_elements(raw) LOOP
+        new_id := gen_random_uuid();
+        new_code := upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
+
+        INSERT INTO events (id, join_code, club_name, club_call, event_year, class, arrl_section,
+                             location, qrz_username, qrz_password, qrz_session_key, qrz_session_expires,
+                             bonuses, event_type, power, created_at)
+        VALUES (
+          new_id, new_code,
+          COALESCE(ev->>'club_name',''), COALESCE(ev->>'club_call',''),
+          COALESCE((ev->>'event_year')::int, EXTRACT(YEAR FROM NOW())::int),
+          COALESCE(ev->>'class',''), COALESCE(ev->>'arrl_section',''),
+          ev->>'location', ev->>'qrz_username', ev->>'qrz_password', ev->>'qrz_session_key',
+          NULLIF(ev->>'qrz_session_expires','')::timestamptz,
+          COALESCE(ev->'bonuses','{}'::jsonb),
+          COALESCE(ev->>'event_type','FD'),
+          COALESCE(ev->>'power','HIGH'),
+          COALESCE(NULLIF(ev->>'created_at','')::timestamptz, NOW())
+        );
+
+        n := 0;
+        FOR qso IN SELECT * FROM jsonb_array_elements(COALESCE(ev->'qsos','[]'::jsonb)) LOOP
+          INSERT INTO qsos (id, event_id, callsign, band, mode, datetime_utc, sent_class, sent_section,
+                             rcvd_class, rcvd_section, operator_call, station_number, is_dupe, created_at)
+          VALUES (
+            gen_random_uuid(), new_id,
+            qso->>'callsign', qso->>'band', qso->>'mode',
+            COALESCE(NULLIF(qso->>'datetime_utc','')::timestamptz, NOW()),
+            qso->>'sent_class', qso->>'sent_section',
+            qso->>'rcvd_class', qso->>'rcvd_section',
+            qso->>'operator_call', COALESCE((qso->>'station_number')::int, 1),
+            COALESCE((qso->>'is_dupe')::boolean, false),
+            COALESCE(NULLIF(qso->>'created_at','')::timestamptz, NOW())
+          );
+          n := n + 1;
+        END LOOP;
+
+        INSERT INTO _restore_summary VALUES (ev->>'join_code', new_code, n);
+      END LOOP;
+    END \$\$;
+
+    SELECT orig_code, new_code, qso_count FROM _restore_summary;
+  " 2>&1)
+  local status=$?
+
+  if [[ $status -ne 0 ]]; then
+    err "Restore failed:"
+    echo "$result" >&2
+    pause; return
+  fi
+
+  echo
+  echo -e "  ${BOLD}Restored:${NC}"
+  printf "  ${BOLD}%-10s  %-10s  %6s${NC}\n" "Old Code" "New Code" "QSOs"
+  hr
+  while IFS='|' read -r orig new_code qso_count; do
+    [[ -z "$orig" ]] && continue
+    printf "  ${DIM}%-10s${NC}  ${CYAN}%-10s${NC}  %6s\n" "$orig" "$new_code" "$qso_count"
+  done <<< "$result"
+  echo
+  log "Restore complete. Share the new join code(s) above with operators."
+  pause
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Update application (git pull → build → rsync → migrate → restart)
 # ─────────────────────────────────────────────────────────────────────────────
 update_app() {
@@ -573,6 +730,7 @@ main_menu() {
       "List / manage events" \
       "Server statistics" \
       "Full JSON backup (all events + QSOs)" \
+      "Restore from JSON backup" \
       "Update application (git pull + rebuild)" \
       "Exit"
 
@@ -580,8 +738,9 @@ main_menu() {
       1) list_events ;;
       2) server_stats ;;
       3) backup_all ;;
-      4) update_app ;;
-      5) echo; exit 0 ;;
+      4) restore_from_json ;;
+      5) update_app ;;
+      6) echo; exit 0 ;;
     esac
   done
 }
