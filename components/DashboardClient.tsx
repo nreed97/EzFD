@@ -19,6 +19,23 @@ const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
 type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed';
 
+interface StationPresence {
+  op_call: string;
+  station: number;
+  band: string;
+  mode: string;
+  updated_at: string;
+}
+
+const PRESENCE_POLL_MS = 15_000;
+const INACTIVE_MS = 15 * 60 * 1000;
+
+const MODE_COLORS: Record<string, string> = {
+  PH:  'text-blue-400 light:text-blue-600',
+  CW:  'text-yellow-400 light:text-yellow-600',
+  DIG: 'text-green-400 light:text-green-600',
+};
+
 interface Props {
   event: Event;
   initialQSOs: QSO[];
@@ -30,6 +47,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   const [mainView, setMainView] = useState<MainView>('map');
   const [bonuses, setBonuses] = useState<Bonuses>(event.bonuses ?? {});
   const [showSummary, setShowSummary] = useState(false);
+  const [presence, setPresence] = useState<StationPresence[]>([]);
 
   useEffect(() => {
     const es = new EventSource(`/api/realtime/${event.id}`);
@@ -40,6 +58,20 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
       else if (op === 'DELETE') setQSOs(prev => prev.filter(q => q.id !== record.id));
     });
     return () => es.close();
+  }, [event.id]);
+
+  // Live band/mode per operator — same presence table BandActivity uses on
+  // the logging page. Dashboard is read-only here: it polls but never
+  // publishes its own presence row.
+  useEffect(() => {
+    let cancelled = false;
+    async function fetchPresence() {
+      const res = await fetch(`/api/presence?event_id=${event.id}`).catch(() => null);
+      if (!cancelled && res?.ok) setPresence(await res.json());
+    }
+    fetchPresence();
+    const id = setInterval(fetchPresence, PRESENCE_POLL_MS);
+    return () => { cancelled = true; clearInterval(id); };
   }, [event.id]);
 
   const score = calculateScore(qsos, bonuses, event.power);
@@ -61,6 +93,13 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
     if (t > s.last) s.last = t;
   }
   const operators = Object.keys(opStats).sort();
+
+  const presenceByOp: Record<string, StationPresence> = {};
+  for (const p of presence) presenceByOp[p.op_call] = p;
+
+  // Union of ops who've logged a QSO and ops who are currently present but
+  // haven't logged one yet (e.g. just signed on) — everyone gets a row.
+  const allOpCalls = Array.from(new Set([...Object.keys(opStats), ...presence.map(p => p.op_call)]));
 
   const VIEW_TABS: { id: MainView; label: string }[] = [
     { id: 'map',      label: 'Map' },
@@ -174,27 +213,39 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
             </div>
           )}
 
-          {Object.keys(opStats).length > 0 && (
+          {allOpCalls.length > 0 && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
               <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Operators</div>
-              {Object.entries(opStats)
-                .sort((a, b) => b[1].total - a[1].total)
-                .map(([op, s]) => {
+              {allOpCalls
+                .map(op => ({ op, s: opStats[op] ?? { total: 0, ph: 0, cw: 0, dig: 0, first: 0, last: 0 } }))
+                .sort((a, b) => b.s.total - a.s.total)
+                .map(({ op, s }) => {
                   const windowHours = Math.max((s.last - s.first) / 3_600_000, 1);
-                  const qhr = Math.round(s.total / windowHours);
+                  const qhr = s.total > 0 ? Math.round(s.total / windowHours) : 0;
+                  const p = presenceByOp[op];
+                  const active = p ? (Date.now() - new Date(p.updated_at).getTime()) <= INACTIVE_MS : false;
                   return (
-                    <div key={op} className="py-1 border-b border-zinc-800/50 last:border-0 light:border-zinc-200">
-                      <div className="flex items-baseline justify-between">
-                        <span className="font-mono text-xs font-bold text-zinc-200 light:text-zinc-800">{op}</span>
-                        <span className="font-mono text-xs text-zinc-400 light:text-zinc-500">{s.total} Q · {qhr}/hr</span>
+                    <div key={op} className={`py-1 border-b border-zinc-800/50 last:border-0 light:border-zinc-200 ${p && !active ? 'opacity-40' : ''}`}>
+                      <div className="flex items-baseline justify-between gap-2">
+                        <span className="flex items-center gap-1.5 min-w-0">
+                          {p && (
+                            <span className={`h-1.5 w-1.5 rounded-full shrink-0 ${active ? 'bg-green-400' : 'bg-zinc-600'}`} />
+                          )}
+                          <span className="font-mono text-xs font-bold text-zinc-200 light:text-zinc-800 truncate">{op}</span>
+                        </span>
+                        <span className="font-mono text-xs text-zinc-400 light:text-zinc-500 shrink-0">{s.total} Q · {qhr}/hr</span>
                       </div>
-                      {s.total > 0 && (
-                        <div className="mt-0.5 flex gap-1">
-                          {s.ph > 0 && <span className="text-[10px] text-blue-400 light:text-blue-600">{s.ph} PH</span>}
-                          {s.cw > 0 && <span className="text-[10px] text-yellow-400 light:text-yellow-600">{s.cw} CW</span>}
-                          {s.dig > 0 && <span className="text-[10px] text-green-400 light:text-green-600">{s.dig} DIG</span>}
-                        </div>
-                      )}
+                      <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
+                        {p && (
+                          <span className="flex items-center gap-1 text-[10px] font-mono">
+                            <span className="text-amber-400 light:text-amber-700">{p.band}</span>
+                            <span className={MODE_COLORS[p.mode] ?? 'text-zinc-400'}>{p.mode}</span>
+                          </span>
+                        )}
+                        {s.ph > 0 && <span className="text-[10px] text-blue-400 light:text-blue-600">{s.ph} PH</span>}
+                        {s.cw > 0 && <span className="text-[10px] text-yellow-400 light:text-yellow-600">{s.cw} CW</span>}
+                        {s.dig > 0 && <span className="text-[10px] text-green-400 light:text-green-600">{s.dig} DIG</span>}
+                      </div>
                     </div>
                   );
                 })}

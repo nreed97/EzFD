@@ -38,7 +38,7 @@ A real-time, multi-operator ARRL Field Day and Winter Field Day logging applicat
 | **Dashboard — Band breakdown** | Band × PH/CW/DIG matrix sorted by points |
 | **Visitor mode** | Read-only join option — no callsign, no logging, no bonus editing — for a dedicated stats-viewing station or a lobby display showing live event stats |
 | **Summary sheet** | Printable ARRL-style summary with QSO table, score calculation (power multiplier row), active bonus line items, sections worked, and operator list |
-| **Operator stats** | Per-operator QSO count, Q/hr (over their operating window), and PH/CW/DIG mode split |
+| **Operator stats** | Per-operator QSO count, Q/hr (over their operating window), PH/CW/DIG mode split, and live band/mode with an active/idle indicator (polled from the same presence data as the logging page's Band Activity panel) |
 | **Night mode** | One-click dim (35% brightness + warm tone) to preserve dark adaptation during nighttime operations |
 | **Light/Dark theme** | Toggle between light and dark UI themes; preference is saved across sessions |
 | **PWA / installable** | Add to home screen on Android/iOS or install as a desktop app via Chrome — works offline for the logging UI |
