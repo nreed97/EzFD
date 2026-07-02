@@ -2,8 +2,15 @@ import { getPool } from '@/lib/db';
 import DashboardClient from '@/components/DashboardClient';
 import { redirect } from 'next/navigation';
 
-export default async function DashboardPage({ params }: { params: Promise<{ code: string }> }) {
+export default async function DashboardPage({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ code: string }>;
+  searchParams: Promise<{ visitor?: string }>;
+}) {
   const { code } = await params;
+  const { visitor } = await searchParams;
   const pool = getPool();
 
   const { rows: evRows } = await pool.query(
@@ -19,5 +26,5 @@ export default async function DashboardPage({ params }: { params: Promise<{ code
     [evRows[0].id]
   );
 
-  return <DashboardClient event={evRows[0]} initialQSOs={qsos} />;
+  return <DashboardClient event={evRows[0]} initialQSOs={qsos} isVisitor={visitor === '1'} />;
 }
