@@ -25,7 +25,7 @@ A real-time, multi-operator ARRL Field Day and Winter Field Day logging applicat
 | **Exchange validation** | Rcvd Class validated against contest rules (number + correct letter set for FD/WFD); Rcvd Section validated against all 81 ARRL/RAC sections |
 | **Callsign validation** | QSO form warns on unusual callsign patterns before logging |
 | **QRZ callsign lookup** | Auto-fills name and state from QRZ.com XML API using a shared club account (optional); credentials encrypted at rest with AES-256-GCM |
-| **N1MM call history lookup** | Optionally downloads the current year's N1MM FD/WFD call history file at event creation; prefills a known station's name/section while logging |
+| **N1MM call history lookup** | Optionally downloads the current year's N1MM FD/WFD call history file at event creation; prefills a known station's class/section while logging |
 | **Master callsign file (MASTER.SCP)** | Optionally downloads the Super Check Partial callsign list; flags recognized calls during logging. Shared across all events on the server, refreshed at most once a day |
 | **Dupe checking** | Server-side duplicate detection (same callsign + band + mode); dupes are logged, flagged, and excluded from scoring |
 | **QSO editing** | Edit any logged QSO inline; dupe status is re-evaluated automatically |
@@ -200,7 +200,7 @@ This opens the same real-time [Dashboard](#dashboard) an operator sees (map, sec
 
 The logging screen is laid out for speed using ESM-style Enter navigation:
 
-1. **Callsign** — type the callsign and press **Enter**. If QRZ is configured it auto-fills name and state; if a call history file is loaded, a matching station's name/section from the file is shown and the Rcvd Section field is prefilled (only if still empty); if the master callsign file is loaded and the call is recognized but has no other match, a "known callsign" hint appears. An orange warning appears for unusual callsign formats or dupe contacts.
+1. **Callsign** — type the callsign and press **Enter**. If QRZ is configured it auto-fills name and state; if a call history file is loaded, a matching station's class/section (and club name, if present) is shown and the Rcvd Class/Section fields are prefilled (only if still empty); if the master callsign file is loaded and the call is recognized but has no other match, a "known callsign" hint appears. An orange warning appears for unusual callsign formats or dupe contacts.
 2. **Rcvd Class** — type the received class (e.g. `2A` for FD, `3O` for WFD) and press **Enter**. Validated against contest rules; orange border on invalid entries.
 3. **Rcvd Section** — type the received section (e.g. `MN`). Has autocomplete for all 81 ARRL/RAC sections (alphabetical). Press **Enter** to log the QSO.
 

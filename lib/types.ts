@@ -101,8 +101,9 @@ export interface QRZLookup {
 
 export interface CallHistoryLookup {
   callsign: string;
-  name: string | null;
+  sent_class: string | null;
   section: string | null;
+  name: string | null;
   user_text: string | null;
   known_master: boolean;
 }

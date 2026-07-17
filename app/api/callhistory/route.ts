@@ -15,7 +15,7 @@ export async function GET(request: Request) {
   const pool = getPool();
 
   const { rows } = await pool.query(
-    `SELECT e.use_call_history, e.use_master_callsign_file, c.name, c.section, c.user_text
+    `SELECT e.use_call_history, e.use_master_callsign_file, c.sent_class, c.section, c.name, c.user_text
      FROM events e
      LEFT JOIN call_history_entries c ON c.event_id = e.id AND c.callsign = $2
      WHERE e.id = $1`,
@@ -23,7 +23,7 @@ export async function GET(request: Request) {
   );
   const row = rows[0];
   if (!row) {
-    return NextResponse.json({ callsign: upper, name: null, section: null, user_text: null, known_master: false });
+    return NextResponse.json({ callsign: upper, sent_class: null, section: null, name: null, user_text: null, known_master: false });
   }
 
   let known_master = false;
@@ -37,8 +37,9 @@ export async function GET(request: Request) {
 
   return NextResponse.json({
     callsign: upper,
-    name: row.use_call_history ? row.name ?? null : null,
+    sent_class: row.use_call_history ? row.sent_class ?? null : null,
     section: row.use_call_history ? row.section ?? null : null,
+    name: row.use_call_history ? row.name ?? null : null,
     user_text: row.use_call_history ? row.user_text ?? null : null,
     known_master,
   });

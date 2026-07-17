@@ -73,7 +73,7 @@ function QSOForm({
     getValues: () => ({ callsign, rcvdClass, rcvdSection }),
   }), [callsign, rcvdClass, rcvdSection]);
   const [qrzInfo, setQrzInfo] = useState<{ name?: string; state?: string; country?: string } | null>(null);
-  const [historyInfo, setHistoryInfo] = useState<{ name: string | null; section: string | null } | null>(null);
+  const [historyInfo, setHistoryInfo] = useState<{ sentClass: string | null; section: string | null; label: string | null } | null>(null);
   const [knownMaster, setKnownMaster] = useState(false);
   const [lookingUp, setLookingUp] = useState(false);
   const [loggedFading, setLoggedFading] = useState(false);
@@ -116,10 +116,16 @@ function QSOForm({
       const res = await fetch(`/api/callhistory?callsign=${encodeURIComponent(call)}&event_id=${eventId}`);
       if (!res.ok) return;
       const data = await res.json();
-      setHistoryInfo(data.name || data.section ? { name: data.name, section: data.section } : null);
+      const label: string | null = data.name || data.user_text || null;
+      setHistoryInfo(
+        data.sent_class || data.section || label
+          ? { sentClass: data.sent_class, section: data.section, label }
+          : null
+      );
       setKnownMaster(!!data.known_master);
-      // Prefill the section field for a known station — only if the operator
-      // hasn't already typed something, so this never clobbers manual entry.
+      // Prefill class/section for a known station — only fields the operator
+      // hasn't already typed into, so this never clobbers manual entry.
+      if (data.sent_class) setRcvdClass(prev => prev || data.sent_class);
       if (data.section) setRcvdSection(prev => prev || data.section);
     } catch {
       // best-effort — logging must never block on this
@@ -220,7 +226,7 @@ function QSOForm({
         )}
         {historyInfo && !isDupe && (
           <p className="mt-1 text-xs text-amber-400/80 light:text-amber-700">
-            History: {historyInfo.name ?? '—'}{historyInfo.section ? ` · ${historyInfo.section}` : ''}
+            History: {[historyInfo.sentClass, historyInfo.section, historyInfo.label].filter(Boolean).join(' · ')}
           </p>
         )}
         {knownMaster && !historyInfo && !qrzInfo && !isDupe && (
