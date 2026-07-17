@@ -4,7 +4,7 @@ import { getPool } from './db';
 // callsigns shared by every contest logger (N1MM, Logger32, etc.), updated
 // by AD1C ahead of major contests. Not contest- or event-specific, so it's
 // cached globally instead of per-event.
-const MASTER_SCP_URL = process.env.EZFD_MASTER_SCP_URL || 'https://www.supercheckpartial.com/MASTER.SCP';
+const MASTER_SCP_URL = process.env.EZFD_MASTER_SCP_URL || 'https://www.supercheckpartial.com/downloads/MASTER.SCP';
 const STALE_MS = 24 * 60 * 60 * 1000;
 const INSERT_CHUNK_SIZE = 2000;
 
@@ -12,7 +12,7 @@ export function parseMasterScp(text: string): string[] {
   const calls = new Set<string>();
   for (const rawLine of text.split(/\r?\n/)) {
     const line = rawLine.trim();
-    if (!line || line.startsWith(';')) continue;
+    if (!line || line.startsWith('!') || line.startsWith('#')) continue;
     const call = line.split(/\s+/)[0]?.toUpperCase();
     if (call && /^[A-Z0-9/]+$/.test(call)) calls.add(call);
   }

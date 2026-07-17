@@ -379,7 +379,7 @@ sudo systemctl restart ezfd
 | `EZFD_CERT_EMAIL` | No | Let's Encrypt email saved by `deploy.sh` for use as a default on the next update run. |
 | `EZFD_FD_CALL_HISTORY_URL` | No | Override the N1MM Field Day call history file URL (supports a `{year}` placeholder). Defaults to N1MM's `fd_{year}-last` file. |
 | `EZFD_WFD_CALL_HISTORY_URL` | No | Override the N1MM Winter Field Day call history file URL (supports a `{year}` placeholder). Defaults to N1MM's `wfd_{year}-last` file. |
-| `EZFD_MASTER_SCP_URL` | No | Override the master callsign (Super Check Partial) file URL. Defaults to `https://www.supercheckpartial.com/MASTER.SCP`. |
+| `EZFD_MASTER_SCP_URL` | No | Override the master callsign (Super Check Partial) file URL. Defaults to `https://www.supercheckpartial.com/downloads/MASTER.SCP`. |
 | `EZFD_REPO_DIR` | No | Path to the cloned repo, saved by `deploy.sh`. Lets `ezfd-admin.sh`'s "Update application" action find the source to `git pull` and rebuild from. |
 | `NODE_ENV` | Yes | Always `production` in deployed installs |
 | `PORT` | Yes | App port (default `3000`; nginx proxies from 80/443) |
