@@ -36,6 +36,8 @@ export default function NewEventPage() {
     qrz_password: '',
     admin_key: '',
   });
+  const [useCallHistory, setUseCallHistory] = useState(false);
+  const [useMasterCallsignFile, setUseMasterCallsignFile] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -51,7 +53,15 @@ export default function NewEventPage() {
     const res = await fetch('/api/events', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...form, class: `${classNum}${classLetter}`, admin_key: form.admin_key, event_type: eventType, power }),
+      body: JSON.stringify({
+        ...form,
+        class: `${classNum}${classLetter}`,
+        admin_key: form.admin_key,
+        event_type: eventType,
+        power,
+        use_call_history: useCallHistory,
+        use_master_callsign_file: useMasterCallsignFile,
+      }),
     });
 
     const data = await res.json();
@@ -196,6 +206,45 @@ export default function NewEventPage() {
                 placeholder="City Park, Anytown PA"
                 className="input"
               />
+            </label>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
+          <h2 className="mb-1 font-semibold text-zinc-300 light:text-zinc-700">Call Databases (optional)</h2>
+          <p className="mb-4 text-xs text-zinc-500">Downloaded once when the event is created and used to prefill/verify callsigns during logging.</p>
+          <div className="flex flex-col gap-3">
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={useCallHistory}
+                onChange={e => setUseCallHistory(e.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm text-zinc-300 light:text-zinc-700">
+                  Use N1MM {eventType} call history file
+                </span>
+                <span className="block text-xs text-zinc-500">
+                  Downloads the latest {eventType === 'WFD' ? 'Winter Field Day' : 'Field Day'} {form.event_year} call history from N1MM and prefills known stations&apos; name/section while logging.
+                </span>
+              </span>
+            </label>
+            <label className="flex items-start gap-2">
+              <input
+                type="checkbox"
+                checked={useMasterCallsignFile}
+                onChange={e => setUseMasterCallsignFile(e.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                <span className="block text-sm text-zinc-300 light:text-zinc-700">
+                  Use master callsign file (MASTER.SCP)
+                </span>
+                <span className="block text-xs text-zinc-500">
+                  Downloads the latest Super Check Partial callsign list to flag whether a call is recognized. Shared across all events, refreshed at most once a day.
+                </span>
+              </span>
             </label>
           </div>
         </div>

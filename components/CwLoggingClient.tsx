@@ -137,6 +137,8 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
           eventId={event.id}
           eventType={event.event_type}
           hasQRZ={!!event.qrz_username}
+          hasCallHistory={!!event.use_call_history}
+          hasMasterCall={!!event.use_master_callsign_file}
           band={currentBand}
           mode={currentMode}
           onBandChange={setCurrentBand}

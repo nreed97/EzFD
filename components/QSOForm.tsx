@@ -30,6 +30,8 @@ interface Props {
   eventId: string;
   eventType: 'FD' | 'WFD';
   hasQRZ: boolean;
+  hasCallHistory: boolean;
+  hasMasterCall: boolean;
   band: Band;
   mode: Mode;
   onBandChange: (b: Band) => void;
@@ -59,7 +61,7 @@ interface Props {
 }
 
 function QSOForm({
-  eventId, eventType, hasQRZ, band, mode, onBandChange, onModeChange,
+  eventId, eventType, hasQRZ, hasCallHistory, hasMasterCall, band, mode, onBandChange, onModeChange,
   onSubmit, submitting, lastLogged, submitError, onDigHelp, existingQSOs,
   bandOccupancy = {}, esm, onEsmCall, onEsmLog, onCallsignInput, autoFadeLoggedMs, largeQsyChip,
 }: Props, ref: React.Ref<QSOFormHandle>) {
@@ -71,6 +73,8 @@ function QSOForm({
     getValues: () => ({ callsign, rcvdClass, rcvdSection }),
   }), [callsign, rcvdClass, rcvdSection]);
   const [qrzInfo, setQrzInfo] = useState<{ name?: string; state?: string; country?: string } | null>(null);
+  const [historyInfo, setHistoryInfo] = useState<{ name: string | null; section: string | null } | null>(null);
+  const [knownMaster, setKnownMaster] = useState(false);
   const [lookingUp, setLookingUp] = useState(false);
   const [loggedFading, setLoggedFading] = useState(false);
   const [loggedHidden, setLoggedHidden] = useState(false);
@@ -106,14 +110,35 @@ function QSOForm({
     }
   }, [eventId, hasQRZ]);
 
+  const lookupCallHistory = useCallback(async (call: string) => {
+    if ((!hasCallHistory && !hasMasterCall) || call.length < 3) return;
+    try {
+      const res = await fetch(`/api/callhistory?callsign=${encodeURIComponent(call)}&event_id=${eventId}`);
+      if (!res.ok) return;
+      const data = await res.json();
+      setHistoryInfo(data.name || data.section ? { name: data.name, section: data.section } : null);
+      setKnownMaster(!!data.known_master);
+      // Prefill the section field for a known station — only if the operator
+      // hasn't already typed something, so this never clobbers manual entry.
+      if (data.section) setRcvdSection(prev => prev || data.section);
+    } catch {
+      // best-effort — logging must never block on this
+    }
+  }, [eventId, hasCallHistory, hasMasterCall]);
+
   function handleCallChange(val: string) {
     const upper = val.toUpperCase().replace(/[^A-Z0-9/]/g, '');
     setCallsign(upper);
     onCallsignInput?.(upper);
     setQrzInfo(null);
+    setHistoryInfo(null);
+    setKnownMaster(false);
     if (lookupTimer.current) clearTimeout(lookupTimer.current);
     if (upper.length >= 3) {
-      lookupTimer.current = setTimeout(() => lookupCallsign(upper), 600);
+      lookupTimer.current = setTimeout(() => {
+        lookupCallsign(upper);
+        lookupCallHistory(upper);
+      }, 600);
     }
   }
 
@@ -127,6 +152,8 @@ function QSOForm({
     setRcvdClass('');
     setRcvdSection('');
     setQrzInfo(null);
+    setHistoryInfo(null);
+    setKnownMaster(false);
     callRef.current?.focus();
   }
 
@@ -190,6 +217,14 @@ function QSOForm({
             {qrzInfo.state ? ` · ${qrzInfo.state}` : ''}
             {qrzInfo.country && qrzInfo.country !== 'United States' ? ` · ${qrzInfo.country}` : ''}
           </p>
+        )}
+        {historyInfo && !isDupe && (
+          <p className="mt-1 text-xs text-amber-400/80 light:text-amber-700">
+            History: {historyInfo.name ?? '—'}{historyInfo.section ? ` · ${historyInfo.section}` : ''}
+          </p>
+        )}
+        {knownMaster && !historyInfo && !qrzInfo && !isDupe && (
+          <p className="mt-1 text-xs text-zinc-500">✓ known callsign (master list)</p>
         )}
         {isDupe && (
           <p className="mt-1 text-xs text-yellow-500">
