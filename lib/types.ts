@@ -33,6 +33,8 @@ export interface Event {
   arrl_section: string;
   location: string | null;
   qrz_username: string | null;
+  use_call_history: boolean;
+  use_master_callsign_file: boolean;
   bonuses: Bonuses;
   created_at: string;
 }
@@ -95,6 +97,15 @@ export interface QRZLookup {
   state: string | null;
   country: string | null;
   grid: string | null;
+}
+
+export interface CallHistoryLookup {
+  callsign: string;
+  sent_class: string | null;
+  section: string | null;
+  name: string | null;
+  user_text: string | null;
+  known_master: boolean;
 }
 
 export const BANDS: Band[] = ['160m', '80m', '40m', '20m', '15m', '10m', '6m', '2m', '1.25m', '70cm', 'SAT'];

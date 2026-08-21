@@ -401,6 +401,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             eventId={event.id}
             eventType={event.event_type}
             hasQRZ={!!event.qrz_username}
+            hasCallHistory={!!event.use_call_history}
+            hasMasterCall={!!event.use_master_callsign_file}
             band={currentBand}
             mode={currentMode}
             onBandChange={setCurrentBand}

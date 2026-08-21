@@ -100,3 +100,41 @@ $$;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS bonuses    JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_type TEXT  NOT NULL DEFAULT 'FD';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS power      TEXT  NOT NULL DEFAULT 'HIGH';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS use_call_history         BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS use_master_callsign_file BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ---------------------------------------------------------------------------
+-- Call history — N1MM-format station exchange history, imported per-event
+-- from the ARRL FD/WFD call history file (contest- and year-specific).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS call_history_entries (
+  id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id    UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  callsign    TEXT NOT NULL,
+  sent_class  TEXT,        -- FD/WFD "Exch1" column — the station's typical class (e.g. "3A")
+  section     TEXT,
+  name        TEXT,
+  user_text   TEXT,
+  UNIQUE (event_id, callsign)
+);
+
+CREATE INDEX IF NOT EXISTS call_history_event_idx ON call_history_entries(event_id);
+ALTER TABLE call_history_entries ADD COLUMN IF NOT EXISTS sent_class TEXT;
+
+-- ---------------------------------------------------------------------------
+-- Master callsign file (Super Check Partial / MASTER.SCP) — a single shared,
+-- global list of known callsigns, refreshed periodically and reused by every
+-- event that opts in (not contest-specific, so it isn't scoped to event_id).
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS master_callsigns (
+  callsign   TEXT        PRIMARY KEY,
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'ezfd') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON call_history_entries, master_callsigns TO ezfd;
+  END IF;
+END
+$$;

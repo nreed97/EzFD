@@ -25,6 +25,8 @@ A real-time, multi-operator ARRL Field Day and Winter Field Day logging applicat
 | **Exchange validation** | Rcvd Class validated against contest rules (number + correct letter set for FD/WFD); Rcvd Section validated against all 81 ARRL/RAC sections |
 | **Callsign validation** | QSO form warns on unusual callsign patterns before logging |
 | **QRZ callsign lookup** | Auto-fills name and state from QRZ.com XML API using a shared club account (optional); credentials encrypted at rest with AES-256-GCM |
+| **N1MM call history lookup** | Optionally downloads the current year's N1MM FD/WFD call history file at event creation; prefills a known station's class/section while logging |
+| **Master callsign file (MASTER.SCP)** | Optionally downloads the Super Check Partial callsign list; flags recognized calls during logging. Shared across all events on the server, refreshed at most once a day |
 | **Dupe checking** | Server-side duplicate detection (same callsign + band + mode); dupes are logged, flagged, and excluded from scoring |
 | **QSO editing** | Edit any logged QSO inline; dupe status is re-evaluated automatically |
 | **Bonus point tracker** | Track all 17 ARRL Field Day bonus categories including emergency power (doubles base score), GOTA, W1AW, satellite, youth ops, and more |
@@ -170,9 +172,10 @@ git pull && sudo bash deploy.sh
 2. Choose event type: **ARRL Field Day** or **Winter Field Day**.
 3. Fill in your club name, callsign, FD class (e.g. `3A` for FD, `2O` for WFD), and ARRL section.
 4. Select your power category: **HIGH** (default), **LOW** (≤150 W), or **QRP** (≤5 W). This sets the scoring multiplier.
-5. Optionally enter QRZ.com credentials — a single XML-subscription account shared by all operators during the event. Credentials are encrypted at rest with AES-256-GCM.
-6. If the server has an admin key configured, enter it in the **Admin Key** field.
-7. Click **Create Event & Get Join Code**. You will receive a 6-character join code (e.g. `HBDAXF`).
+5. Optionally check **Use N1MM call history file** to download that year's FD/WFD call history from N1MM (prefills a known station's class/section while logging), and/or **Use master callsign file (MASTER.SCP)** to download the Super Check Partial callsign list (flags recognized calls). Both downloads happen once, at event creation.
+6. Optionally enter QRZ.com credentials — a single XML-subscription account shared by all operators during the event. Credentials are encrypted at rest with AES-256-GCM.
+7. If the server has an admin key configured, enter it in the **Admin Key** field.
+8. Click **Create Event & Get Join Code**. You will receive a 6-character join code (e.g. `HBDAXF`).
 
 ### Joining an Event
 
@@ -197,7 +200,7 @@ This opens the same real-time [Dashboard](#dashboard) an operator sees (map, sec
 
 The logging screen is laid out for speed using ESM-style Enter navigation:
 
-1. **Callsign** — type the callsign and press **Enter**. If QRZ is configured it auto-fills name and state. An orange warning appears for unusual callsign formats or dupe contacts.
+1. **Callsign** — type the callsign and press **Enter**. If QRZ is configured it auto-fills name and state; if a call history file is loaded, a matching station's class/section (and club name, if present) is shown and the Rcvd Class/Section fields are prefilled (only if still empty); if the master callsign file is loaded and the call is recognized but has no other match, a "known callsign" hint appears. An orange warning appears for unusual callsign formats or dupe contacts.
 2. **Rcvd Class** — type the received class (e.g. `2A` for FD, `3O` for WFD) and press **Enter**. Validated against contest rules; orange border on invalid entries.
 3. **Rcvd Section** — type the received section (e.g. `MN`). Has autocomplete for all 81 ARRL/RAC sections (alphabetical). Press **Enter** to log the QSO.
 
@@ -374,6 +377,9 @@ sudo systemctl restart ezfd
 | `EZFD_ADMIN_KEY` | No | If set, this key must be submitted when creating a new event. Prevents unauthorised event creation on public servers. |
 | `EZFD_DOMAIN` | No | Domain name saved by `deploy.sh` for use as a default on the next update run. |
 | `EZFD_CERT_EMAIL` | No | Let's Encrypt email saved by `deploy.sh` for use as a default on the next update run. |
+| `EZFD_FD_CALL_HISTORY_URL` | No | Override the N1MM Field Day call history file URL (supports a `{year}` placeholder). Defaults to N1MM's `fd_{year}-last` file. |
+| `EZFD_WFD_CALL_HISTORY_URL` | No | Override the N1MM Winter Field Day call history file URL (supports a `{year}` placeholder). Defaults to N1MM's `wfd_{year}-last` file. |
+| `EZFD_MASTER_SCP_URL` | No | Override the master callsign (Super Check Partial) file URL. Defaults to `https://www.supercheckpartial.com/downloads/MASTER.SCP`. |
 | `EZFD_REPO_DIR` | No | Path to the cloned repo, saved by `deploy.sh`. Lets `ezfd-admin.sh`'s "Update application" action find the source to `git pull` and rebuild from. |
 | `NODE_ENV` | Yes | Always `production` in deployed installs |
 | `PORT` | Yes | App port (default `3000`; nginx proxies from 80/443) |
@@ -456,6 +462,7 @@ EzFD/
 │       ├── presence/route.ts           # GET/POST band-activity presence (15-min TTL)
 │       ├── realtime/[eventId]/route.ts # SSE stream (pg_notify → EventSource)
 │       ├── qrz/route.ts                # QRZ.com callsign lookup proxy
+│       ├── callhistory/route.ts        # N1MM call history + master callsign file lookup
 │       ├── export/[code]/route.ts      # ADIF + Cabrillo download (?format=cabrillo)
 │       ├── import/adif/route.ts        # POST bulk ADIF import
 │       └── download/
@@ -492,11 +499,13 @@ EzFD/
 │   ├── cabrillo.ts                     # Cabrillo 3.0 file generation (handles pg Date objects)
 │   ├── offline-queue.ts                # localStorage QSO queue for offline tolerance
 │   ├── qrz.ts                          # QRZ XML API client with session caching + decryption
+│   ├── callHistory.ts                  # N1MM call history file download/parse, per-event prefill lookup
+│   ├── masterCallsigns.ts              # MASTER.SCP (Super Check Partial) download/parse, shared known-callsign lookup
 │   ├── sections.ts                     # ARRL/RAC section names + map coordinates
 │   └── useRigBridge.ts                 # Shared WebSocket hook — rig band/mode/freq/CW send, used by both windows
 ├── db/
 │   └── schema.sql                      # Schema, indexes, pg_notify trigger, idempotent migrations
-│                                       # Migrations: bonuses (v2), event_type (v3), power (v4)
+│                                       # Migrations: bonuses (v2), event_type (v3), power (v4), call history + master callsign file (v5)
 ├── public/
 │   ├── manifest.json                   # PWA manifest (standalone display, amber theme)
 │   ├── sw.js                           # Service worker (cache-first static, network-first pages)

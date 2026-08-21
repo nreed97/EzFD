@@ -19,6 +19,8 @@ Run `npx tsc --noEmit` and `npm run build` — both must be clean.
 - **`deploy.sh`'s rsync of `.next/standalone/` must keep `--exclude='.env'`** — without it, `rsync --delete` wipes the live secrets file on every redeploy.
 - **`public/ezfd-rig-bridge.py` is a manual duplicate** of the root `ezfd-rig-bridge.py`, served for direct browser download. They are NOT symlinked — always `cp` the root file over the public copy after editing the bridge script.
 - **`EZFD_REPO_DIR`** (in `/opt/ezfd/.env`, written by `deploy.sh`) tells `ezfd-admin.sh`'s "Update application" action where to `git pull` from.
+- **N1MM call history files are contest-year-specific**, unlike `MASTER.SCP` (evergreen). `lib/callHistory.ts` builds the download URL from `event_type`+`event_year` against N1MM's `{fd|wfd}_{year}-LAST.txt` slug and falls back to the prior year if that year's file isn't published yet — override with `EZFD_FD_CALL_HISTORY_URL`/`EZFD_WFD_CALL_HISTORY_URL` (supports a `{year}` placeholder) if N1MM changes their URL scheme. The FD/WFD file's `Exch1` column is the station's **sent class** (e.g. `3A`), not a generic exchange field — mapped to `sent_class` and used to prefill Rcvd Class, alongside `Sect` → Rcvd Section. `MASTER.SCP` header/comment lines start with `!` or `#` (not `;`). Both downloads are best-effort at event creation — a failed fetch must never block event creation, only degrade the prefill/lookup feature (each fetch carries an `AbortSignal.timeout`, since the create request awaits them).
+- **The app's DB role (`ezfd`) is granted DML only, not table ownership** — `db/schema.sql` is applied as the `postgres` superuser by both `deploy.sh` and `ezfd-admin.sh`, so `postgres` owns every table. `TRUNCATE` needs ownership and fails with "permission denied" at runtime; use `DELETE FROM` for bulk clears (`lib/masterCallsigns.ts` refreshes the whole list this way, inside a transaction so a mid-import failure can't leave a partial list carrying a fresh `updated_at`).
 
 ## Rig control / CW keying (`ezfd-rig-bridge.py`, `lib/useRigBridge.ts`)
 
@@ -48,6 +50,8 @@ Hard-won fixes worth knowing before touching this code:
 | `components/BandActivity.tsx` | Presence/conflict panel — QRT, QSY occupancy |
 | `lib/useRigBridge.ts` | Shared rig WebSocket hook |
 | `lib/scoring.ts` | ARRL scoring formula |
+| `lib/callHistory.ts` | N1MM call history file download/parse, per-event prefill lookup |
+| `lib/masterCallsigns.ts` | `MASTER.SCP` (Super Check Partial) download/parse, shared known-callsign lookup |
 | `ezfd-admin.sh` | Interactive server admin console |
 | `deploy.sh` | VPS deploy/update script |
 | `ezfd-rig-bridge.py` | Local rig control bridge (keep `public/` copy in sync) |

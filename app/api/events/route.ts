@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { encryptField } from '@/lib/crypto';
+import { refreshCallHistory } from '@/lib/callHistory';
+import { refreshMasterCallsignsIfStale } from '@/lib/masterCallsigns';
 
 function generateJoinCode(): string {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -9,7 +11,11 @@ function generateJoinCode(): string {
 
 export async function POST(request: Request) {
   const body = await request.json();
-  const { club_name, club_call, event_year, class: fdClass, arrl_section, location, qrz_username, qrz_password, admin_key, event_type, power } = body;
+  const {
+    club_name, club_call, event_year, class: fdClass, arrl_section, location,
+    qrz_username, qrz_password, admin_key, event_type, power,
+    use_call_history, use_master_callsign_file,
+  } = body;
 
   if (!club_name || !club_call || !fdClass || !arrl_section) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -43,25 +49,51 @@ export async function POST(request: Request) {
     }
   }
 
+  const resolvedEventType = event_type === 'WFD' ? 'WFD' : 'FD';
+  const resolvedYear = event_year ?? new Date().getFullYear();
+
   const { rows } = await pool.query(
     `INSERT INTO events
-       (join_code, club_name, club_call, event_year, class, arrl_section, location, qrz_username, qrz_password, event_type, power)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
+       (join_code, club_name, club_call, event_year, class, arrl_section, location, qrz_username, qrz_password, event_type, power, use_call_history, use_master_callsign_file)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)
      RETURNING id, join_code`,
     [
       join_code,
       club_name.trim(),
       club_call.toUpperCase().trim(),
-      event_year ?? new Date().getFullYear(),
+      resolvedYear,
       fdClass.toUpperCase().trim(),
       arrl_section.toUpperCase().trim(),
       location?.trim() ?? null,
       qrz_username?.trim() ?? null,
       encryptedPassword,
-      event_type === 'WFD' ? 'WFD' : 'FD',
+      resolvedEventType,
       ['HIGH','LOW','QRP'].includes(power) ? power : 'HIGH',
+      !!use_call_history,
+      !!use_master_callsign_file,
     ]
   );
 
-  return NextResponse.json(rows[0]);
+  const event = rows[0];
+  const warnings: string[] = [];
+
+  // Best-effort downloads — a slow or unreachable upstream shouldn't block
+  // event creation. Operators can still log without prefill; only the
+  // convenience feature is degraded.
+  if (use_call_history) {
+    try {
+      await refreshCallHistory(event.id, resolvedEventType, resolvedYear);
+    } catch (err) {
+      warnings.push(`Call history download failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+    }
+  }
+  if (use_master_callsign_file) {
+    try {
+      await refreshMasterCallsignsIfStale();
+    } catch (err) {
+      warnings.push(`Master callsign file download failed: ${err instanceof Error ? err.message : 'unknown error'}`);
+    }
+  }
+
+  return NextResponse.json(warnings.length ? { ...event, warnings } : event);
 }
