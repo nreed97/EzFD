@@ -172,7 +172,7 @@ git pull && sudo bash deploy.sh
 2. Choose event type: **ARRL Field Day** or **Winter Field Day**.
 3. Fill in your club name, callsign, FD class (e.g. `3A` for FD, `2O` for WFD), and ARRL section.
 4. Select your power category: **HIGH** (default), **LOW** (≤150 W), or **QRP** (≤5 W). This sets the scoring multiplier.
-5. Optionally check **Use N1MM call history file** to download that year's FD/WFD call history from N1MM (prefills known stations' name/section while logging), and/or **Use master callsign file (MASTER.SCP)** to download the Super Check Partial callsign list (flags recognized calls). Both downloads happen once, at event creation.
+5. Optionally check **Use N1MM call history file** to download that year's FD/WFD call history from N1MM (prefills a known station's class/section while logging), and/or **Use master callsign file (MASTER.SCP)** to download the Super Check Partial callsign list (flags recognized calls). Both downloads happen once, at event creation.
 6. Optionally enter QRZ.com credentials — a single XML-subscription account shared by all operators during the event. Credentials are encrypted at rest with AES-256-GCM.
 7. If the server has an admin key configured, enter it in the **Admin Key** field.
 8. Click **Create Event & Get Join Code**. You will receive a 6-character join code (e.g. `HBDAXF`).

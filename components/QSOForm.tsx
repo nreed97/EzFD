@@ -93,6 +93,11 @@ function QSOForm({
   const classRef   = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLInputElement>(null);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // The callsign the form is currently on. Lookups are debounced and then
+  // awaited, so a reply can arrive after the operator has already logged the
+  // QSO and moved on — every lookup checks this before touching state so a
+  // late reply can't prefill or mislabel the *next* station.
+  const currentCallRef = useRef('');
 
   useEffect(() => { callRef.current?.focus(); }, []);
 
@@ -103,6 +108,7 @@ function QSOForm({
       const res = await fetch(`/api/qrz?callsign=${encodeURIComponent(call)}&event_id=${eventId}`);
       if (res.ok) {
         const data = await res.json();
+        if (currentCallRef.current !== call) return;
         setQrzInfo(data.name ? data : null);
       }
     } finally {
@@ -116,6 +122,7 @@ function QSOForm({
       const res = await fetch(`/api/callhistory?callsign=${encodeURIComponent(call)}&event_id=${eventId}`);
       if (!res.ok) return;
       const data = await res.json();
+      if (currentCallRef.current !== call) return;
       const label: string | null = data.name || data.user_text || null;
       setHistoryInfo(
         data.sent_class || data.section || label
@@ -135,6 +142,7 @@ function QSOForm({
   function handleCallChange(val: string) {
     const upper = val.toUpperCase().replace(/[^A-Z0-9/]/g, '');
     setCallsign(upper);
+    currentCallRef.current = upper;
     onCallsignInput?.(upper);
     setQrzInfo(null);
     setHistoryInfo(null);
@@ -153,6 +161,8 @@ function QSOForm({
     if (!callsign || submitting) return;
     if (esm) onEsmLog?.();
     await onSubmit({ callsign, band, mode, rcvd_class: rcvdClass, rcvd_section: rcvdSection });
+    if (lookupTimer.current) clearTimeout(lookupTimer.current);
+    currentCallRef.current = '';
     setCallsign('');
     onCallsignInput?.('');
     setRcvdClass('');

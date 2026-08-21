@@ -7,6 +7,9 @@ import { getPool } from './db';
 const MASTER_SCP_URL = process.env.EZFD_MASTER_SCP_URL || 'https://www.supercheckpartial.com/downloads/MASTER.SCP';
 const STALE_MS = 24 * 60 * 60 * 1000;
 const INSERT_CHUNK_SIZE = 2000;
+// Event creation awaits this download — cap it so an unreachable or hanging
+// upstream degrades the feature instead of stalling the create request.
+const DOWNLOAD_TIMEOUT_MS = 30_000;
 
 export function parseMasterScp(text: string): string[] {
   const calls = new Set<string>();
@@ -25,24 +28,39 @@ export async function refreshMasterCallsignsIfStale(): Promise<void> {
   const last = rows[0]?.last ? new Date(rows[0].last) : null;
   if (last && Date.now() - last.getTime() < STALE_MS) return;
 
-  const res = await fetch(MASTER_SCP_URL);
+  const res = await fetch(MASTER_SCP_URL, { signal: AbortSignal.timeout(DOWNLOAD_TIMEOUT_MS) });
   if (!res.ok) throw new Error(`Failed to download master callsign file (HTTP ${res.status})`);
   const text = await res.text();
   const calls = parseMasterScp(text);
   if (calls.length === 0) throw new Error('Master callsign file downloaded but contained no callsigns');
 
-  await pool.query('TRUNCATE master_callsigns');
-  for (let i = 0; i < calls.length; i += INSERT_CHUNK_SIZE) {
-    const chunk = calls.slice(i, i + INSERT_CHUNK_SIZE);
-    const values: string[] = [];
-    const rows = chunk.map((call, idx) => {
-      values.push(call);
-      return `($${idx + 1})`;
-    });
-    await pool.query(
-      `INSERT INTO master_callsigns (callsign) VALUES ${rows.join(',')} ON CONFLICT DO NOTHING`,
-      values
-    );
+  // Swap the list inside one transaction. A failure part-way through the
+  // inserts must not leave a partial list behind — the rows written would
+  // carry a fresh updated_at, which then reads as "current" for 24h and
+  // silently degrades every lookup until it expires.
+  //
+  // DELETE, not TRUNCATE: db/schema.sql is applied as the postgres superuser
+  // (deploy.sh / ezfd-admin.sh), so these tables are owned by postgres while
+  // the app connects as the ezfd role, which is granted DML only. TRUNCATE
+  // needs table ownership and would fail with "permission denied".
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    await client.query('DELETE FROM master_callsigns');
+    for (let i = 0; i < calls.length; i += INSERT_CHUNK_SIZE) {
+      const chunk = calls.slice(i, i + INSERT_CHUNK_SIZE);
+      const placeholders = chunk.map((_, idx) => `($${idx + 1})`);
+      await client.query(
+        `INSERT INTO master_callsigns (callsign) VALUES ${placeholders.join(',')} ON CONFLICT DO NOTHING`,
+        chunk
+      );
+    }
+    await client.query('COMMIT');
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
   }
 }
 

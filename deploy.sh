@@ -302,6 +302,34 @@ apply_migration \
   "ALTER TABLE events
      ADD COLUMN power TEXT NOT NULL DEFAULT 'HIGH'"
 
+# ── v5: N1MM call history + master callsign (MASTER.SCP) file ─────────────────
+apply_migration \
+  "events.use_call_history / use_master_callsign_file (call databases)" \
+  "SELECT 1 FROM information_schema.columns
+     WHERE table_name='events' AND column_name='use_call_history'" \
+  "ALTER TABLE events
+     ADD COLUMN use_call_history         BOOLEAN NOT NULL DEFAULT FALSE,
+     ADD COLUMN use_master_callsign_file BOOLEAN NOT NULL DEFAULT FALSE"
+
+apply_migration \
+  "call_history_entries + master_callsigns tables" \
+  "SELECT 1 FROM information_schema.tables
+     WHERE table_name='master_callsigns'" \
+  "CREATE TABLE IF NOT EXISTS call_history_entries (
+     id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     event_id    UUID NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+     callsign    TEXT NOT NULL,
+     sent_class  TEXT,
+     section     TEXT,
+     name        TEXT,
+     user_text   TEXT,
+     UNIQUE (event_id, callsign));
+   CREATE INDEX IF NOT EXISTS call_history_event_idx ON call_history_entries(event_id);
+   CREATE TABLE IF NOT EXISTS master_callsigns (
+     callsign   TEXT        PRIMARY KEY,
+     updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW());
+   GRANT SELECT, INSERT, UPDATE, DELETE ON call_history_entries, master_callsigns TO ezfd"
+
 # ── add future migrations above this line ────────────────────────────────────
 
 if   [[ $MIGRATIONS_APPLIED -gt 0 ]]; then

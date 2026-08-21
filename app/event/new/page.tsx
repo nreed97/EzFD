@@ -40,6 +40,11 @@ export default function NewEventPage() {
   const [useMasterCallsignFile, setUseMasterCallsignFile] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  // The event is created even when a call-database download fails; the API
+  // reports those failures as warnings. Hold them so the operator finds out
+  // the prefill/lookup feature they ticked isn't actually available, instead
+  // of being redirected straight past the notice.
+  const [pending, setPending] = useState<{ code: string; warnings: string[] } | null>(null);
 
   function set(key: string, value: string | number) {
     setForm(prev => ({ ...prev, [key]: value }));
@@ -47,6 +52,7 @@ export default function NewEventPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (loading || pending) return; // the event already exists — don't create a second one
     setLoading(true);
     setError('');
 
@@ -67,6 +73,12 @@ export default function NewEventPage() {
     const data = await res.json();
     if (!res.ok) {
       setError(data.error ?? 'Failed to create event');
+      setLoading(false);
+      return;
+    }
+
+    if (Array.isArray(data.warnings) && data.warnings.length > 0) {
+      setPending({ code: data.join_code, warnings: data.warnings });
       setLoading(false);
       return;
     }
@@ -226,7 +238,7 @@ export default function NewEventPage() {
                   Use N1MM {eventType} call history file
                 </span>
                 <span className="block text-xs text-zinc-500">
-                  Downloads the latest {eventType === 'WFD' ? 'Winter Field Day' : 'Field Day'} {form.event_year} call history from N1MM and prefills known stations&apos; name/section while logging.
+                  Downloads the latest {eventType === 'WFD' ? 'Winter Field Day' : 'Field Day'} {form.event_year} call history from N1MM and prefills a known station&apos;s Rcvd Class/Section while logging.
                 </span>
               </span>
             </label>
@@ -295,13 +307,36 @@ export default function NewEventPage() {
 
         {error && <p className="rounded-lg border border-red-800 bg-red-900/30 p-3 text-sm text-red-400">{error}</p>}
 
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-lg bg-amber-400 py-3 font-semibold text-zinc-900 transition-colors hover:bg-amber-300 disabled:opacity-50"
-        >
-          {loading ? 'Creating...' : 'Create Event & Get Join Code'}
-        </button>
+        {pending && (
+          <div className="rounded-lg border border-yellow-800 bg-yellow-900/20 p-3 text-sm text-yellow-500 light:border-yellow-400 light:bg-yellow-50 light:text-yellow-700">
+            <p className="font-semibold">Event created &mdash; join code {pending.code}</p>
+            <p className="mt-1 text-xs">
+              These optional call databases could not be downloaded. Logging works normally; only the
+              prefill/lookup hints are unavailable.
+            </p>
+            <ul className="mt-2 list-inside list-disc text-xs">
+              {pending.warnings.map(w => <li key={w}>{w}</li>)}
+            </ul>
+          </div>
+        )}
+
+        {pending ? (
+          <button
+            type="button"
+            onClick={() => router.push(`/event/${pending.code}`)}
+            className="rounded-lg bg-amber-400 py-3 font-semibold text-zinc-900 transition-colors hover:bg-amber-300"
+          >
+            Continue to Event &rarr;
+          </button>
+        ) : (
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-lg bg-amber-400 py-3 font-semibold text-zinc-900 transition-colors hover:bg-amber-300 disabled:opacity-50"
+          >
+            {loading ? 'Creating...' : 'Create Event & Get Join Code'}
+          </button>
+        )}
       </form>
     </main>
   );
