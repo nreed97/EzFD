@@ -1,0 +1,141 @@
+# Operating
+
+The logging screen. Everything here applies to all three event types unless
+noted; the exchange fields differ, which is covered per type in
+[Field Day](field-day.md) and [Special event stations](special-events.md).
+
+## The entry form
+
+Focus starts in the callsign field and returns there after every logged QSO.
+The keyboard path is designed so a run never requires the mouse:
+
+| Key | Where you are | What happens |
+|---|---|---|
+| `Enter` | Callsign | Move to the first exchange field |
+| `Enter` | An exchange field | Move to the next one |
+| `Enter` | The last field | Log the QSO, clear, focus the callsign |
+| `Tab` | The last field | Wrap to the callsign, not the next page control |
+
+That `Tab` behaviour is deliberate. The browser default would move focus into
+the band buttons and out of the form entirely, which at 4 AM is how you end up
+typing a callsign into nothing.
+
+### Hints while you type
+
+After three characters, the app looks the callsign up in whatever sources the
+event enabled. Everything here is advisory — none of it blocks logging:
+
+- **QRZ** — name, state, country, if the event has credentials.
+- **Call history** — that station's usual class and section, from the N1MM
+  file. Prefills the exchange fields, but only ones you haven't typed into
+  yourself.
+- **MASTER.SCP** — a `✓ known callsign` marker if the call is in the Super
+  Check Partial list.
+- **Unusual format** — a warning if the callsign doesn't look like a callsign
+  (no digit, no letter, too short). Plenty of real calls trip this; it's a
+  prompt to double-check, not a refusal.
+
+Lookups are debounced and the reply is checked against the callsign still in
+the field, so a slow response can't prefill the *next* station's QSO.
+
+## Band and mode
+
+The **QSY** drawer holds a band grid and a mode selector. The collapsed button
+always shows the current band and mode, so a glance confirms where you are.
+
+- Bands: 160m through 70cm, plus SAT.
+- Modes: `PH` (phone), `CW`, `DIG` (anything digital).
+- An orange dot on a band tile means another active operator is on it. Hover
+  for who.
+
+If a radio is connected, band and mode follow the VFO automatically and you
+can ignore this entirely — see [Rig control](rig-control.md).
+
+## Duplicates
+
+The server decides authoritatively; the form shows a heads-up as you type.
+What counts as a duplicate depends on the event's **dupe rule**:
+
+| Rule | A duplicate is | Typical use |
+|---|---|---|
+| `EVENT` | The same callsign on the same band and mode, at any point in the event | Field Day, Winter Field Day |
+| `DAY` | The same callsign on the same band and mode, on the same UTC day | A special event running over weeks |
+| `NONE` | Nothing is ever flagged | Events that don't care |
+
+Duplicates are **logged, not rejected**. They're marked, excluded from
+scoring, and excluded from exports. Refusing them outright would lose the
+record of a contact that actually happened.
+
+## Who else is on
+
+The **Operators** panel lists everyone currently signed in, with their band,
+mode, and time since their last QSO.
+
+- A red row and a `!` mean someone else is on your band and mode.
+- Operators idle more than 15 minutes grey out and stop counting toward
+  conflicts, so a forgotten tab doesn't permanently block a band.
+- **Go QRT** removes you from the list immediately rather than waiting for the
+  timeout. Use it when you step away.
+
+On a special event this panel is supplemented by **Call Checkout**, which is
+authoritative about who may transmit — see
+[Special event stations](special-events.md).
+
+## Working offline
+
+QSOs are written to browser local storage *first*, then sent to the server.
+If the send fails the QSO stays queued, the header shows a pending count, and
+logging continues normally. When connectivity returns the queue flushes
+automatically; you can also click the pending badge to retry.
+
+A queued QSO shows as `Queued — syncing…` until the server confirms it.
+
+Two consequences worth knowing:
+
+- **Nothing is lost to a flaky link.** This is the point of the design.
+- **Replayed QSOs bypass the special-event checkout gate.** By the time the
+  browser reconnects the reservation has expired, and the contact already
+  happened on the air. Dropping it would only lose the record.
+
+## Editing and deleting
+
+The QSO table supports inline editing of callsign, band, mode and exchange.
+Duplicate status is re-evaluated after an edit. Deleting a QSO removes it
+everywhere in real time.
+
+A queued QSO that hasn't synced yet can be deleted locally — it never reaches
+the server.
+
+## Night mode
+
+One click dims the interface to 35% brightness with a warm tone, to preserve
+dark adaptation on an overnight shift. It's separate from the light/dark theme
+toggle and persists across sessions.
+
+## Reading the header
+
+| Element | Meaning |
+|---|---|
+| `147 Q` | Non-duplicate QSOs |
+| `31 ×` | Sections worked (contest events only) |
+| Amber number | Score before bonuses (contest events only) |
+| `OFFLINE` | The browser has lost connectivity |
+| `3 pending ↑` | QSOs queued locally, click to retry |
+| `● RIG 14.250` | A radio is connected; click for details |
+| `⚡ CW` | The rig supports CAT keying; opens the macro window |
+
+A special event shows only the QSO count — there is no contest score.
+
+## The dashboard
+
+A separate read-only view for a second screen:
+
+- **Map** — worked sections plotted geographically
+- **Sections** / **Needed** — grid of sections worked and the hunt list
+- **Rate** — QSOs per hour, with gaps visible
+- **Bands** — band × mode matrix
+- **Operators** — per-operator totals, rate, and current band/mode
+- **Summary** — printable ARRL-style worksheet
+
+Special events show Rate, Bands, Operators and a live **On The Air** list
+instead of the section-based views, which don't apply.
