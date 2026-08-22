@@ -65,6 +65,32 @@ export interface Event {
   require_operator_approval: boolean;
 }
 
+/** Display names for the three event types. Every user-facing surface reads
+ *  from here so a new type can't leave "Field Day" hard-coded behind it. */
+export const EVENT_TYPE_LABELS: Record<EventType, { name: string; short: string; blurb: string }> = {
+  FD: {
+    name: 'ARRL Field Day',
+    short: 'Field Day',
+    blurb: 'Fourth full weekend in June. Class + ARRL/RAC section exchange, scored.',
+  },
+  WFD: {
+    name: 'Winter Field Day',
+    short: 'Winter Field Day',
+    blurb: 'Last full weekend in January. Category + ARRL/RAC section exchange, scored.',
+  },
+  SES: {
+    name: 'Special Event Station',
+    short: 'Special Event',
+    blurb: 'One callsign, many operators, no contest exchange. Band/mode checkout instead of a score.',
+  },
+};
+
+/** Full display name for an event type — 'ARRL Field Day', 'Winter Field Day',
+ *  'Special Event Station'. */
+export function eventTypeLabel(type: EventType): string {
+  return EVENT_TYPE_LABELS[type].name;
+}
+
 /** True when the event is a Special Event Station, i.e. contest scoring,
  *  the class/section exchange and Cabrillo export do not apply. */
 export function isSES(event: Pick<Event, 'event_type'>): boolean {

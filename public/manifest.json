@@ -1,7 +1,7 @@
 {
-  "name": "EzFD – Field Day Logger",
+  "name": "EzFD – Field Day & Special Event Logger",
   "short_name": "EzFD",
-  "description": "Real-time multi-op ARRL Field Day logging for amateur radio clubs",
+  "description": "Real-time multi-operator logging for ARRL Field Day, Winter Field Day and special event stations",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#09090b",
@@ -25,7 +25,7 @@
     {
       "name": "New Event",
       "url": "/event/new",
-      "description": "Create a new Field Day event"
+      "description": "Create a Field Day, Winter Field Day or special event log"
     }
   ]
 }

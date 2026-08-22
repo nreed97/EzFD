@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { eventTypeLabel } from '@/lib/types';
 import type { Event } from '@/lib/types';
 
 export default function EventJoinPage() {
@@ -79,9 +80,10 @@ export default function EventJoinPage() {
           <h1 className="mt-1 text-2xl font-bold text-zinc-100 light:text-zinc-900">{event.club_name}</h1>
           <p className="text-zinc-400 light:text-zinc-600">
             {event.club_call}
-            {event.event_type === 'SES'
-              ? ' • Special Event Station'
-              : ` • ${event.class} • ${event.arrl_section}`}
+            {event.event_type !== 'SES' && ` • ${event.class} • ${event.arrl_section}`}
+          </p>
+          <p className="mt-1 text-xs uppercase tracking-wider text-zinc-500">
+            {eventTypeLabel(event.event_type)} {event.event_year}
           </p>
           {event.ses_description && (
             <p className="mt-1 text-sm text-zinc-400 light:text-zinc-600">{event.ses_description}</p>
@@ -146,7 +148,9 @@ export default function EventJoinPage() {
         <div className="mt-4 rounded-xl border border-zinc-800 bg-zinc-900 p-6 light:border-zinc-200 light:bg-zinc-50">
           <h2 className="mb-2 font-semibold text-zinc-200 light:text-zinc-800">Just Watching?</h2>
           <p className="mb-4 text-sm text-zinc-400 light:text-zinc-600">
-            Visitor mode shows live stats — score, map, rate, sections — with no sign-in and no logging. Good for a stats-only station or a lobby display.
+            {event.event_type === 'SES'
+              ? 'Visitor mode shows live stats — QSO count, map, rate, band activity — with no sign-in and no logging. A special event has no contest score. Good for a lobby display.'
+              : 'Visitor mode shows live stats — score, map, rate, sections — with no sign-in and no logging. Good for a stats-only station or a lobby display.'}
           </p>
           <Link
             href={`/event/${code}/dashboard?visitor=1`}
