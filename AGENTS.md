@@ -12,8 +12,8 @@ EzFD is a real-time, multi-operator ARRL Field Day / Winter Field Day logger. Ne
 Run `npm run lint`, `npx tsc --noEmit` and `npm run build` — all three must be clean.
 CI gates on all of them, plus `shellcheck` for any shell change.
 
-Changes touching the schema, the SES routes, `lib/scoring.ts` or `ezfd-admin.sh`
-should also run the relevant suite (CI runs all of them — see the Tests section in `README.md`):
+Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
+`lib/cabrillo.ts` or `ezfd-admin.sh` should also run the relevant suite (CI runs all of them — see the Tests section in `README.md`):
 
 | Script | Covers |
 |---|---|
@@ -23,6 +23,8 @@ should also run the relevant suite (CI runs all of them — see the Tests sectio
 | `scripts/test-e2e.sh` | The API end to end, including Field Day regressions |
 | `scripts/test-sections.cjs` | The ARRL/RAC section list — the three enumerations agree, no hardcoded totals |
 | `scripts/test-scoring.cjs` | The ARRL scoring formula — multipliers, every bonus and its cap, dupes, Worked All Sections |
+| `scripts/test-adif.cjs` | ADIF parse and export — the `Date`/string shapes, per-operator `MY_*`, SES vs contest exchange |
+| `scripts/test-cabrillo.cjs` | Cabrillo submission — `CLAIMED-SCORE`, transmitter numbering, ordering, null class/section |
 
 When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
@@ -36,7 +38,7 @@ exclusion constraint.
 - **`DX` is a valid exchange but not a section.** Field Day stations outside the US and Canada send it. It belongs in `VALID_EXCHANGES` (what the entry form accepts) and never in `ARRL_SECTIONS` (the Worked All Sections denominator) — adding it there would quietly move the bonus target to 86. Worked All Sections counts only recognised sections: `score.sections` holds those, `score.unknown_sections` holds logged exchanges that are neither a section nor `DX` so the UI can flag them as likely typos. Counting raw exchange strings meant a handful of typos could award the 100-point bonus.
 - **Bash `set -e` breaks interactive menus** — `ezfd-admin.sh` uses `set -uo pipefail` only, no `-e`. Any new interactive bash needs the same. Use `[[ ]]` comparisons, not `(( ))` (returns exit 1 on false, triggers `-e`-style failures). Always `local var=""`, never bare `local var`, to avoid unbound-variable errors under `set -u`.
 - **`deploy.sh`'s rsync of `.next/standalone/` must keep `--exclude='.env'`** — without it, `rsync --delete` wipes the live secrets file on every redeploy.
-- **`public/ezfd-rig-bridge.py` is a manual duplicate** of the root `ezfd-rig-bridge.py`, served for direct browser download. They are NOT symlinked — always `cp` the root file over the public copy after editing the bridge script.
+- **`public/ezfd-rig-bridge.py` is a manual duplicate** of the root `ezfd-rig-bridge.py`, served for direct browser download. They are NOT symlinked — always `cp` the root file over the public copy after editing the bridge script. CI's `shell` job fails if the two drift.
 - **`EZFD_REPO_DIR`** (in `/opt/ezfd/.env`, written by `deploy.sh`) tells `ezfd-admin.sh`'s "Update application" action where to `git pull` from.
 - **N1MM call history files are contest-year-specific**, unlike `MASTER.SCP` (evergreen). `lib/callHistory.ts` builds the download URL from `event_type`+`event_year` against N1MM's `{fd|wfd}_{year}-LAST.txt` slug and falls back to the prior year if that year's file isn't published yet — override with `EZFD_FD_CALL_HISTORY_URL`/`EZFD_WFD_CALL_HISTORY_URL` (supports a `{year}` placeholder) if N1MM changes their URL scheme. The FD/WFD file's `Exch1` column is the station's **sent class** (e.g. `3A`), not a generic exchange field — mapped to `sent_class` and used to prefill Rcvd Class, alongside `Sect` → Rcvd Section. `MASTER.SCP` header/comment lines start with `!` or `#` (not `;`). Both downloads are best-effort at event creation — a failed fetch must never block event creation, only degrade the prefill/lookup feature (each fetch carries an `AbortSignal.timeout`, since the create request awaits them).
 - **`events.class` and `events.arrl_section` are nullable** — they are NULL for every `event_type='SES'` row (a special event station has no contest exchange). Anything reading them needs a null guard; `lib/cabrillo.ts`, `lib/adif.ts`, `components/SummarySheet.tsx` and the QSO insert paths already have one. Cabrillo export is refused outright for SES.

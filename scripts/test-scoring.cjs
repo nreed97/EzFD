@@ -12,38 +12,14 @@
 //   * sections multiplying the score instead of the power multiplier
 //   * the Worked All Sections bonus counting unrecognised exchanges
 //
-// lib/scoring.ts is TypeScript, so it's compiled to a temp directory with the
-// project's own tsc and required from there. That keeps the suite dependency
-// free — same as every other script here, plain `node`, no test runner.
+// lib/scoring.ts is TypeScript; scripts/_compile-ts.cjs compiles it and hands
+// back a require-able module. That keeps the suite dependency free — same as
+// every other script here, plain `node`, no test runner.
 
-const { execFileSync } = require('child_process');
-const fs = require('fs');
-const os = require('os');
-const path = require('path');
-
-const root = path.join(__dirname, '..');
-const outDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ezfd-scoring-'));
-
-const tsc = path.join(root, 'node_modules', '.bin', 'tsc');
-if (!fs.existsSync(tsc)) {
-  console.error(`No TypeScript compiler at ${tsc} — run \`npm ci\` first.`);
-  process.exit(1);
-}
-
-try {
-  execFileSync(
-    tsc,
-    ['lib/scoring.ts', '--outDir', outDir, '--module', 'commonjs',
-     '--target', 'es2022', '--skipLibCheck'],
-    { cwd: root, stdio: 'pipe' },
-  );
-} catch (err) {
-  console.error('Could not compile lib/scoring.ts:\n' + (err.stdout || err.message));
-  process.exit(1);
-}
-
-const { calculateScore, calculateBonusPoints, powerMultiplier } = require(path.join(outDir, 'scoring.js'));
-const { ARRL_SECTIONS } = require(path.join(outDir, 'types.js'));
+const { compile } = require('./_compile-ts.cjs');
+const ts = compile(['lib/scoring.ts']);
+const { calculateScore, calculateBonusPoints, powerMultiplier } = ts.load('scoring');
+const { ARRL_SECTIONS } = ts.load('types');
 
 let failures = 0;
 const ok = m => console.log(`ok    ${m}`);
@@ -211,7 +187,7 @@ console.log('\n── empty log ──');
   eq(s.unknown_sections.length, 0, 'and nothing unrecognised');
 }
 
-fs.rmSync(outDir, { recursive: true, force: true });
+ts.cleanup();
 
 console.log('');
 if (failures) {

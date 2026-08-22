@@ -145,7 +145,7 @@ Tailwind v4 · Leaflet · Hamlib
 `AGENTS.md` documents the conventions and the accumulated gotchas — worth
 reading before changing anything non-obvious. `npx tsc --noEmit` and
 `npm run build` must both be clean; CI additionally runs the section-list,
-scoring, schema, query, restore and end-to-end suites.
+scoring, ADIF, Cabrillo, schema, query, restore and end-to-end suites.
 
 When adding a test, break the thing it guards and watch it fail before
 trusting it. That practice has already caught a bug the test was written to
