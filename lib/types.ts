@@ -197,12 +197,18 @@ export interface Score {
   digital_qsos: number;
   qso_points: number;
   power_multiplier: number;
+  /** Distinct *recognised* sections — the Worked All Sections numerator. */
   sections_worked: number;
   total_score: number;
   bonus_points: number;
   claimed_score: number;
   by_band: Partial<Record<Band, BandStats>>;
+  /** Recognised sections only, sorted. Drives the grid, the map and the
+   *  "sections needed" panel, none of which can render an unknown value. */
   sections: string[];
+  /** Exchanges that were logged but aren't a section and aren't DX — almost
+   *  always typos. Surfaced so an operator can find and correct them. */
+  unknown_sections: string[];
 }
 
 // QSO with an optional pending marker for optimistic UI
@@ -259,3 +265,23 @@ export const ARRL_SECTIONS = [
 ] as const;
 
 export type ARRLSection = typeof ARRL_SECTIONS[number];
+
+/**
+ * Field Day stations outside the US and Canada send `DX` as their exchange.
+ * It is a legal thing to receive and log, but it is not a section: it has no
+ * place on the map, and it must never count toward Worked All Sections or the
+ * bonus target would become 86.
+ */
+export const DX_EXCHANGE = 'DX';
+
+/** Everything the entry form should accept without complaining. */
+export const VALID_EXCHANGES: readonly string[] = [...ARRL_SECTIONS, DX_EXCHANGE];
+
+export function isValidExchange(value: string): boolean {
+  return VALID_EXCHANGES.includes(value.toUpperCase());
+}
+
+/** True only for real sections — the things Worked All Sections counts. */
+export function isARRLSection(value: string): boolean {
+  return (ARRL_SECTIONS as readonly string[]).includes(value.toUpperCase());
+}

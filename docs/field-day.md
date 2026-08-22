@@ -86,6 +86,12 @@ sections. The scoring code, the summary sheet, the "Sections Needed" button and
 the section grid all derive that total from a single list, so they cannot
 disagree with each other.
 
+Only recognised sections count toward it. A station outside the US and Canada
+sends `DX`, which the entry form accepts and the log exports, but which is not
+a section and does not count. Anything else that isn't a section — almost
+always a typo — is listed in the "Sections Needed" panel so it can be
+corrected.
+
 ## Submitting
 
 From the logger header or the dashboard:

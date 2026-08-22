@@ -103,3 +103,36 @@ export const SECTION_DATA: Record<string, SectionInfo> = {
   QC:  { name: 'Quebec',                lat: 53.0,  lon: -71.6 },
   SK:  { name: 'Saskatchewan',          lat: 52.9,  lon: -106.5 },
 };
+
+/**
+ * The call-area layout, used by every panel that shows sections as a grid.
+ *
+ * This lives here, once, because it used to live twice — SectionGrid and
+ * SectionsNeeded each carried their own copy, and when the section list was
+ * corrected only one of them was updated. The panel an operator reads to know
+ * what to chase went on listing sections RAC had retired and omitting seven
+ * real ones. Adding a third copy is the bug; there is no third copy to add.
+ *
+ * `label` is the call area, `title` is what a panel renders as its heading.
+ */
+export interface SectionGroup {
+  label: string;
+  title: string;
+  sections: string[];
+}
+
+export const SECTION_GROUPS: SectionGroup[] = [
+  { label: '1',      title: '1st District', sections: ['CT','EMA','ME','NH','RI','VT','WMA'] },
+  { label: '2',      title: '2nd District', sections: ['ENY','NLI','NNJ','NNY','SNJ','WNY'] },
+  { label: '3',      title: '3rd District', sections: ['DE','EPA','MDC','WPA'] },
+  // Puerto Rico and the Virgin Islands sit in the Southeastern Division with
+  // the rest of these, though their call areas (KP4/KP2) are their own.
+  { label: '4',      title: '4th District', sections: ['AL','GA','KY','NC','NFL','PR','SC','SFL','TN','VA','VI','WCF'] },
+  { label: '5',      title: '5th District', sections: ['AR','LA','MS','NM','NTX','OK','STX','WTX'] },
+  { label: '6',      title: '6th District', sections: ['EB','LAX','ORG','PAC','SB','SCV','SDG','SF','SJV','SV'] },
+  { label: '7',      title: '7th District', sections: ['AK','AZ','EWA','ID','MT','NV','OR','UT','WWA','WY'] },
+  { label: '8',      title: '8th District', sections: ['MI','OH','WV'] },
+  { label: '9',      title: '9th District', sections: ['IL','IN','WI'] },
+  { label: '0',      title: '0th District', sections: ['CO','IA','KS','MN','MO','ND','NE','SD'] },
+  { label: 'Canada', title: 'Canada',       sections: ['AB','BC','GH','MB','NB','NL','NS','NT','ONE','ONN','ONS','PE','QC','SK'] },
+];

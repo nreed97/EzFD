@@ -85,11 +85,19 @@ ARRL/RAC sections. The QSO still logs and the exchange is stored exactly as
 typed, so nothing is lost — but the section won't count toward Worked All
 Sections or appear on the map.
 
-Usually this is a typo. The other cause is an abbreviation RAC has retired:
+`DX` is accepted — that's the correct exchange from a station outside the US
+and Canada. It's logged and exported normally, but it isn't a section, so it
+doesn't count toward Worked All Sections or appear on the map.
+
+Otherwise this is usually a typo. The other cause is an abbreviation RAC has
+retired:
 Maritime (`MAR`) is now `NB` / `NS` / `PE`, plain Ontario (`ON`) is now `ONE` /
 `ONN` / `ONS` / `GH`, `GTA` was renamed `GH`, and Yukon is part of Northern
 Territories (`NT`) rather than a section of its own. Log the current
 abbreviation.
+
+The "Sections Needed" panel lists anything logged that isn't a recognised
+section, so a typo is easy to find and correct while it still matters.
 
 Logs recorded before EzFD tracked the current list may contain those retired
 abbreviations. They export as recorded, but they no longer match a section, so

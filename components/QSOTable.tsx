@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import type { Band, Mode, DisplayQSO, QSO } from '@/lib/types';
-import { ARRL_SECTIONS } from '@/lib/types';
+import { VALID_EXCHANGES } from '@/lib/types';
 
 const BAND_GRID: Band[][] = [
   ['160m', '80m',  '40m'],
@@ -159,7 +159,7 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
                 maxLength={5}
               />
               <datalist id="edit-section-list">
-                {ARRL_SECTIONS.map(s => <option key={s} value={s} />)}
+                {VALID_EXCHANGES.map(s => <option key={s} value={s} />)}
               </datalist>
             </div>
           </div>
