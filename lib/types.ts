@@ -101,6 +101,12 @@ export function isSES(event: Pick<Event, 'event_type'>): boolean {
   return event.event_type === 'SES';
 }
 
+/** Transmitter count implied by a contest class (e.g. "3A" → 3, "1D" → 1).
+ *  SES has no class, so callers pass `event.class` which is nullable. */
+export function transmitterCount(eventClass: string | null): number {
+  return parseInt(eventClass?.match(/^\d+/)?.[0] ?? '1', 10);
+}
+
 /** One operator's claim on the shared callsign for a band/mode over a time
  *  window. Overlap is prevented by an exclusion constraint in the database,
  *  not by the application — see db/schema.sql. */
