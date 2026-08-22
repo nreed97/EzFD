@@ -10,6 +10,7 @@ import { useMemo, useState } from 'react';
 import type { Band, Mode, SesReservation } from '@/lib/types';
 import { BANDS, MODES } from '@/lib/types';
 import DateTimeField from './DateTimeField';
+import ScheduleTimeline from './ScheduleTimeline';
 
 interface Props {
   eventId: string;
@@ -23,6 +24,9 @@ interface Props {
   /** Callsigns seen logging or present, offered as datalist suggestions when assigning. */
   knownOperators: string[];
   readOnly?: boolean;
+  /** Bumped by the parent on every checkout change, so the timeline reloads
+   *  its own (history-inclusive) window alongside the live grid. */
+  refreshToken: number;
 }
 
 const MODE_COLORS: Record<string, string> = {
@@ -52,7 +56,7 @@ function dayClockUTC(iso: string | null): string {
 
 export default function CheckoutBoard({
   eventId, slotMinutes, eventStartsAt, eventEndsAt, reservations, onRefresh,
-  myOpCall, knownOperators, readOnly = false,
+  myOpCall, knownOperators, readOnly = false, refreshToken,
 }: Props) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -168,12 +172,21 @@ export default function CheckoutBoard({
   }
 
   return (
-    <div className="flex flex-col gap-4 overflow-y-auto p-4">
+    <div className="flex h-full flex-col gap-4 overflow-y-auto p-4">
       {error && (
         <div className="rounded-lg border border-red-800 bg-red-900/25 px-3 py-2 text-sm text-red-400">
           {error}
         </div>
       )}
+
+      {/* Overview first: the timeline answers "what's covered, and by whom"
+          at a glance. The 15-band action grid below is taller than a screen,
+          so putting it first buried the thing people come here to read. */}
+      <ScheduleTimeline
+        eventId={eventId}
+        myOpCall={myOpCall}
+        refreshToken={refreshToken}
+      />
 
       <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-4 light:border-zinc-200 light:bg-white">
         <h3 className="mb-3 text-xs font-semibold uppercase tracking-wider text-zinc-500">

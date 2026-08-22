@@ -75,10 +75,18 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
     }
   }, [event.join_code]);
 
+  // Bumped whenever checkouts change, so the timeline (which fetches its own
+  // wider window, including past and released slots) reloads in step without
+  // this component having to hold two differently-shaped reservation lists.
+  const [reservationVersion, setReservationVersion] = useState(0);
+
   const refreshReservations = useCallback(async () => {
     if (!isSes) return;
     const res = await fetch(`/api/ses/reservations?event_id=${event.id}`).catch(() => null);
-    if (res?.ok) setReservations(await res.json());
+    if (res?.ok) {
+      setReservations(await res.json());
+      setReservationVersion(v => v + 1);
+    }
   }, [event.id, isSes]);
 
   useEffect(() => {
@@ -233,7 +241,14 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
       </header>
 
       <div className="flex flex-col flex-1 overflow-hidden md:flex-row">
-        <div className="h-56 shrink-0 md:h-auto md:flex-1">
+        {/* overflow-hidden + a definite height give the pane's child a box to
+            scroll inside; without it the Checkouts board grew past the
+            flex row and was silently clipped by its overflow-hidden parent.
+            Checkouts is a tall interactive form, so it gets more of the
+            viewport than the at-a-glance map/chart views do on mobile. */}
+        <div className={`shrink-0 overflow-hidden md:h-auto md:flex-1 ${
+          mainView === 'checkouts' ? 'h-[65vh]' : 'h-56'
+        }`}>
           {mainView === 'map'      && <MapView workedSections={score.sections} />}
           {mainView === 'sections' && <SectionGrid workedSections={score.sections} />}
           {mainView === 'needed'   && <SectionsNeeded workedSections={score.sections} />}
@@ -250,6 +265,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
               myOpCall={myOpCall}
               knownOperators={allOpCalls}
               readOnly={isVisitor}
+              refreshToken={reservationVersion}
             />
           )}
         </div>

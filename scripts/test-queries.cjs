@@ -72,6 +72,49 @@ function check(name, ok, detail = '') {
        ORDER BY lower(during) ASC`, [ev.id, String(48)]);
     check('upcoming-slots query (hours interval cast)', upcoming.length === 1);
 
+    // ── GET past_hours / include_released, for the dashboard timeline ────
+    // The timeline shows who held a band/mode *before* you, so the route
+    // takes two opt-in widening params that must each leave the default
+    // result untouched. Each fixture below is placed so that exactly one
+    // clause can exclude it — otherwise the assertion passes for the wrong
+    // reason (the first draft of this test was guarded by the time window,
+    // not by the status filter it claimed to check).
+    const timelineSql = `
+      SELECT ${RESERVATION_COLUMNS} FROM ses_reservations
+      WHERE event_id = $1
+        AND ($4::boolean OR status <> 'RELEASED')
+        AND during && tstzrange(NOW() - ($3 || ' hours')::interval,
+                                NOW() + ($2 || ' hours')::interval, '[)')
+      ORDER BY lower(during) ASC`;
+    const names = async (past, incRel) =>
+      (await pool.query(timelineSql, [ev.id, String(48), String(past), incRel]))
+        .rows.map(r => r.op_call);
+
+    // Spans NOW, so it sits inside the default time window: only the
+    // status filter can keep it out. (The exclusion constraint ignores
+    // RELEASED rows, so this may overlap a live slot freely.)
+    await pool.query(
+      `INSERT INTO ses_reservations (event_id, op_call, band, mode, during, status)
+       VALUES ($1,'W4RELNOW','15m','CW',
+               tstzrange(NOW() - interval '1 hour', NOW() + interval '1 hour','[)'),'RELEASED')`,
+      [ev.id]);
+    check('an active RELEASED slot stays hidden unless asked for',
+      !(await names(0, false)).includes('W4RELNOW'));
+    check('include_released surfaces that same active slot',
+      (await names(0, true)).includes('W4RELNOW'));
+
+    // Entirely in the past and still RESERVED, so only the past window can
+    // reach it — isolating past_hours from the status filter.
+    await pool.query(
+      `INSERT INTO ses_reservations (event_id, op_call, band, mode, during)
+       VALUES ($1,'W5DONE','10m','PH',
+               tstzrange(NOW() - interval '5 hours', NOW() - interval '3 hours','[)'))`,
+      [ev.id]);
+    check('a finished slot is outside the default window',
+      !(await names(0, false)).includes('W5DONE'));
+    check('past_hours reaches back to it',
+      (await names(6, false)).includes('W5DONE'));
+
     // ── lib/ses.ts currentHolder ─────────────────────────────────────────
     const { rows: [holder] } = await pool.query(
       `SELECT ${RESERVATION_COLUMNS} FROM ses_reservations
