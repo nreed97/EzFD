@@ -1,12 +1,13 @@
 # The checks AGENTS.md already requires before finishing a change, plus the
 # ones that would have caught bugs this project has actually hit:
 #
-#   build   — the section-list and scoring unit checks, then lint, typecheck
-#             and the production build (the AGENTS.md gate), then the
-#             end-to-end API flow against the real server
+#   build   — the pure unit checks (section list, scoring, ADIF, Cabrillo),
+#             then lint, typecheck and the production build (the AGENTS.md
+#             gate), then the end-to-end API flow against the real server
 #   schema  — schema idempotency, the SES exclusion constraint, the route-level
 #             SQL, and the admin console's backup/restore round trip
-#   shell   — syntax-checks the shell scripts and gates on shellcheck
+#   shell   — syntax-checks the shell scripts, gates on shellcheck, and
+#             verifies the two rig-bridge copies haven't drifted
 
 name: CI
 
@@ -58,6 +59,16 @@ jobs:
       # tsc — no runner, no database, no server.
       - name: Scoring tests
         run: node scripts/test-scoring.cjs
+
+      # ADIF and Cabrillo are what a log looks like once it leaves this app —
+      # the file uploaded to LoTW and the one submitted to the ARRL. Both were
+      # covered only by substring checks in the end-to-end suite, which can't
+      # reach the shapes that actually go wrong (a Date where a string was
+      # assumed, a null class on an SES, a hardcoded transmitter number).
+      - name: Export format tests
+        run: |
+          node scripts/test-adif.cjs
+          node scripts/test-cabrillo.cjs
 
       # Gated now that the react-hooks backlog is worked through. Anything it
       # reports is new.
@@ -151,6 +162,20 @@ jobs:
             echo "checking $f"
             bash -n "$f"
           done
+
+      # public/ezfd-rig-bridge.py is a manual duplicate of the root copy,
+      # served for direct browser download — they are deliberately not
+      # symlinked (see AGENTS.md), so nothing but this check stops them
+      # drifting after someone edits one and forgets the other.
+      - name: Rig bridge copies are in sync
+        run: |
+          if ! diff -q ezfd-rig-bridge.py public/ezfd-rig-bridge.py >/dev/null; then
+            echo "public/ezfd-rig-bridge.py has drifted from the root copy."
+            echo "They are a manual duplicate — run: cp ezfd-rig-bridge.py public/"
+            diff ezfd-rig-bridge.py public/ezfd-rig-bridge.py || true
+            exit 1
+          fi
+          echo "rig bridge copies are identical"
 
       # Gated, at every severity. The backlog that kept this advisory is
       # cleared, so anything it reports now is new.
