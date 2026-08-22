@@ -7,8 +7,8 @@ const geistSans = Geist({ variable: '--font-geist-sans', subsets: ['latin'] });
 const geistMono = Geist_Mono({ variable: '--font-geist-mono', subsets: ['latin'] });
 
 export const metadata: Metadata = {
-  title: 'EzFD – Field Day Logger',
-  description: 'Real-time, multi-op ARRL Field Day logging for amateur radio clubs',
+  title: 'EzFD – Field Day & Special Event Logger',
+  description: 'Real-time, multi-operator logging for ARRL Field Day, Winter Field Day and special event stations',
   manifest: '/manifest.json',
 };
 

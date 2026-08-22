@@ -4,6 +4,8 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import ThemeToggle from '@/components/ThemeToggle';
+import { EVENT_TYPE_LABELS } from '@/lib/types';
+import type { EventType } from '@/lib/types';
 
 export default function HomePage() {
   const router = useRouter();
@@ -31,7 +33,9 @@ export default function HomePage() {
     <main className="flex min-h-screen flex-col items-center justify-center gap-12 p-8">
       <div className="text-center">
         <h1 className="text-5xl font-bold tracking-tight text-amber-400">EzFD</h1>
-        <p className="mt-2 text-zinc-400">Real-time Field Day logging for amateur radio clubs</p>
+        <p className="mt-2 text-zinc-400">
+          Real-time multi-operator logging for ARRL Field Day, Winter Field Day and special event stations
+        </p>
       </div>
 
       <div className="flex w-full max-w-md flex-col gap-6">
@@ -63,7 +67,17 @@ export default function HomePage() {
         {/* Create new event */}
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 light:border-zinc-200 light:bg-zinc-50">
           <h2 className="mb-2 text-lg font-semibold text-zinc-100 light:text-zinc-900">Start a New Event</h2>
-          <p className="mb-4 text-sm text-zinc-400 light:text-zinc-600">Set up a Field Day log for your club. You&apos;ll get a join code to share with your operators.</p>
+          <p className="mb-3 text-sm text-zinc-400 light:text-zinc-600">
+            Set up a log for your club or activation. You&apos;ll get a join code to share with your operators.
+          </p>
+          <ul className="mb-4 flex flex-col gap-2">
+            {(['FD', 'WFD', 'SES'] as EventType[]).map(type => (
+              <li key={type} className="text-sm">
+                <span className="font-semibold text-zinc-300 light:text-zinc-700">{EVENT_TYPE_LABELS[type].name}</span>
+                <span className="block text-xs text-zinc-500">{EVENT_TYPE_LABELS[type].blurb}</span>
+              </li>
+            ))}
+          </ul>
           <Link
             href="/event/new"
             className="block w-full rounded-lg border border-amber-400 px-4 py-2 text-center font-semibold text-amber-400 transition-colors hover:bg-amber-400 hover:text-zinc-900"
@@ -74,7 +88,7 @@ export default function HomePage() {
       </div>
 
       <footer className="flex items-center justify-center gap-4 text-xs text-zinc-600 light:text-zinc-400">
-        <span>73 de EzFD &bull; Open source Field Day logger</span>
+        <span>73 de EzFD &bull; Open source Field Day, Winter Field Day &amp; special event logger</span>
         <a
           href="https://github.com/nreed97/EzFD"
           target="_blank"

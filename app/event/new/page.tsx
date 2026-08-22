@@ -3,22 +3,27 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ARRL_SECTIONS } from '@/lib/types';
+import { ARRL_SECTIONS, EVENT_TYPE_LABELS, eventTypeLabel } from '@/lib/types';
 import type { EventType, SlotEnforcement, DupeRule } from '@/lib/types';
 
+// ARRL Field Day entry classes (rule 4). The number in front is the count of
+// simultaneously-transmitting stations, not the operator count.
 const FD_CLASS_LETTERS = [
-  { value: 'A', label: 'A — Club portable' },
-  { value: 'B', label: 'B — Home/1 transmitter' },
+  { value: 'A', label: 'A — Club portable (3+)' },
+  { value: 'B', label: 'B — 1 or 2 op portable' },
   { value: 'C', label: 'C — Mobile' },
-  { value: 'D', label: 'D — Home station' },
-  { value: 'E', label: 'E — Emergency operation' },
-  { value: 'F', label: 'F — EOC emergency power' },
+  { value: 'D', label: 'D — Home, mains power' },
+  { value: 'E', label: 'E — Home, emergency power' },
+  { value: 'F', label: 'F — EOC' },
 ];
 
+// Winter Field Day categories — a different set from Field Day's A–F, with no
+// emergency-power or EOC split. The leading number is transmitters, as for FD.
 const WFD_CLASS_LETTERS = [
-  { value: 'H', label: 'H — Home station' },
-  { value: 'O', label: 'O — Outdoor/portable' },
-  { value: 'I', label: 'I — Indoor/club' },
+  { value: 'H', label: 'H — Home' },
+  { value: 'I', label: 'I — Indoor' },
+  { value: 'O', label: 'O — Outdoor' },
+  { value: 'M', label: 'M — Mobile' },
 ];
 
 export default function NewEventPage() {
@@ -120,11 +125,52 @@ export default function NewEventPage() {
         &larr; Back
       </Link>
 
-      <h1 className="mb-6 text-3xl font-bold text-amber-400">
-        {isSes ? 'Create Special Event Station' : 'Create Field Day Event'}
+      <h1 className="mb-2 text-3xl font-bold text-amber-400">
+        {isSes ? 'Create Special Event Station' : `Create ${eventTypeLabel(eventType)} Event`}
       </h1>
+      <p className="mb-6 text-sm text-zinc-400 light:text-zinc-600">{EVENT_TYPE_LABELS[eventType].blurb}</p>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
+          <h2 className="mb-1 font-semibold text-zinc-300 light:text-zinc-700">Event Type</h2>
+          <p className="mb-4 text-xs text-zinc-500">
+            Pick this first &mdash; it decides the exchange, the scoring and which
+            of the settings below apply.
+          </p>
+          <fieldset className="flex flex-col gap-2">
+            <legend className="sr-only">Event Type</legend>
+            {(['FD', 'WFD', 'SES'] as EventType[]).map(type => (
+              <button
+                key={type}
+                type="button"
+                aria-pressed={eventType === type}
+                onClick={() => {
+                  setEventType(type);
+                  if (type !== 'SES') setClassLetter(type === 'WFD' ? 'H' : 'A');
+                  // FD/WFD require a section; an SES defaults to none.
+                  set('arrl_section', type === 'SES' ? '' : 'EPA');
+                  // Contest dupes are once per event; a special event may
+                  // run for weeks, where working someone again on another
+                  // day is normal.
+                  setDupeRule(type === 'SES' ? 'DAY' : 'EVENT');
+                }}
+                className={`rounded-lg border px-3 py-2 text-left transition-colors ${
+                  eventType === type
+                    ? 'border-amber-400 bg-amber-400/10'
+                    : 'border-zinc-700 hover:border-zinc-500 light:border-zinc-300'
+                }`}
+              >
+                <span className={`block text-sm font-semibold ${
+                  eventType === type ? 'text-amber-400' : 'text-zinc-300 light:text-zinc-700'
+                }`}>
+                  {EVENT_TYPE_LABELS[type].name}
+                </span>
+                <span className="block text-xs text-zinc-500">{EVENT_TYPE_LABELS[type].blurb}</span>
+              </button>
+            ))}
+          </fieldset>
+        </div>
+
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
           <h2 className="mb-4 font-semibold text-zinc-300 light:text-zinc-700">
             {isSes ? 'Station Info' : 'Club Info'}
@@ -169,34 +215,6 @@ export default function NewEventPage() {
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
           <h2 className="mb-4 font-semibold text-zinc-300 light:text-zinc-700">Event Setup</h2>
           <div className="flex flex-col gap-3">
-            <fieldset className="flex flex-col gap-1">
-              <span className="text-sm text-zinc-400">Event Type</span>
-              <div className="flex gap-2">
-                {(['FD', 'WFD', 'SES'] as const).map(type => (
-                  <button
-                    key={type}
-                    type="button"
-                    onClick={() => {
-                      setEventType(type);
-                      if (type !== 'SES') setClassLetter(type === 'WFD' ? 'H' : 'A');
-                      // FD/WFD require a section; an SES defaults to none.
-                      set('arrl_section', type === 'SES' ? '' : 'EPA');
-                      // Contest dupes are once per event; a special event may
-                      // run for weeks, where working someone again on another
-                      // day is normal.
-                      setDupeRule(type === 'SES' ? 'DAY' : 'EVENT');
-                    }}
-                    className={`flex-1 rounded-lg border py-2 text-xs font-semibold transition-colors ${
-                      eventType === type
-                        ? 'border-amber-400 bg-amber-400/10 text-amber-400'
-                        : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 light:border-zinc-300 light:text-zinc-600'
-                    }`}
-                  >
-                    {type === 'FD' ? 'ARRL Field Day' : type === 'WFD' ? 'Winter Field Day' : 'Special Event'}
-                  </button>
-                ))}
-              </div>
-            </fieldset>
             {isSes ? (
               <>
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -239,9 +257,9 @@ export default function NewEventPage() {
                     {ARRL_SECTIONS.map(sec => <option key={sec} value={sec}>{sec}</option>)}
                   </select>
                   <span className="text-xs text-zinc-500">
-                    Not required &mdash; special events often run outside Field Day
-                    entirely. Set it if your operators trade sections; it becomes
-                    MY_ARRL_SECT in the exported ADIF.
+                    Not required &mdash; a special event has no contest exchange and
+                    usually runs outside Field Day entirely. Set it if your operators
+                    trade sections; it becomes MY_ARRL_SECT in the exported ADIF.
                   </span>
                 </label>
                 <label className="flex flex-col gap-1">
@@ -255,9 +273,16 @@ export default function NewEventPage() {
                 </label>
               </>
             ) : (
+            <>
+            <p className="text-xs text-zinc-500">
+              {eventType === 'WFD'
+                ? 'Winter Field Day exchange: your category (transmitters + letter) and ARRL/RAC section — DX stations send "DX".'
+                : 'ARRL Field Day exchange: your class (transmitters + letter) and ARRL/RAC section.'}
+              {' '}Both are sent on every QSO and stamped on the Cabrillo entry.
+            </p>
             <div className="flex flex-col gap-3 sm:flex-row">
-              <fieldset className="flex flex-1 flex-col gap-1">
-                <span className="text-sm text-zinc-400">{eventType === 'WFD' ? 'WFD' : 'FD'} Class</span>
+              <fieldset className="flex min-w-0 flex-col gap-1 sm:flex-2">
+                <span className="text-sm text-zinc-400">{eventType === 'WFD' ? 'WFD Category' : 'FD Class'}</span>
                 <div className="flex">
                   <input
                     type="number"
@@ -280,17 +305,22 @@ export default function NewEventPage() {
                   </select>
                 </div>
               </fieldset>
-              <label className="flex flex-1 flex-col gap-1">
-                <span className="text-sm text-zinc-400">ARRL Section</span>
+              <label className="flex min-w-0 flex-col gap-1 sm:flex-1">
+                <span className="text-sm text-zinc-400">ARRL/RAC Section</span>
                 <select value={form.arrl_section} onChange={e => set('arrl_section', e.target.value)} className="input">
                   {ARRL_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </label>
             </div>
+            </>
             )}
             {/* Power category only affects the ARRL score multiplier. */}
             <fieldset className={`flex flex-col gap-1 ${isSes ? 'hidden' : ''}`}>
               <span className="text-sm text-zinc-400">Power Category</span>
+              <span className="text-xs text-zinc-500">
+                Score multiplier only &mdash; HIGH &times;1, LOW &times;2, QRP &times;5. It
+                doesn&apos;t change the exchange you send.
+              </span>
               <div className="flex gap-2">
                 {(['HIGH', 'LOW', 'QRP'] as const).map(p => (
                   <button
@@ -403,7 +433,7 @@ export default function NewEventPage() {
                     Require operator approval
                   </span>
                   <span className="block text-xs text-zinc-500">
-                    Off by default, matching Field Day: anyone with the join code can
+                    Off by default, matching FD and WFD: anyone with the join code can
                     log. Turn this on and a new operator lands in the roster as
                     pending and can&apos;t log until you approve them in
                     <code className="mx-1 rounded bg-zinc-800 px-1 light:bg-zinc-200">ezfd-admin.sh</code>
@@ -433,7 +463,11 @@ export default function NewEventPage() {
                   Use N1MM {eventType} call history file
                 </span>
                 <span className="block text-xs text-zinc-500">
-                  Downloads the latest {eventType === 'WFD' ? 'Winter Field Day' : 'Field Day'} {form.event_year} call history from N1MM and prefills a known station&apos;s Rcvd Class/Section while logging.
+                  Downloads the {eventTypeLabel(eventType)} call history for{' '}
+                  {form.event_year}{' '}
+                  from N1MM and prefills a known station&apos;s Rcvd Class/Section
+                  while logging. Falls back to the previous year if that
+                  year&apos;s file isn&apos;t published yet.
                 </span>
               </span>
             </label>
