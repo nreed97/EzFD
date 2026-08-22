@@ -7,6 +7,7 @@
 // ring, 12-23 on the inner ring; picking an hour advances to minutes.
 
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 function pad2(n: number) {
   return String(n).padStart(2, '0');
@@ -179,12 +180,12 @@ export default function ClockTimePicker({
   const hour = Number.isFinite(h) ? h : 0;
   const minute = Number.isFinite(m) ? m : 0;
 
-  // Popover width the panel below is given explicitly (w-64) so this can
-  // clamp against it exactly, and it's positioned `fixed` from the trigger's
-  // own viewport rect rather than `absolute` under it — a field near the
-  // right edge of a narrow column (the two-up Starts/Ends row, or the SES
-  // sidebar) would otherwise push the clock face off the page.
+  // The popover is rendered in a portal on document.body and positioned
+  // `fixed` from the trigger's own viewport rect, so no ancestor's
+  // overflow/stacking context can clip or bury it — the dashboard's
+  // Checkouts pane is a scrolling flex child, which did both.
   const POPOVER_W = 256;
+  const panelRef = useRef<HTMLDivElement>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   useLayoutEffect(() => {
@@ -193,8 +194,21 @@ export default function ClockTimePicker({
       const rect = wrapRef.current?.getBoundingClientRect();
       if (!rect) return;
       const margin = 8;
+      // Measure the panel rather than assuming — clamping only the *top*
+      // against the viewport bottom used to park a ~330px popover entirely
+      // below the fold whenever the trigger sat low on the page.
+      const panelH = panelRef.current?.offsetHeight ?? 340;
       const left = clamp(rect.left, margin, Math.max(margin, window.innerWidth - POPOVER_W - margin));
-      const top = clamp(rect.bottom + 4, margin, Math.max(margin, window.innerHeight - margin));
+
+      const below = rect.bottom + 4;
+      const above = rect.top - 4 - panelH;
+      // Prefer below; flip above when it doesn't fit there but does above.
+      const fitsBelow = below + panelH <= window.innerHeight - margin;
+      const top = fitsBelow
+        ? below
+        : above >= margin
+          ? above
+          : clamp(below, margin, Math.max(margin, window.innerHeight - panelH - margin));
       setPos({ top, left });
     }
     reposition();
@@ -204,12 +218,19 @@ export default function ClockTimePicker({
       window.removeEventListener('resize', reposition);
       window.removeEventListener('scroll', reposition, true);
     };
-  }, [open]);
+    // `mode` inside ClockFace changes the panel's height slightly; `value`
+    // re-runs cheaply and keeps the flip decision honest as it does.
+  }, [open, value]);
 
   useEffect(() => {
     if (!open) return;
     function onDocDown(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) setOpen(false);
+      const t = e.target as Node;
+      // The panel lives in a portal, so it is NOT inside wrapRef — without
+      // checking it too, the first click on the clock face would close the
+      // picker instead of picking an hour.
+      if (panelRef.current?.contains(t)) return;
+      if (wrapRef.current && !wrapRef.current.contains(t)) setOpen(false);
     }
     function onKey(e: KeyboardEvent) {
       if (e.key === 'Escape') setOpen(false);
@@ -274,10 +295,21 @@ export default function ClockTimePicker({
           </svg>
         </button>
       </div>
-      {open && pos && (
+      {/* `open` is false on the first render, so the portal never runs during
+          SSR where document.body doesn't exist. */}
+      {open && createPortal(
         <div
-          style={{ position: 'fixed', top: pos.top, left: pos.left, width: POPOVER_W }}
-          className="z-50 rounded-xl border border-zinc-700 bg-zinc-900 p-4 shadow-xl light:border-zinc-300 light:bg-white"
+          ref={panelRef}
+          style={{
+            position: 'fixed',
+            top: pos?.top ?? -9999,
+            left: pos?.left ?? -9999,
+            width: POPOVER_W,
+            // Hidden until measured, so the first paint can't flash in the
+            // wrong place before useLayoutEffect resolves the position.
+            visibility: pos ? 'visible' : 'hidden',
+          }}
+          className="z-[100] rounded-xl border border-zinc-700 bg-zinc-900 p-4 shadow-xl light:border-zinc-300 light:bg-white"
         >
           <ClockFace
             hour={hour}
@@ -291,7 +323,8 @@ export default function ClockTimePicker({
           >
             Done
           </button>
-        </div>
+        </div>,
+        document.body
       )}
     </div>
   );

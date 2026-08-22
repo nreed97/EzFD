@@ -12,21 +12,44 @@ import { BANDS, MODES } from '@/lib/types';
 
 /**
  * Current and upcoming call checkouts for the coordination grid.
- * Released slots and slots that have already ended are omitted.
+ * Released slots and slots that have already ended are omitted by default.
+ *
+ * The dashboard timeline needs history too — "who had 20m PH before me" is
+ * the whole point of it — so two opt-in params widen the result. Both
+ * default to the original behaviour, so the logging-page panel and the
+ * dashboard sidebar are unaffected.
+ *
+ *   past_hours=N        also return slots overlapping the N hours before now
+ *   include_released=1  also return RELEASED slots, which are the record of
+ *                       who actually held the call earlier
+ *
+ * A slot cancelled before it ever started is clamped to a zero-length range
+ * by the release path; those never appear here regardless of the params,
+ * because an empty range doesn't overlap anything under `&&`.
  */
 export async function GET(request: Request) {
-  const eventId = new URL(request.url).searchParams.get('event_id');
+  const params = new URL(request.url).searchParams;
+  const eventId = params.get('event_id');
   if (!eventId) return NextResponse.json({ error: 'event_id required' }, { status: 400 });
+
+  const rawPast = Number(params.get('past_hours'));
+  // Clamp: a hostile or fat-fingered value must not turn this into a full
+  // table scan of a multi-week special event.
+  const pastHours = Number.isFinite(rawPast) ? Math.min(Math.max(rawPast, 0), 168) : 0;
+  const includeReleased = params.get('include_released') === '1';
 
   const pool = getPool();
   const { rows } = await pool.query(
     `SELECT ${RESERVATION_COLUMNS}
      FROM ses_reservations
      WHERE event_id = $1
-       AND status <> 'RELEASED'
-       AND during && tstzrange(NOW(), NOW() + ($2 || ' hours')::interval, '[)')
+       AND ($4::boolean OR status <> 'RELEASED')
+       AND during && tstzrange(
+             NOW() - ($3 || ' hours')::interval,
+             NOW() + ($2 || ' hours')::interval,
+             '[)')
      ORDER BY lower(during) ASC`,
-    [eventId, String(UPCOMING_WINDOW_HOURS)]
+    [eventId, String(UPCOMING_WINDOW_HOURS), String(pastHours), includeReleased]
   );
 
   return NextResponse.json(rows);
