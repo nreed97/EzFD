@@ -94,36 +94,36 @@ export default function EventJoinPage() {
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 light:border-zinc-200 light:bg-zinc-50">
           <h2 className="mb-4 font-semibold text-zinc-200 light:text-zinc-800">Sign In as Operator</h2>
           <form onSubmit={handleJoin} className="flex flex-col gap-3">
-            <label className="flex flex-col gap-1">
+            <label className="flex min-w-0 flex-col gap-1">
               <span className="text-sm text-zinc-400">Your Callsign</span>
               <input
                 required
                 value={opCall}
                 onChange={e => setOpCall(e.target.value.toUpperCase())}
                 placeholder="W0NY"
-                className="input font-mono text-lg tracking-widest"
+                className="input w-full font-mono text-lg tracking-widest"
                 autoFocus
               />
             </label>
             {event.event_type === 'SES' && (
               <div className="flex gap-3">
-                <label className="flex flex-1 flex-col gap-1">
+                <label className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="text-sm text-zinc-400">Your Grid</span>
                   <input
                     value={opGrid}
                     onChange={e => setOpGrid(e.target.value.toUpperCase())}
                     placeholder="EN34"
-                    className="input font-mono"
+                    className="input w-full font-mono"
                     maxLength={8}
                   />
                 </label>
-                <label className="flex flex-1 flex-col gap-1">
+                <label className="flex min-w-0 flex-1 flex-col gap-1">
                   <span className="text-sm text-zinc-400">Your State</span>
                   <input
                     value={opState}
                     onChange={e => setOpState(e.target.value.toUpperCase())}
                     placeholder="MN"
-                    className="input font-mono"
+                    className="input w-full font-mono"
                     maxLength={4}
                   />
                 </label>

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
 import { useRigBridge } from '@/lib/useRigBridge';
 import { enqueue, dequeue, loadQueue, type PendingQSO } from '@/lib/offline-queue';
-import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
+import type { Event, QSO, Band, Mode, DisplayQSO, SesReservation } from '@/lib/types';
 import type { QSOSubmission } from './QSOForm';
 import QSOForm from './QSOForm';
 import SesCoordination from './SesCoordination';
@@ -187,6 +187,33 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
     return () => es.close();
   }, [event.id]);
+
+  // If this operator already holds a live checkout when they sign in — e.g.
+  // arriving right at the start of their scheduled slot — start the form on
+  // that band/mode instead of the 20m/PH default, since that's what they're
+  // here to work.
+  useEffect(() => {
+    if (!isSes) return;
+    let cancelled = false;
+    fetch(`/api/ses/reservations?event_id=${event.id}`)
+      .then(r => r.ok ? r.json() as Promise<SesReservation[]> : null)
+      .then(rows => {
+        if (cancelled || !rows) return;
+        const now = Date.now();
+        const mine = rows.find(r => {
+          if (r.op_call !== operatorCall) return false;
+          const start = new Date(r.starts_at).getTime();
+          const end = r.ends_at ? new Date(r.ends_at).getTime() : Infinity;
+          return start <= now && end > now;
+        });
+        if (mine) {
+          setCurrentBand(mine.band);
+          setCurrentMode(mine.mode);
+        }
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [isSes, event.id, operatorCall]);
 
   const flushQueue = useCallback(async () => {
     if (syncingRef.current) return;
@@ -522,6 +549,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
               currentBand={currentBand}
               currentMode={currentMode}
               slotMinutes={event.slot_minutes ?? 120}
+              eventStartsAt={event.starts_at}
+              eventEndsAt={event.ends_at}
               refreshToken={reservationVersion}
               lastQsoAt={myLastQsoAt}
               onHoldingChange={handleHoldingChange}

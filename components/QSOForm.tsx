@@ -40,6 +40,9 @@ const BAND_GRID: Band[][] = [
 ];
 
 const EXTRA_BANDS: Band[] = ['1.25m', '70cm'];
+// WARC bands + 60m are excluded from ARRL FD/WFD scoring, so only an SES
+// (no contest exchange, not bound by that rule) offers them.
+const SES_EXTRA_BANDS: Band[] = ['60m', '30m', '17m', '12m', '1.25m', '70cm'];
 const MODES: Mode[] = ['PH', 'CW', 'DIG'];
 
 const MODE_STYLE: Record<Mode, string> = {
@@ -137,6 +140,22 @@ function QSOForm({
   }, [lastLogged, autoFadeLoggedMs]);
   const [showQSY, setShowQSY] = useState(false);
   const [showExtra, setShowExtra] = useState(false);
+  const extraBands = isSes ? SES_EXTRA_BANDS : EXTRA_BANDS;
+  // Per-browser preference, not per-event — an operator who likes skipping
+  // the exchange wants that everywhere, so it's read/written directly to
+  // localStorage rather than threaded through event settings.
+  const [quickLog, setQuickLog] = useState(false);
+  useEffect(() => {
+    setQuickLog(localStorage.getItem('ezfd_quicklog') === '1');
+  }, []);
+  function toggleQuickLog() {
+    setQuickLog(prev => {
+      const next = !prev;
+      localStorage.setItem('ezfd_quicklog', next ? '1' : '0');
+      return next;
+    });
+  }
+  const formRef    = useRef<HTMLFormElement>(null);
   const callRef    = useRef<HTMLInputElement>(null);
   const classRef   = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLInputElement>(null);
@@ -289,16 +308,29 @@ function QSOForm({
     !(ARRL_SECTIONS as readonly string[]).includes(rcvdSection);
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-3">
       {/* Callsign */}
       <div>
-        <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Callsign</label>
+        <div className="mb-1 flex items-center justify-between">
+          <label className="block text-xs text-zinc-400 light:text-zinc-600">Callsign</label>
+          <label className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700" title="Enter logs immediately with default exchange values, skipping the other fields">
+            <input type="checkbox" checked={quickLog} onChange={toggleQuickLog} tabIndex={-1} className="h-3 w-3" />
+            Quick Log
+          </label>
+        </div>
         <input
           ref={callRef}
           value={callsign}
           onChange={e => handleCallChange(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'Enter') {
+              if (quickLog && !esm) {
+                if (callsign) {
+                  e.preventDefault();
+                  formRef.current?.requestSubmit();
+                }
+                return;
+              }
               const firstExchangeField = isSes ? rstRcvdRef : classRef;
               if (esm) {
                 e.preventDefault();
@@ -594,37 +626,39 @@ function QSOForm({
             </div>
 
             {showExtra ? (
-              <div className="flex gap-1">
-                {EXTRA_BANDS.map(b => {
-                  const ops = bandOccupancy[b] ?? [];
-                  const occupied = ops.length > 0;
-                  return (
-                    <button
-                      key={b}
-                      type="button"
-                      tabIndex={-1}
-                      onClick={() => pickBand(b)}
-                      title={occupied ? `Active: ${ops.join(', ')}` : undefined}
-                      className={`relative flex-1 rounded py-2.5 text-sm font-mono font-semibold transition-colors ${
-                        band === b
-                          ? 'bg-amber-400 text-zinc-900'
-                          : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-200 light:text-zinc-700 light:hover:bg-zinc-300'
-                      }`}
-                    >
-                      {b}
-                      {occupied && band !== b && (
-                        <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400" />
-                      )}
-                    </button>
-                  );
-                })}
+              <div className="flex flex-col gap-1">
+                <div className="grid grid-cols-3 gap-1">
+                  {extraBands.map(b => {
+                    const ops = bandOccupancy[b] ?? [];
+                    const occupied = ops.length > 0;
+                    return (
+                      <button
+                        key={b}
+                        type="button"
+                        tabIndex={-1}
+                        onClick={() => pickBand(b)}
+                        title={occupied ? `Active: ${ops.join(', ')}` : undefined}
+                        className={`relative rounded py-2.5 text-sm font-mono font-semibold transition-colors ${
+                          band === b
+                            ? 'bg-amber-400 text-zinc-900'
+                            : 'bg-zinc-800 text-zinc-300 hover:bg-zinc-700 light:bg-zinc-200 light:text-zinc-700 light:hover:bg-zinc-300'
+                        }`}
+                      >
+                        {b}
+                        {occupied && band !== b && (
+                          <span className="absolute top-1 right-1 h-1.5 w-1.5 rounded-full bg-orange-400" />
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
                 <button
                   type="button"
                   tabIndex={-1}
                   onClick={() => setShowExtra(false)}
-                  className="px-2 text-xs text-zinc-500 hover:text-zinc-300 light:text-zinc-600 light:hover:text-zinc-800"
+                  className="self-start px-1 text-xs text-zinc-500 hover:text-zinc-300 light:text-zinc-600 light:hover:text-zinc-800"
                 >
-                  ↑
+                  ↑ less
                 </button>
               </div>
             ) : (
@@ -634,7 +668,7 @@ function QSOForm({
                 onClick={() => setShowExtra(true)}
                 className="text-left text-xs text-zinc-600 hover:text-zinc-400 light:text-zinc-500 light:hover:text-zinc-700"
               >
-                + 1.25m / 70cm
+                + {extraBands.join(' / ')}
               </button>
             )}
 
