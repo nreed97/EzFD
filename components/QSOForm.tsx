@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
+import { useStoredFlag } from '@/lib/useStoredFlag';
 import type { Band, Mode, DisplayQSO, QSO, EventType, DupeRule } from '@/lib/types';
 import { VALID_EXCHANGES, isValidExchange } from '@/lib/types';
 
@@ -130,9 +131,19 @@ function QSOForm({
   const [loggedFading, setLoggedFading] = useState(false);
   const [loggedHidden, setLoggedHidden] = useState(false);
 
-  useEffect(() => {
+  // Resetting the fade when a new QSO is logged is an adjustment to a changed
+  // prop, not a side effect, so it happens during render — React's documented
+  // pattern for this. Doing it in the effect meant the stale "faded out" state
+  // was committed and painted for one frame before the reset landed, so a
+  // contact logged just after a fade could flash in already-dimmed.
+  const [fadeKey, setFadeKey] = useState(lastLogged);
+  if (fadeKey !== lastLogged) {
+    setFadeKey(lastLogged);
     setLoggedFading(false);
     setLoggedHidden(false);
+  }
+
+  useEffect(() => {
     if (!lastLogged || !autoFadeLoggedMs) return;
     const fadeTimer = setTimeout(() => setLoggedFading(true), Math.max(0, autoFadeLoggedMs - 500));
     const hideTimer = setTimeout(() => setLoggedHidden(true), autoFadeLoggedMs);
@@ -144,16 +155,9 @@ function QSOForm({
   // Per-browser preference, not per-event — an operator who likes skipping
   // the exchange wants that everywhere, so it's read/written directly to
   // localStorage rather than threaded through event settings.
-  const [quickLog, setQuickLog] = useState(false);
-  useEffect(() => {
-    setQuickLog(localStorage.getItem('ezfd_quicklog') === '1');
-  }, []);
+  const [quickLog, setQuickLog] = useStoredFlag('ezfd_quicklog');
   function toggleQuickLog() {
-    setQuickLog(prev => {
-      const next = !prev;
-      localStorage.setItem('ezfd_quicklog', next ? '1' : '0');
-      return next;
-    });
+    setQuickLog(prev => !prev);
   }
   const formRef    = useRef<HTMLFormElement>(null);
   const callRef    = useRef<HTMLInputElement>(null);

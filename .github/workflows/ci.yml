@@ -1,15 +1,13 @@
 # The checks AGENTS.md already requires before finishing a change, plus the
 # ones that would have caught bugs this project has actually hit:
 #
-#   build   — the section-list consistency check, then typecheck and the
-#             production build (the AGENTS.md gate), then the end-to-end API
-#             flow against the real server
+#   build   — the section-list and scoring unit checks, then lint, typecheck
+#             and the production build (the AGENTS.md gate), then the
+#             end-to-end API flow against the real server
 #   schema  — schema idempotency, the SES exclusion constraint, the route-level
 #             SQL, and the admin console's backup/restore round trip
-#   shell   — syntax-checks the shell scripts, which nothing else validates
-#
-# Deliberately not gating on `npm run lint`: eslint reports 22 pre-existing
-# errors on master, so it would fail every PR. Worth adding once cleared.
+#   shell   — syntax-checks the shell scripts and gates on shellcheck
+
 name: CI
 
 on:
@@ -53,6 +51,18 @@ jobs:
       # written out as a literal instead of derived from ARRL_SECTIONS.length.
       - name: Section list consistency
         run: node scripts/test-sections.cjs
+
+      # The scoring formula decides the number a club submits to the ARRL, so
+      # it gets asserted directly rather than only through the Cabrillo header
+      # in the end-to-end suite. Compiles lib/scoring.ts with the project's own
+      # tsc — no runner, no database, no server.
+      - name: Scoring tests
+        run: node scripts/test-scoring.cjs
+
+      # Gated now that the react-hooks backlog is worked through. Anything it
+      # reports is new.
+      - name: Lint
+        run: npm run lint
 
       - name: Typecheck
         run: npx tsc --noEmit
@@ -142,10 +152,9 @@ jobs:
             bash -n "$f"
           done
 
-      # Advisory: the existing scripts predate this and would fail a gate,
-      # but new problems are still worth surfacing in the log.
-      - name: shellcheck (advisory)
-        continue-on-error: true
+      # Gated, at every severity. The backlog that kept this advisory is
+      # cleared, so anything it reports now is new.
+      - name: shellcheck
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
-          shellcheck --severity=error $(git ls-files '*.sh') || true
+          shellcheck $(git ls-files '*.sh')

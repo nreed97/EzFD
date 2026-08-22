@@ -9,10 +9,11 @@ This version has breaking changes — APIs, conventions, and file structure may 
 EzFD is a real-time, multi-operator ARRL Field Day / Winter Field Day logger. Next.js 16 App Router (standalone output, `node server.js`), PostgreSQL 16 with `pg_notify` → SSE for real-time updates, Tailwind v4 (`light:` prefix for light mode — dark is default). Deployed to Ubuntu/Debian VPS via `deploy.sh` (nginx + certbot + systemd). See `README.md` for full feature docs and usage.
 
 ## Before finishing a frontend change
-Run `npx tsc --noEmit` and `npm run build` — both must be clean.
+Run `npm run lint`, `npx tsc --noEmit` and `npm run build` — all three must be clean.
+CI gates on all of them, plus `shellcheck` for any shell change.
 
-Changes touching the schema, the SES routes, or `ezfd-admin.sh` should also run
-the relevant suite (CI runs all of them — see the Tests section in `README.md`):
+Changes touching the schema, the SES routes, `lib/scoring.ts` or `ezfd-admin.sh`
+should also run the relevant suite (CI runs all of them — see the Tests section in `README.md`):
 
 | Script | Covers |
 |---|---|
@@ -21,6 +22,7 @@ the relevant suite (CI runs all of them — see the Tests section in `README.md`
 | `scripts/test-restore.sh` | `ezfd-admin.sh` backup/restore for SES, FD and empty events |
 | `scripts/test-e2e.sh` | The API end to end, including Field Day regressions |
 | `scripts/test-sections.cjs` | The ARRL/RAC section list — the three enumerations agree, no hardcoded totals |
+| `scripts/test-scoring.cjs` | The ARRL scoring formula — multipliers, every bonus and its cap, dupes, Worked All Sections |
 
 When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
@@ -61,6 +63,10 @@ Hard-won fixes worth knowing before touching this code:
 - **All rigctld I/O is guarded by one `asyncio.Lock`** — polling (`get_freq`/`get_mode`) and CW commands share a single connection and must not interleave.
 
 ## React gotchas from this project
+
+- **`react-hooks/set-state-in-effect` cannot see through an async boundary.** It flags `useEffect(() => { load(); })` where `load` is async exactly as it flags a synchronous `setState`, even though the state update happens in a promise continuation and cannot cascade. Those sites carry a per-site disable with that reasoning; a *synchronous* setState in an effect is a real finding and should be fixed, not disabled.
+- **Browser-only values belong in `useSyncExternalStore`, not in an effect.** `lib/useLightMode.ts`, `lib/useOnline.ts` and `lib/useStoredFlag.ts` exist because reading the theme class, `navigator.onLine` or a `localStorage` preference in an effect renders the wrong value once and then corrects it — a visible flicker. `useStoredFlag` also syncs across documents, which matters because the CW keying window is a separate `window.open`.
+- **Don't read the clock during render.** `lib/useNow.ts` returns a ticking timestamp from state. Beyond the purity rule, `Date.now()` in render means "is this slot active" only updates when something *else* re-renders the component, so an expired checkout could sit on screen looking live.
 
 - **Inline arrow-function props recreate identity every render.** If a parent re-renders often (e.g. every rig frequency tick, ~4/sec) and passes `foo={() => ...}` to a child whose `useCallback`/`useEffect` depends on it, that effect keeps re-firing — this once prevented an auto-CQ timer from ever completing its interval. Fix: memoize with `useCallback(..., [])` in the parent, and/or read the latest value via a ref inside long-lived timers instead of depending on the function directly.
 - **`QSOForm` exposes an imperative handle** (`QSOFormHandle` via `forwardRef`/`useImperativeHandle`) for reading live field values without lifting state — used by `CwMacroPanel` for `{call}`/`{exch}` macro placeholder expansion.

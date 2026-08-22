@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState, useCallback } from 'react';
+import { useNow } from '@/lib/useNow';
 import type { Band, Mode, DisplayQSO } from '@/lib/types';
 
 interface StationPresence {
@@ -83,6 +84,11 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
   }, [publishPresence, currentBand, currentMode]);
 
   useEffect(() => {
+    // the loader is async: whatever state it sets happens in a promise
+    // continuation after an await, never synchronously during the effect, so
+    // it cannot cascade a render. The rule cannot see through the async
+    // boundary.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPresence();
     const id = setInterval(fetchPresence, POLL_MS);
     return () => clearInterval(id);
@@ -102,8 +108,10 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
     publishPresence(currentBand, currentMode);
   }
 
-  // Last QSO time per operator from the live QSO list
-  const now = Date.now();
+  // Last QSO time per operator from the live QSO list. The clock comes from
+  // state so that an operator crossing the INACTIVE_MS threshold dims on its
+  // own, rather than only when the next presence poll happens to re-render.
+  const now = useNow(POLL_MS);
   const lastQSOByOp: Record<string, string> = {};
   for (const q of qsos) {
     if (q.operator_call && !q._pending) {

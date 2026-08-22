@@ -56,7 +56,7 @@ export async function POST(request: Request) {
     const is_dupe = await isDupeQSO(
       pool, event_id, callsign, rec.band, rec.mode, event.dupe_rule ?? 'EVENT', dt
     );
-    is_dupe ? dupes++ : imported++;
+    if (is_dupe) dupes++; else imported++;
 
     await pool.query(
       `INSERT INTO qsos

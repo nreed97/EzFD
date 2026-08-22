@@ -11,7 +11,7 @@ IFS=$'\n\t'
 
 # ── Colours ───────────────────────────────────────────────────────────────────
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
-BLUE='\033[0;34m'; CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
+CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 
 hr()    { echo -e "${DIM}────────────────────────────────────────────────────────────────${NC}"; }
 hr2()   { echo -e "${BOLD}════════════════════════════════════════════════════════════════${NC}"; }
@@ -601,6 +601,9 @@ list_events() {
     local -a codes=()
     local code="" name="" call="" year="" class="" section="" etype="" power=""
     local location="" created="" qsos="" dupes="" ops=""
+    # Every column of the SELECT has to be named here or the fields shift;
+    # not all of them are printed in the summary row below.
+    # shellcheck disable=SC2034
     while IFS='|' read -r code name call year class section etype power location created qsos dupes ops; do
       codes+=("$code")
       printf "  ${CYAN}%-8s${NC}  %-24s %-7s %-4s  %-5s  ${GREEN}%6s${NC}  ${YELLOW}%5s${NC}  %4s\n" \
@@ -690,7 +693,8 @@ server_stats() {
 # ─────────────────────────────────────────────────────────────────────────────
 backup_all() {
   banner
-  local file="/tmp/ezfd_backup_$(date -u +%Y%m%d_%H%M%S).json"
+  local file=""
+  file="/tmp/ezfd_backup_$(date -u +%Y%m%d_%H%M%S).json"
   echo -e "  Writing full backup to ${BOLD}${file}${NC}…"
   echo
   PG -c "
@@ -1033,7 +1037,7 @@ server_time() {
 
   label "System clock (UTC):"; echo "$app_now"
   label "Database clock:";     echo "${db_now:-unavailable}"
-  label "Local time:";         echo "$(date '+%Y-%m-%d %H:%M:%S %Z')"
+  label "Local time:";         date '+%Y-%m-%d %H:%M:%S %Z'
 
   local synced="" ntp_service=""
   if command -v timedatectl >/dev/null 2>&1; then

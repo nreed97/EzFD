@@ -27,6 +27,8 @@ q()  { $PSQL -d "$DB" -tAX -c "$1" 2>&1; }
 ok() { echo "ok    $1"; }
 no() { echo "FAIL  $1  ${2:-}"; FAILURES=$((FAILURES + 1)); }
 
+# Invoked by the EXIT trap below, which shellcheck can't see.
+# shellcheck disable=SC2317
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
 
@@ -64,21 +66,6 @@ extract_restore() {
   local json_file="$1" out="$2"
   python3 "$SCRIPT_DIR/scripts/_extract_restore.py" \
     "$SCRIPT_DIR/ezfd-admin.sh" "$json_file" "$out"
-}
-
-restore() {
-  local json_file="$1" out="$2"
-  python3 - "$SCRIPT_DIR/ezfd-admin.sh" "$json_file" "$out" <<'PY'
-import sys
-src, json_file, out = sys.argv[1], sys.argv[2], sys.argv[3]
-s = open(src).read()
-start = s.index('    DO \\$\\$')
-end = s.index('SELECT orig_code, new_code, qso_count FROM _restore_summary;')
-block = s[start:end].replace('\\$\\$', '$$').replace("'$json_file'", f"'{json_file}'")
-open(out, 'w').write(
-    "CREATE TEMP TABLE _restore_summary(orig_code text, new_code text, qso_count int);\n"
-    + block + "\nSELECT new_code FROM _restore_summary;\n")
-PY
 }
 
 restore() {
@@ -137,38 +124,50 @@ else
 
   # NULLIF, not COALESCE(...,''): an empty string here would put a blank
   # MY_ARRL_SECT into every exported ADIF record.
-  [[ "$(q "SELECT class IS NULL FROM events WHERE join_code='$SES_NEW';")" == "t" ]] \
-    && ok "  class restores as NULL, not an empty string" \
-    || no "  class restores as NULL, not an empty string"
+  if [[ "$(q "SELECT class IS NULL FROM events WHERE join_code='$SES_NEW';")" == "t" ]]; then
+    ok "  class restores as NULL, not an empty string"
+  else
+    no "  class restores as NULL, not an empty string"
+  fi
 
-  [[ "$(q "SELECT slot_enforcement||'/'||slot_minutes||'/'||dupe_rule||'/'||require_operator_approval
-           FROM events WHERE join_code='$SES_NEW';")" == "HARD/90/DAY/true" ]] \
-    && ok "  checkout, dupe and approval settings survive" \
-    || no "  checkout, dupe and approval settings survive"
+  if [[ "$(q "SELECT slot_enforcement||'/'||slot_minutes||'/'||dupe_rule||'/'||require_operator_approval
+           FROM events WHERE join_code='$SES_NEW';")" == "HARD/90/DAY/true" ]]; then
+    ok "  checkout, dupe and approval settings survive"
+  else
+    no "  checkout, dupe and approval settings survive"
+  fi
 
   # The roster is the only source for the ADIF MY_* fields, so losing it
   # produces a restored log that no longer uploads correctly.
-  [[ "$(q "SELECT COUNT(*)||':'||COUNT(*) FILTER (WHERE approved)
-           FROM ses_operators o JOIN events e ON e.id=o.event_id WHERE e.join_code='$SES_NEW';")" == "2:1" ]] \
-    && ok "  operator roster survives with per-operator approval state" \
-    || no "  operator roster survives with per-operator approval state"
+  if [[ "$(q "SELECT COUNT(*)||':'||COUNT(*) FILTER (WHERE approved)
+           FROM ses_operators o JOIN events e ON e.id=o.event_id WHERE e.join_code='$SES_NEW';")" == "2:1" ]]; then
+    ok "  operator roster survives with per-operator approval state"
+  else
+    no "  operator roster survives with per-operator approval state"
+  fi
 
-  [[ "$(q "SELECT COALESCE(grid,'-')||'/'||COALESCE(state,'-')||'/'||COALESCE(county,'-')
+  if [[ "$(q "SELECT COALESCE(grid,'-')||'/'||COALESCE(state,'-')||'/'||COALESCE(county,'-')
            FROM ses_operators o JOIN events e ON e.id=o.event_id
-           WHERE e.join_code='$SES_NEW' AND o.op_call='W0AAA';")" == "EN34/MN/Hennepin" ]] \
-    && ok "  per-operator location survives (feeds ADIF MY_*)" \
-    || no "  per-operator location survives (feeds ADIF MY_*)"
+           WHERE e.join_code='$SES_NEW' AND o.op_call='W0AAA';")" == "EN34/MN/Hennepin" ]]; then
+    ok "  per-operator location survives (feeds ADIF MY_*)"
+  else
+    no "  per-operator location survives (feeds ADIF MY_*)"
+  fi
 
   # A tstzrange can't survive JSON intact, so it's decomposed and rebuilt.
-  [[ "$(q "SELECT ROUND(EXTRACT(EPOCH FROM (upper(during)-lower(during)))/60)::text
-           FROM ses_reservations r JOIN events e ON e.id=r.event_id WHERE e.join_code='$SES_NEW';")" == "120" ]] \
-    && ok "  reservation range rebuilt with the right span" \
-    || no "  reservation range rebuilt with the right span"
+  if [[ "$(q "SELECT ROUND(EXTRACT(EPOCH FROM (upper(during)-lower(during)))/60)::text
+           FROM ses_reservations r JOIN events e ON e.id=r.event_id WHERE e.join_code='$SES_NEW';")" == "120" ]]; then
+    ok "  reservation range rebuilt with the right span"
+  else
+    no "  reservation range rebuilt with the right span"
+  fi
 
-  [[ "$(q "SELECT COALESCE(rst_sent,'-')||'/'||COALESCE(rcvd_name,'-')||'/'||COALESCE(rcvd_section,'-')||'/'||COALESCE(freq_khz::text,'-')
-           FROM qsos q JOIN events e ON e.id=q.event_id WHERE e.join_code='$SES_NEW';")" == "59/Dave/MN/14250" ]] \
-    && ok "  SES QSO columns survive" \
-    || no "  SES QSO columns survive"
+  if [[ "$(q "SELECT COALESCE(rst_sent,'-')||'/'||COALESCE(rcvd_name,'-')||'/'||COALESCE(rcvd_section,'-')||'/'||COALESCE(freq_khz::text,'-')
+           FROM qsos q JOIN events e ON e.id=q.event_id WHERE e.join_code='$SES_NEW';")" == "59/Dave/MN/14250" ]]; then
+    ok "  SES QSO columns survive"
+  else
+    no "  SES QSO columns survive"
+  fi
 fi
 
 # ── Field Day (JSON-null SES arrays) ─────────────────────────────────────────
@@ -179,19 +178,23 @@ if [[ -z "$FD_NEW" ]]; then
   no "FD event restores (JSON-null ses arrays)"
 else
   ok "FD event restores as $FD_NEW"
-  [[ "$(q "SELECT class||'/'||arrl_section||'/'||power||'/'||(SELECT COUNT(*) FROM qsos q WHERE q.event_id=e.id)
-           FROM events e WHERE join_code='$FD_NEW';")" == "3A/MN/LOW/1" ]] \
-    && ok "  contest fields and QSOs survive" \
-    || no "  contest fields and QSOs survive"
+  if [[ "$(q "SELECT class||'/'||arrl_section||'/'||power||'/'||(SELECT COUNT(*) FROM qsos q WHERE q.event_id=e.id)
+           FROM events e WHERE join_code='$FD_NEW';")" == "3A/MN/LOW/1" ]]; then
+    ok "  contest fields and QSOs survive"
+  else
+    no "  contest fields and QSOs survive"
+  fi
 fi
 
 # ── Event with zero QSOs ─────────────────────────────────────────────────────
 NIL_UUID=$(q "SELECT id FROM events WHERE join_code='RTNIL';")
 backup "$NIL_UUID" "$WORK/nil.json"
 NIL_NEW=$(restore "$WORK/nil.json")
-[[ -n "$NIL_NEW" ]] \
-  && ok "event with zero QSOs restores (json_agg null scalar)" \
-  || no "event with zero QSOs restores (json_agg null scalar)"
+if [[ -n "$NIL_NEW" ]]; then
+  ok "event with zero QSOs restores (json_agg null scalar)"
+else
+  no "event with zero QSOs restores (json_agg null scalar)"
+fi
 
 echo "── cleanup ──"
 for c in RTSES RTFD RTNIL "$SES_NEW" "$FD_NEW" "$NIL_NEW"; do

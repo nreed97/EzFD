@@ -252,6 +252,11 @@ if ! sudo -u postgres psql -tAc "SELECT 1 FROM pg_database WHERE datname='ezfd'"
 fi
 
 # Apply base schema (CREATE TABLE IF NOT EXISTS, triggers — safe to re-run on fresh DB)
+# The input redirect is deliberately performed by *this* shell, not by the
+# sudo'd process: schema.sql lives in the repo checkout, which the deploying
+# user can read and the postgres user generally cannot. SC2024 warns about the
+# opposite case (a redirect needing the elevated user's privileges).
+# shellcheck disable=SC2024
 sudo -u postgres psql -d ezfd >/dev/null < "$REPO_DIR/db/schema.sql"
 log "Database schema applied"
 

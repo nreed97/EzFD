@@ -73,7 +73,7 @@ export default function EventJoinPage() {
     <div className="flex min-h-screen flex-col items-center justify-center gap-4">
       <p className="text-xl font-semibold text-red-400">Event not found</p>
       <p className="text-zinc-400">Code <span className="font-mono text-zinc-200">{code}</span> doesn&apos;t match any active event.</p>
-      <a href="/" className="text-amber-400 underline">Go back home</a>
+      <Link href="/" className="text-amber-400 underline">Go back home</Link>
     </div>
   );
   if (!event) return null;

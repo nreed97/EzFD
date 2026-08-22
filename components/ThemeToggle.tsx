@@ -1,17 +1,15 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useLightMode } from '@/lib/useLightMode';
 
 export default function ThemeToggle() {
-  const [light, setLight] = useState(false);
-
-  useEffect(() => {
-    setLight(document.documentElement.classList.contains('light'));
-  }, []);
+  // The class on <html> is the source of truth, not a copy of it in state:
+  // an inline script sets it before first paint to avoid a flash, so mirroring
+  // it into state meant rendering the wrong label once and then correcting.
+  const light = useLightMode();
 
   function toggle() {
     const next = !light;
-    setLight(next);
     if (next) {
       document.documentElement.classList.add('light');
       localStorage.setItem('ezfd_theme', 'light');
