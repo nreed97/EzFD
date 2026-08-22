@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ARRL_SECTIONS } from '@/lib/types';
+import type { EventType, SlotEnforcement, DupeRule } from '@/lib/types';
 
 const FD_CLASS_LETTERS = [
   { value: 'A', label: 'A — Club portable' },
@@ -22,7 +23,7 @@ const WFD_CLASS_LETTERS = [
 
 export default function NewEventPage() {
   const router = useRouter();
-  const [eventType, setEventType] = useState<'FD' | 'WFD'>('FD');
+  const [eventType, setEventType] = useState<EventType>('FD');
   const [power, setPower] = useState<'HIGH' | 'LOW' | 'QRP'>('HIGH');
   const [classNum, setClassNum] = useState(3);
   const [classLetter, setClassLetter] = useState('A');
@@ -38,6 +39,23 @@ export default function NewEventPage() {
   });
   const [useCallHistory, setUseCallHistory] = useState(false);
   const [useMasterCallsignFile, setUseMasterCallsignFile] = useState(false);
+  // Special event station settings — ignored for FD/WFD.
+  const [sesForm, setSesForm] = useState({
+    starts_at: '',
+    ends_at: '',
+    ses_description: '',
+    ses_qsl_info: '',
+  });
+  const [slotEnforcement, setSlotEnforcement] = useState<SlotEnforcement>('SOFT');
+  const [slotMinutes, setSlotMinutes] = useState(120);
+  const [dupeRule, setDupeRule] = useState<DupeRule>('DAY');
+  const [requireApproval, setRequireApproval] = useState(false);
+
+  const isSes = eventType === 'SES';
+
+  function setSes(key: keyof typeof sesForm, value: string) {
+    setSesForm(prev => ({ ...prev, [key]: value }));
+  }
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   // The event is created even when a call-database download fails; the API
@@ -67,6 +85,16 @@ export default function NewEventPage() {
         power,
         use_call_history: useCallHistory,
         use_master_callsign_file: useMasterCallsignFile,
+        // A datetime-local value has no timezone. Operators think in UTC
+        // during an event, so it's read as UTC rather than as browser-local.
+        starts_at: sesForm.starts_at ? `${sesForm.starts_at}:00Z` : null,
+        ends_at:   sesForm.ends_at   ? `${sesForm.ends_at}:00Z`   : null,
+        ses_description: sesForm.ses_description,
+        ses_qsl_info: sesForm.ses_qsl_info,
+        slot_enforcement: slotEnforcement,
+        slot_minutes: slotMinutes,
+        dupe_rule: dupeRule,
+        require_operator_approval: requireApproval,
       }),
     });
 
@@ -92,30 +120,34 @@ export default function NewEventPage() {
         &larr; Back
       </Link>
 
-      <h1 className="mb-6 text-3xl font-bold text-amber-400">Create Field Day Event</h1>
+      <h1 className="mb-6 text-3xl font-bold text-amber-400">
+        {isSes ? 'Create Special Event Station' : 'Create Field Day Event'}
+      </h1>
 
       <form onSubmit={handleSubmit} className="flex flex-col gap-5">
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
-          <h2 className="mb-4 font-semibold text-zinc-300 light:text-zinc-700">Club Info</h2>
+          <h2 className="mb-4 font-semibold text-zinc-300 light:text-zinc-700">
+            {isSes ? 'Station Info' : 'Club Info'}
+          </h2>
           <div className="flex flex-col gap-3">
             <label className="flex flex-col gap-1">
-              <span className="text-sm text-zinc-400">Club Name</span>
+              <span className="text-sm text-zinc-400">{isSes ? 'Event Name' : 'Club Name'}</span>
               <input
                 required
                 value={form.club_name}
                 onChange={e => set('club_name', e.target.value)}
-                placeholder="Anytown Amateur Radio Club"
+                placeholder={isSes ? 'Lighthouse Weekend 2026' : 'Anytown Amateur Radio Club'}
                 className="input"
               />
             </label>
             <div className="flex gap-3">
               <label className="flex flex-1 flex-col gap-1">
-                <span className="text-sm text-zinc-400">Club Callsign</span>
+                <span className="text-sm text-zinc-400">{isSes ? 'Special Event Callsign' : 'Club Callsign'}</span>
                 <input
                   required
                   value={form.club_call}
                   onChange={e => set('club_call', e.target.value.toUpperCase())}
-                  placeholder="W0NY"
+                  placeholder={isSes ? 'W9X' : 'W0NY'}
                   className="input font-mono tracking-widest"
                 />
               </label>
@@ -140,25 +172,89 @@ export default function NewEventPage() {
             <fieldset className="flex flex-col gap-1">
               <span className="text-sm text-zinc-400">Event Type</span>
               <div className="flex gap-2">
-                {(['FD', 'WFD'] as const).map(type => (
+                {(['FD', 'WFD', 'SES'] as const).map(type => (
                   <button
                     key={type}
                     type="button"
                     onClick={() => {
                       setEventType(type);
-                      setClassLetter(type === 'WFD' ? 'H' : 'A');
+                      if (type !== 'SES') setClassLetter(type === 'WFD' ? 'H' : 'A');
+                      // FD/WFD require a section; an SES defaults to none.
+                      set('arrl_section', type === 'SES' ? '' : 'EPA');
+                      // Contest dupes are once per event; a special event may
+                      // run for weeks, where working someone again on another
+                      // day is normal.
+                      setDupeRule(type === 'SES' ? 'DAY' : 'EVENT');
                     }}
-                    className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
+                    className={`flex-1 rounded-lg border py-2 text-xs font-semibold transition-colors ${
                       eventType === type
                         ? 'border-amber-400 bg-amber-400/10 text-amber-400'
                         : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 light:border-zinc-300 light:text-zinc-600'
                     }`}
                   >
-                    {type === 'FD' ? 'ARRL Field Day' : 'Winter Field Day'}
+                    {type === 'FD' ? 'ARRL Field Day' : type === 'WFD' ? 'Winter Field Day' : 'Special Event'}
                   </button>
                 ))}
               </div>
             </fieldset>
+            {isSes ? (
+              <>
+                <div className="flex flex-col gap-3 sm:flex-row">
+                  <label className="flex flex-1 flex-col gap-1">
+                    <span className="text-sm text-zinc-400">Starts (UTC)</span>
+                    <input
+                      type="datetime-local"
+                      value={sesForm.starts_at}
+                      onChange={e => setSes('starts_at', e.target.value)}
+                      className="input"
+                    />
+                  </label>
+                  <label className="flex flex-1 flex-col gap-1">
+                    <span className="text-sm text-zinc-400">Ends (UTC)</span>
+                    <input
+                      type="datetime-local"
+                      value={sesForm.ends_at}
+                      onChange={e => setSes('ends_at', e.target.value)}
+                      className="input"
+                    />
+                  </label>
+                </div>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-zinc-400">Description (optional)</span>
+                  <input
+                    value={sesForm.ses_description}
+                    onChange={e => setSes('ses_description', e.target.value)}
+                    placeholder="Commemorating the 150th anniversary of ..."
+                    className="input"
+                  />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-zinc-400">ARRL Section (optional)</span>
+                  <select
+                    value={form.arrl_section}
+                    onChange={e => set('arrl_section', e.target.value)}
+                    className="input"
+                  >
+                    <option value="">&mdash; none &mdash;</option>
+                    {ARRL_SECTIONS.map(sec => <option key={sec} value={sec}>{sec}</option>)}
+                  </select>
+                  <span className="text-xs text-zinc-500">
+                    Not required &mdash; special events often run outside Field Day
+                    entirely. Set it if your operators trade sections; it becomes
+                    MY_ARRL_SECT in the exported ADIF.
+                  </span>
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-zinc-400">QSL Info (optional)</span>
+                  <input
+                    value={sesForm.ses_qsl_info}
+                    onChange={e => setSes('ses_qsl_info', e.target.value)}
+                    placeholder="QSL via LoTW, or SASE to ..."
+                    className="input"
+                  />
+                </label>
+              </>
+            ) : (
             <div className="flex flex-col gap-3 sm:flex-row">
               <fieldset className="flex flex-1 flex-col gap-1">
                 <span className="text-sm text-zinc-400">{eventType === 'WFD' ? 'WFD' : 'FD'} Class</span>
@@ -191,7 +287,9 @@ export default function NewEventPage() {
                 </select>
               </label>
             </div>
-            <fieldset className="flex flex-col gap-1">
+            )}
+            {/* Power category only affects the ARRL score multiplier. */}
+            <fieldset className={`flex flex-col gap-1 ${isSes ? 'hidden' : ''}`}>
               <span className="text-sm text-zinc-400">Power Category</span>
               <div className="flex gap-2">
                 {(['HIGH', 'LOW', 'QRP'] as const).map(p => (
@@ -218,15 +316,112 @@ export default function NewEventPage() {
                 placeholder="City Park, Anytown PA"
                 className="input"
               />
+              {isSes && (
+                <span className="text-xs text-zinc-500">
+                  A nominal location for the event. Each operator sets their own
+                  grid and state on the roster — that&apos;s what lands in the ADIF
+                  MY_ fields, since a distributed activation has one location per
+                  operator rather than one per event.
+                </span>
+              )}
             </label>
           </div>
         </div>
+
+        {/* Coordination — SES only */}
+        {isSes && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
+            <h2 className="mb-1 font-semibold text-zinc-300 light:text-zinc-700">Call Coordination</h2>
+            <p className="mb-4 text-xs text-zinc-500">
+              Operators check the callsign out for a band and mode. The database
+              refuses overlapping checkouts, so two stations can&apos;t be signing
+              the same call on the same band and mode at once.
+            </p>
+            <div className="flex flex-col gap-3">
+              <fieldset className="flex flex-col gap-1">
+                <span className="text-sm text-zinc-400">Enforcement</span>
+                <div className="flex gap-2">
+                  {([
+                    ['SOFT', 'Warn only'],
+                    ['HARD', 'Block logging'],
+                  ] as const).map(([value, label]) => (
+                    <button
+                      key={value}
+                      type="button"
+                      onClick={() => setSlotEnforcement(value)}
+                      className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
+                        slotEnforcement === value
+                          ? 'border-amber-400 bg-amber-400/10 text-amber-400'
+                          : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 light:border-zinc-300 light:text-zinc-600'
+                      }`}
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <span className="text-xs text-zinc-500">
+                  {slotEnforcement === 'SOFT'
+                    ? 'Logging a QSO without holding the band/mode shows a warning but still records the contact — recommended, since refusing a contact that already happened on the air loses real data.'
+                    : 'Logging is refused unless the operator holds the band/mode. QSOs replayed from the offline queue are always accepted regardless.'}
+                </span>
+              </fieldset>
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <label className="flex flex-1 flex-col gap-1">
+                  <span className="text-sm text-zinc-400">Default slot length</span>
+                  <select
+                    value={slotMinutes}
+                    onChange={e => setSlotMinutes(Number(e.target.value))}
+                    className="input"
+                  >
+                    {[30, 60, 120, 180, 240].map(m => (
+                      <option key={m} value={m}>{m >= 60 ? `${m / 60} hour${m > 60 ? 's' : ''}` : `${m} minutes`}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="flex flex-1 flex-col gap-1">
+                  <span className="text-sm text-zinc-400">Duplicate rule</span>
+                  <select
+                    value={dupeRule}
+                    onChange={e => setDupeRule(e.target.value as DupeRule)}
+                    className="input"
+                  >
+                    <option value="DAY">Once per band/mode per day</option>
+                    <option value="EVENT">Once per band/mode for the whole event</option>
+                    <option value="NONE">Never flag duplicates</option>
+                  </select>
+                </label>
+              </div>
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={requireApproval}
+                  onChange={e => setRequireApproval(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm text-zinc-300 light:text-zinc-700">
+                    Require operator approval
+                  </span>
+                  <span className="block text-xs text-zinc-500">
+                    Off by default, matching Field Day: anyone with the join code can
+                    log. Turn this on and a new operator lands in the roster as
+                    pending and can&apos;t log until you approve them in
+                    <code className="mx-1 rounded bg-zinc-800 px-1 light:bg-zinc-200">ezfd-admin.sh</code>
+                    &mdash; worth it when a shared special event callsign is at stake.
+                  </span>
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-5 light:border-zinc-200 light:bg-zinc-50">
           <h2 className="mb-1 font-semibold text-zinc-300 light:text-zinc-700">Call Databases (optional)</h2>
           <p className="mb-4 text-xs text-zinc-500">Downloaded once when the event is created and used to prefill/verify callsigns during logging.</p>
           <div className="flex flex-col gap-3">
-            <label className="flex items-start gap-2">
+            {/* The N1MM call history file is a contest exchange database
+                (a station's usual class and section) — nothing for an SES. */}
+            <label className={`flex items-start gap-2 ${isSes ? 'hidden' : ''}`}>
               <input
                 type="checkbox"
                 checked={useCallHistory}

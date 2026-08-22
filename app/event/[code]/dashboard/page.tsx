@@ -1,4 +1,5 @@
 import { getPool } from '@/lib/db';
+import { EVENT_COLUMNS } from '@/lib/events';
 import DashboardClient from '@/components/DashboardClient';
 import { redirect } from 'next/navigation';
 
@@ -14,9 +15,7 @@ export default async function DashboardPage({
   const pool = getPool();
 
   const { rows: evRows } = await pool.query(
-    `SELECT id, join_code, club_name, club_call, event_year, class, arrl_section,
-            event_type, power, location, qrz_username, bonuses, created_at
-     FROM events WHERE join_code=$1`,
+    `SELECT ${EVENT_COLUMNS} FROM events WHERE join_code=$1`,
     [code.toUpperCase()]
   );
   if (!evRows[0]) redirect('/');

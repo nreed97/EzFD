@@ -138,3 +138,177 @@ BEGIN
   END IF;
 END
 $$;
+
+-- ---------------------------------------------------------------------------
+-- Special Event Station (SES) support — event_type = 'SES'
+--
+-- An SES is a distributed activation: many operators, in many different
+-- physical locations, all signing one callsign over a date range. That breaks
+-- three assumptions FD/WFD baked in:
+--   1. class/arrl_section are meaningless (there is no contest exchange),
+--   2. there is one site (so one MY_GRIDSQUARE) — there are N,
+--   3. two ops on the same band+mode is a soft warning — here it is two
+--      stations transmitting as the same callsign at once.
+-- ---------------------------------------------------------------------------
+
+-- An SES has no contest exchange, so these can't stay NOT NULL. Every read
+-- path that used to assume they're present now has to null-guard.
+ALTER TABLE events ALTER COLUMN class        DROP NOT NULL;
+ALTER TABLE events ALTER COLUMN arrl_section DROP NOT NULL;
+
+-- SES runs over an arbitrary date range, not a fixed contest weekend.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS starts_at        TIMESTAMPTZ;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS ends_at          TIMESTAMPTZ;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS ses_description  TEXT;
+ALTER TABLE events ADD COLUMN IF NOT EXISTS ses_qsl_info     TEXT;
+-- SOFT: log the QSO and warn.  HARD: refuse it (offline replays always bypass).
+ALTER TABLE events ADD COLUMN IF NOT EXISTS slot_enforcement TEXT NOT NULL DEFAULT 'SOFT';
+ALTER TABLE events ADD COLUMN IF NOT EXISTS slot_minutes     INTEGER NOT NULL DEFAULT 120;
+-- EVENT: once per band/mode for the whole event (the FD rule).
+-- DAY:   once per band/mode per UTC day (sane for a multi-week SES).
+-- NONE:  never flag a dupe.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS dupe_rule        TEXT NOT NULL DEFAULT 'EVENT';
+-- Opt-in. Off by default so an existing event's behaviour is unchanged: the
+-- join code stays the only gate unless a coordinator asks for more. When on,
+-- an operator joining lands in the roster as unapproved and cannot log until
+-- someone approves them in ezfd-admin.sh.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS require_operator_approval BOOLEAN NOT NULL DEFAULT FALSE;
+
+-- ---------------------------------------------------------------------------
+-- SES operator roster — per-operator station identity.
+--
+-- LoTW signs by station callsign *and* location, so a distributed SES has to
+-- carry each operator's own grid/state/county through to the ADIF MY_* fields.
+-- Taking these from events.location (one site) would produce a log that
+-- doesn't upload cleanly.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS ses_operators (
+  event_id   UUID    NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  op_call    TEXT    NOT NULL,
+  op_name    TEXT,
+  grid       TEXT,
+  state      TEXT,
+  county     TEXT,
+  dxcc       INTEGER,
+  approved   BOOLEAN NOT NULL DEFAULT TRUE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  PRIMARY KEY (event_id, op_call)
+);
+
+-- ---------------------------------------------------------------------------
+-- SES call checkout — one holder per (band, mode) at a time.
+--
+-- The overlap rule is enforced by an exclusion constraint rather than an
+-- app-level check-then-insert, which would race between two operators
+-- claiming the same slot at the same moment. A collision surfaces as
+-- SQLSTATE 23P01 (exclusion_violation) and the API maps it to a 409.
+--
+-- btree_gist is what allows the plain `=` comparisons on uuid/text to sit
+-- alongside the `&&` range overlap test inside a single GiST index.
+--
+-- Granularity is deliberately (band, mode) and must stay that way: special
+-- event rules generally permit one signal per band per mode, so a finer
+-- frequency-level slot would let the database bless something the rules
+-- forbid. Operators who want to note a planned frequency use planned_freq,
+-- which is free text and intentionally carries no exclusivity.
+-- ---------------------------------------------------------------------------
+CREATE EXTENSION IF NOT EXISTS btree_gist;
+
+CREATE TABLE IF NOT EXISTS ses_reservations (
+  id         UUID        PRIMARY KEY DEFAULT gen_random_uuid(),
+  event_id   UUID        NOT NULL REFERENCES events(id) ON DELETE CASCADE,
+  op_call    TEXT        NOT NULL,
+  band       TEXT        NOT NULL,
+  mode       TEXT        NOT NULL,
+  during     TSTZRANGE   NOT NULL,
+  planned_freq TEXT,
+  note       TEXT,
+  status     TEXT        NOT NULL DEFAULT 'RESERVED',   -- RESERVED | RELEASED
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  CONSTRAINT ses_no_overlap EXCLUDE USING gist (
+    event_id WITH =,
+    band     WITH =,
+    mode     WITH =,
+    during   WITH &&
+  ) WHERE (status <> 'RELEASED')
+);
+
+-- The constraint above is declared inline in CREATE TABLE, which Postgres
+-- skips entirely once the table exists — so re-applying this file would not
+-- restore the constraint if it were ever dropped, or if the table were
+-- created by a partial earlier run. deploy.sh and ezfd-admin.sh both re-apply
+-- schema.sql as the repair path, so it has to be able to heal this: without
+-- the guard below, the one invariant the whole feature rests on could stay
+-- silently missing while every migration reported success.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT FROM pg_constraint
+    WHERE conname = 'ses_no_overlap'
+      AND conrelid = 'ses_reservations'::regclass
+  ) THEN
+    ALTER TABLE ses_reservations ADD CONSTRAINT ses_no_overlap EXCLUDE USING gist (
+      event_id WITH =,
+      band     WITH =,
+      mode     WITH =,
+      during   WITH &&
+    ) WHERE (status <> 'RELEASED');
+  END IF;
+END
+$$;
+
+CREATE INDEX IF NOT EXISTS ses_res_event_idx ON ses_reservations(event_id, during);
+CREATE INDEX IF NOT EXISTS ses_res_op_idx    ON ses_reservations(event_id, op_call);
+
+-- ---------------------------------------------------------------------------
+-- SES exchange fields on qsos. All nullable — FD/WFD ignore them entirely,
+-- and ADIF export gets richer for every event type for free.
+--
+-- Note adif_mode is deliberately a *separate* column rather than widening the
+-- qsos.mode CHECK: scoring, dupe detection and the band/mode UI all rely on
+-- the three-way PH/CW/DIG split, while ADIF export needs to emit the real
+-- submode (FT8, RTTY, PSK31...).
+-- ---------------------------------------------------------------------------
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS rst_sent   TEXT;
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS rst_rcvd   TEXT;
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS rcvd_name  TEXT;
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS rcvd_qth   TEXT;
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS rcvd_grid  TEXT;
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS comment    TEXT;
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS adif_mode  TEXT;
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS freq_khz   INTEGER;
+
+-- ---------------------------------------------------------------------------
+-- pg_notify trigger for reservations — clients LISTEN on "ses_<event_id>"
+-- alongside the existing "qsos_<event_id>" channel, so the coordination grid
+-- is live rather than polled.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION notify_ses_reservation_change()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  rec  RECORD;
+  chan TEXT;
+BEGIN
+  rec  := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+  chan := 'ses_' || rec.event_id::text;
+  PERFORM pg_notify(chan, json_build_object('op', TG_OP, 'record', row_to_json(rec))::text);
+  RETURN rec;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS ses_reservation_notify ON ses_reservations;
+CREATE TRIGGER ses_reservation_notify
+  AFTER INSERT OR UPDATE OR DELETE ON ses_reservations
+  FOR EACH ROW EXECUTE FUNCTION notify_ses_reservation_change();
+
+-- ---------------------------------------------------------------------------
+-- Grants — the ezfd role gets DML only; postgres owns the tables.
+-- Without this every SES query fails with "permission denied" at runtime.
+-- ---------------------------------------------------------------------------
+DO $$
+BEGIN
+  IF EXISTS (SELECT FROM pg_roles WHERE rolname = 'ezfd') THEN
+    GRANT SELECT, INSERT, UPDATE, DELETE ON ses_operators, ses_reservations TO ezfd;
+  END IF;
+END
+$$;

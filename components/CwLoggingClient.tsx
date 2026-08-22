@@ -41,7 +41,9 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
   const rig = useRigBridge({ onBand: setCurrentBand, onMode: setCurrentMode });
 
   const getFormValues = useCallback(
-    () => formRef.current?.getValues() ?? { callsign: '', rcvdClass: '', rcvdSection: '' },
+    () => formRef.current?.getValues() ?? {
+      callsign: '', rcvdClass: '', rcvdSection: '', rstSent: '', rstRcvd: '', rcvdName: '',
+    },
     []
   );
 
@@ -136,6 +138,7 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
           ref={formRef}
           eventId={event.id}
           eventType={event.event_type}
+          dupeRule={event.dupe_rule}
           hasQRZ={!!event.qrz_username}
           hasCallHistory={!!event.use_call_history}
           hasMasterCall={!!event.use_master_callsign_file}

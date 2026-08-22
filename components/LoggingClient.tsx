@@ -6,7 +6,9 @@ import { calculateScore } from '@/lib/scoring';
 import { useRigBridge } from '@/lib/useRigBridge';
 import { enqueue, dequeue, loadQueue, type PendingQSO } from '@/lib/offline-queue';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
+import type { QSOSubmission } from './QSOForm';
 import QSOForm from './QSOForm';
+import SesCoordination from './SesCoordination';
 import QSOTable from './QSOTable';
 import Scoreboard from './Scoreboard';
 import BandActivity from './BandActivity';
@@ -22,9 +24,12 @@ interface Props {
   initialQSOs: QSO[];
   operatorCall: string;
   stationNumber: number;
+  /** SES with roster approval on, and this operator isn't approved yet.
+   *  The server rejects their QSOs; this is the up-front warning. */
+  approvalPending?: boolean;
 }
 
-function pendingToDisplay(p: PendingQSO, sentClass: string, sentSection: string): DisplayQSO {
+function pendingToDisplay(p: PendingQSO, sentClass: string | null, sentSection: string | null): DisplayQSO {
   return {
     id: p.local_id,
     event_id: p.event_id,
@@ -40,12 +45,28 @@ function pendingToDisplay(p: PendingQSO, sentClass: string, sentSection: string)
     station_number: p.station_number,
     is_dupe: false,
     created_at: p.submitted_at,
+    rst_sent: p.rst_sent ?? null,
+    rst_rcvd: p.rst_rcvd ?? null,
+    rcvd_name: p.rcvd_name ?? null,
+    rcvd_qth: p.rcvd_qth ?? null,
+    rcvd_grid: p.rcvd_grid ?? null,
+    comment: p.comment ?? null,
+    adif_mode: null,
+    freq_khz: null,
     _pending: true,
     _local_id: p.local_id,
   };
 }
 
-async function submitQSOToServer(eventId: string, pending: PendingQSO): Promise<{ qso: QSO | null; error?: string }> {
+/** `replay` marks a QSO coming back off the offline queue. The server always
+ *  accepts those, bypassing the SES band/mode gate: by reconnect time the slot
+ *  has expired, and a contact that already happened on the air must never be
+ *  dropped because the network blipped. */
+async function submitQSOToServer(
+  eventId: string,
+  pending: PendingQSO,
+  replay = false,
+): Promise<{ qso: QSO | null; error?: string; warning?: string }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -62,13 +83,21 @@ async function submitQSOToServer(eventId: string, pending: PendingQSO): Promise<
         rcvd_section: pending.rcvd_section,
         operator_call: pending.operator_call,
         station_number: pending.station_number,
+        rst_sent: pending.rst_sent,
+        rst_rcvd: pending.rst_rcvd,
+        rcvd_name: pending.rcvd_name,
+        rcvd_qth: pending.rcvd_qth,
+        rcvd_grid: pending.rcvd_grid,
+        comment: pending.comment,
+        replay,
       }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({})) as { error?: string };
       return { qso: null, error: body.error ?? `Server error ${res.status}` };
     }
-    return { qso: await res.json() };
+    const qso = await res.json() as QSO & { slot_warning?: string };
+    return { qso, warning: qso.slot_warning };
   } catch (err) {
     const msg = err instanceof Error ? err.message : 'Network error';
     return { qso: null, error: msg.includes('abort') ? 'Request timed out' : msg };
@@ -77,7 +106,7 @@ async function submitQSOToServer(eventId: string, pending: PendingQSO): Promise<
   }
 }
 
-export default function LoggingClient({ event, initialQSOs, operatorCall, stationNumber }: Props) {
+export default function LoggingClient({ event, initialQSOs, operatorCall, stationNumber, approvalPending = false }: Props) {
   const router = useRouter();
   const [confirmedQSOs, setConfirmedQSOs] = useState<QSO[]>(initialQSOs);
   const [pendingQSOs, setPendingQSOs] = useState<DisplayQSO[]>([]);
@@ -96,7 +125,16 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [bandConflict, setBandConflict] = useState(false);
   const [bandOccupancy, setBandOccupancy] = useState<Partial<Record<Band, string[]>>>({});
   const [showRigHelp, setShowRigHelp] = useState(false);
+  // SES: advisory notice when a QSO was logged on a band/mode this operator
+  // hasn't checked out. Under SOFT enforcement the QSO is still logged.
+  const [slotWarning, setSlotWarning] = useState<string | null>(null);
+  const [holdsSlot, setHoldsSlot] = useState(false);
+  // Bumped on each SSE reservation event so SesCoordination refetches without
+  // opening a second EventSource for the same event.
+  const [reservationVersion, setReservationVersion] = useState(0);
   const syncingRef = useRef(false);
+
+  const isSes = event.event_type === 'SES';
 
   const rig = useRigBridge({ onBand: setCurrentBand, onMode: setCurrentMode });
   const rigConnected = rig.connected;
@@ -138,6 +176,11 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       }
     });
 
+    // Call checkouts arrive on the same stream (the realtime route LISTENs on
+    // both channels). The payload carries the raw range column rather than the
+    // decomposed timestamps the UI wants, so this just signals "refetch".
+    es.addEventListener('reservation', () => setReservationVersion(v => v + 1));
+
     es.onerror = () => {
       // Browser will auto-reconnect for SSE; errors here are transient
     };
@@ -149,8 +192,12 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     if (syncingRef.current) return;
     syncingRef.current = true;
     for (const pending of loadQueue(event.id)) {
-      const result = await submitQSOToServer(event.id, pending);
-      if (!result) break;
+      // replay=true — the server accepts these unconditionally.
+      const result = await submitQSOToServer(event.id, pending, true);
+      // Only drop the queued copy once the server has actually taken it.
+      // Checking the wrapper object here instead of result.qso meant a failed
+      // submit still dequeued, silently losing the contact.
+      if (!result.qso) break;
       dequeue(event.id, pending.local_id);
       setPendingQSOs(prev => prev.filter(p => p._local_id !== pending.local_id));
       setPendingCount(prev => Math.max(0, prev - 1));
@@ -170,21 +217,26 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     };
   }, [flushQueue]);
 
-  const logQSO = useCallback(async (data: {
-    callsign: string; band: Band; mode: Mode;
-    rcvd_class: string; rcvd_section: string;
-  }) => {
+  const logQSO = useCallback(async (data: QSOSubmission) => {
     setSubmitting(true);
     setSubmitError(null);
+    setSlotWarning(null);
     try {
-      const pending = enqueue(event.id, { ...data, operator_call: operatorCall, station_number: stationNumber });
+      const pending = enqueue(event.id, {
+        ...data,
+        rcvd_class: data.rcvd_class,
+        rcvd_section: data.rcvd_section,
+        operator_call: operatorCall,
+        station_number: stationNumber,
+      });
       const display = pendingToDisplay(pending, event.class, event.arrl_section);
       setPendingQSOs(prev => [display, ...prev]);
       setPendingCount(prev => prev + 1);
       setLastLogged(display);
 
       if (navigator.onLine) {
-        const { qso, error } = await submitQSOToServer(event.id, pending);
+        const { qso, error, warning } = await submitQSOToServer(event.id, pending);
+        if (warning) setSlotWarning(warning);
         if (qso) {
           dequeue(event.id, pending.local_id);
           setPendingQSOs(prev => prev.filter(p => p._local_id !== pending.local_id));
@@ -200,6 +252,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       setSubmitting(false);
     }
   }, [event.id, event.class, event.arrl_section, operatorCall, stationNumber]);
+
+  const handleHoldingChange = useCallback((holding: boolean) => setHoldsSlot(holding), []);
 
   const updateQSO = useCallback((updated: QSO) => {
     setConfirmedQSOs(prev => prev.map(q => q.id === updated.id ? updated : q));
@@ -222,13 +276,23 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   ];
   const score = calculateScore(confirmedQSOs, {}, event.power);
 
+  // Most recent confirmed QSO by this operator — SesCoordination auto-extends
+  // a slot only for someone actually working the band.
+  const myLastQsoAt = confirmedQSOs.reduce<string | null>((latest, q) => {
+    if (q.operator_call !== operatorCall) return latest;
+    const iso = typeof q.datetime_utc === 'string' ? q.datetime_utc : q.datetime_utc.toISOString();
+    return !latest || iso > latest ? iso : latest;
+  }, null);
+
   return (
     <div data-night={nightMode ? 'true' : undefined} className="night-scope flex h-screen flex-col overflow-hidden bg-zinc-950 light:bg-white">
       <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-2 flex-shrink-0 light:border-zinc-200 light:bg-zinc-50">
         <div className="flex items-center gap-3 min-w-0">
           <span className="font-bold text-amber-400 text-lg shrink-0">{event.club_call}</span>
           <span className="text-zinc-600 hidden sm:inline">|</span>
-          <span className="text-zinc-300 text-sm shrink-0 hidden sm:inline">{event.class} · {event.arrl_section}</span>
+          <span className="text-zinc-300 text-sm shrink-0 hidden sm:inline">
+            {isSes ? 'Special Event' : `${event.class} · ${event.arrl_section}`}
+          </span>
           {event.location && (
             <span className="text-zinc-500 text-sm truncate hidden lg:block">{event.location}</span>
           )}
@@ -263,12 +327,17 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             </button>
           )}
           <span className="text-zinc-600 hidden sm:inline">|</span>
+          {/* A special event station has no contest score — just a QSO count. */}
           <span className="text-zinc-400 hidden sm:inline light:text-zinc-500">
             <span className="text-zinc-200 font-mono font-bold light:text-zinc-800">{score.valid_qsos}</span>
             <span className="text-zinc-600 mx-1">Q</span>
-            <span className="text-zinc-200 font-mono font-bold light:text-zinc-800">{score.sections_worked}</span>
-            <span className="text-zinc-600 mx-1">×</span>
-            <span className="text-amber-400 font-mono font-bold">{score.total_score.toLocaleString()}</span>
+            {!isSes && (
+              <>
+                <span className="text-zinc-200 font-mono font-bold light:text-zinc-800">{score.sections_worked}</span>
+                <span className="text-zinc-600 mx-1">×</span>
+                <span className="text-amber-400 font-mono font-bold">{score.total_score.toLocaleString()}</span>
+              </>
+            )}
           </span>
 
           {!isOnline && (
@@ -326,10 +395,13 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
               className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
               ADIF
             </a>
-            <a href={`/api/export/${event.join_code}?format=cabrillo`}
-              className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
-              Cabrillo
-            </a>
+            {/* Cabrillo is a contest submission format — nothing to submit for an SES. */}
+            {!isSes && (
+              <a href={`/api/export/${event.join_code}?format=cabrillo`}
+                className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
+                Cabrillo
+              </a>
+            )}
           </div>
         </div>
       </header>
@@ -340,9 +412,13 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           <span className="font-mono text-xs text-zinc-400 light:text-zinc-600">
             <span className="text-zinc-200 font-bold light:text-zinc-800">{score.valid_qsos}</span>
             <span className="text-zinc-600 mx-1">Q</span>
-            <span className="text-zinc-200 font-bold light:text-zinc-800">{score.sections_worked}</span>
-            <span className="text-zinc-600 mx-1">×</span>
-            <span className="text-amber-400 font-bold">{score.total_score.toLocaleString()}</span>
+            {!isSes && (
+              <>
+                <span className="text-zinc-200 font-bold light:text-zinc-800">{score.sections_worked}</span>
+                <span className="text-zinc-600 mx-1">×</span>
+                <span className="text-amber-400 font-bold">{score.total_score.toLocaleString()}</span>
+              </>
+            )}
           </span>
           <div className="flex items-center gap-2">
             <ThemeToggle />
@@ -391,15 +467,39 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
       <div className="flex flex-1 overflow-hidden">
         <aside className={`${mobileTab === 'log' ? 'flex' : 'hidden'} md:flex w-full md:w-80 flex-col gap-3 overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-4 shrink-0 light:border-zinc-200 light:bg-zinc-50`}>
-          {bandConflict && (
+          {/* For an SES the checkout panel is authoritative about who may
+              transmit, so the presence-based conflict warning would just be
+              noise on top of it. */}
+          {bandConflict && !isSes && (
             <div className="flex items-center gap-2 rounded-lg border border-yellow-600 bg-yellow-900/30 px-3 py-2 text-xs text-yellow-400">
               <span className="text-base">⚠</span>
               <span>Another station is on <strong>{currentBand} {currentMode}</strong> — band conflict!</span>
             </div>
           )}
+          {approvalPending && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-700 bg-red-900/30 px-3 py-2 text-xs text-red-400">
+              <span className="text-base leading-none">⛔</span>
+              <span>
+                <strong>{operatorCall}</strong> isn&apos;t approved to operate this event yet.
+                QSOs will be refused until the coordinator approves you.
+              </span>
+            </div>
+          )}
+          {isSes && slotWarning && (
+            <div className="flex items-start gap-2 rounded-lg border border-yellow-600 bg-yellow-900/30 px-3 py-2 text-xs text-yellow-400">
+              <span className="text-base leading-none">⚠</span>
+              <span>{slotWarning} The QSO was logged anyway.</span>
+            </div>
+          )}
+          {isSes && !holdsSlot && !slotWarning && (
+            <div className="rounded-lg border border-zinc-700 bg-zinc-800/40 px-3 py-2 text-xs text-zinc-400 light:border-zinc-300 light:bg-zinc-100 light:text-zinc-600">
+              You haven&apos;t checked out <strong>{currentBand} {currentMode}</strong> — check it out below before calling.
+            </div>
+          )}
           <QSOForm
             eventId={event.id}
             eventType={event.event_type}
+            dupeRule={event.dupe_rule}
             hasQRZ={!!event.qrz_username}
             hasCallHistory={!!event.use_call_history}
             hasMasterCall={!!event.use_master_callsign_file}
@@ -415,6 +515,18 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             existingQSOs={confirmedQSOs}
             bandOccupancy={bandOccupancy}
           />
+          {isSes && (
+            <SesCoordination
+              eventId={event.id}
+              myOpCall={operatorCall}
+              currentBand={currentBand}
+              currentMode={currentMode}
+              slotMinutes={event.slot_minutes ?? 120}
+              refreshToken={reservationVersion}
+              lastQsoAt={myLastQsoAt}
+              onHoldingChange={handleHoldingChange}
+            />
+          )}
           <BandActivity
             eventId={event.id}
             myOpCall={operatorCall}
@@ -427,14 +539,19 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             rigConnected={rigConnected}
             onRigHelp={() => setShowRigHelp(true)}
           />
-          <Scoreboard score={score} />
-          <button
-            type="button"
-            onClick={() => setShowNeeds(true)}
-            className="w-full rounded-lg border border-zinc-700 py-2 text-xs font-semibold text-zinc-400 hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
-          >
-            Sections Needed ({Math.max(0, 84 - score.sections_worked)})
-          </button>
+          {/* Contest scoring and section chasing don't apply to an SES. */}
+          {!isSes && (
+            <>
+              <Scoreboard score={score} />
+              <button
+                type="button"
+                onClick={() => setShowNeeds(true)}
+                className="w-full rounded-lg border border-zinc-700 py-2 text-xs font-semibold text-zinc-400 hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
+              >
+                Sections Needed ({Math.max(0, 84 - score.sections_worked)})
+              </button>
+            </>
+          )}
         </aside>
 
         <main className={`${mobileTab === 'qsos' ? 'flex flex-col' : 'hidden'} md:flex md:flex-col flex-1 overflow-hidden`}>

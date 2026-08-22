@@ -14,6 +14,8 @@ A real-time, multi-operator ARRL Field Day and Winter Field Day logging applicat
 | **Offline tolerance** | QSOs are written to `localStorage` first and synced when connectivity restores — nothing is lost on a flaky WiFi link |
 | **ESM-style Enter navigation** | Enter in Callsign → focuses Rcvd Class → focuses Rcvd Section → logs QSO; matches N1MM+/ESM workflow. Tab loops Section back to Callsign instead of continuing into other controls |
 | **Field Day + Winter Field Day** | Supports both ARRL FD (classes A–F) and Winter Field Day (classes H/O/I); class letters validated per event type |
+| **Special Event Stations (SES)** | Third event type for a distributed activation of one callsign — no contest exchange, no score, and per-operator station locations. See [Special Event Stations](#special-event-stations) |
+| **Call checkout / band coordination** | SES operators check the shared callsign out for a band+mode window. A PostgreSQL exclusion constraint makes overlapping checkouts impossible, so two stations can't sign the same call on the same band and mode at once |
 | **Power category** | Events configured as HIGH / LOW (≤150 W) / QRP (≤5 W); affects scoring multiplier (×1 / ×2 / ×5) |
 | **Band activity panel** | See which band/mode each station is currently using; conflict banner when two stations select the same band/mode. Inactive operators (idle >15 min) are excluded from conflict checks and greyed out |
 | **Go QRT** | Manually remove yourself from the presence list — the band opens back up for others immediately instead of waiting for the inactivity timeout |
@@ -27,7 +29,7 @@ A real-time, multi-operator ARRL Field Day and Winter Field Day logging applicat
 | **QRZ callsign lookup** | Auto-fills name and state from QRZ.com XML API using a shared club account (optional); credentials encrypted at rest with AES-256-GCM |
 | **N1MM call history lookup** | Optionally downloads the current year's N1MM FD/WFD call history file at event creation; prefills a known station's class/section while logging |
 | **Master callsign file (MASTER.SCP)** | Optionally downloads the Super Check Partial callsign list; flags recognized calls during logging. Shared across all events on the server, refreshed at most once a day |
-| **Dupe checking** | Server-side duplicate detection (same callsign + band + mode); dupes are logged, flagged, and excluded from scoring |
+| **Dupe checking** | Server-side duplicate detection (same callsign + band + mode); dupes are logged, flagged, and excluded from scoring. Configurable per event: once per event (contest rule), once per UTC day (sensible for a multi-week SES), or never |
 | **QSO editing** | Edit any logged QSO inline; dupe status is re-evaluated automatically |
 | **Bonus point tracker** | Track all 17 ARRL Field Day bonus categories including emergency power (doubles base score), GOTA, W1AW, satellite, youth ops, and more |
 | **Live scoring** | Correct ARRL formula: QSO points × power multiplier + bonus points — updated in real time |
@@ -305,6 +307,91 @@ Two export buttons appear in both the logger header and the dashboard:
 
 Both exports include only non-duplicate QSOs, sorted chronologically.
 
+The ADIF export also accepts filters, which the SES workflow relies on:
+
+| Query parameter | Effect |
+|---|---|
+| `?op=W1BBB` | Only that operator's QSOs — so each operator can upload their own contacts to their own LoTW account. The filename gains the callsign (`W9X_SES2026_W1BBB.adi`) |
+| `?from=2026-06-01&to=2026-06-08` | Only QSOs in that UTC window — one weekend out of a multi-week special event |
+
+Cabrillo is a contest submission format, so it is unavailable for SES events (the
+button is hidden, and the endpoint returns 400).
+
+---
+
+## Special Event Stations
+
+Set **Event Type → Special Event** when creating an event. An SES is a
+distributed activation: many operators, in many different places, all signing
+one callsign over a date range. That differs from Field Day in three ways the
+app has to respect.
+
+**There is no contest exchange or score.** Class and section are stored as
+NULL, the Rcvd Class/Section fields are replaced by RST sent/received, name,
+QTH, grid and comment, and the scoring, bonus, section-multiplier and Cabrillo
+UI is hidden. The dashboard shows a QSO total and rate instead of a score.
+
+**Each operator has their own location.** LoTW signs by station callsign *and*
+location, so operators enter their own grid and state when they join. Those
+become the `MY_GRIDSQUARE` / `MY_STATE` / `MY_CNTY` on the contacts they
+personally made, while `STATION_CALLSIGN` stays the special event call and
+`OPERATOR` records who was at the key. Taking the location from the event
+instead would stamp every operator's QSOs with the same wrong location and
+produce a log that doesn't upload cleanly.
+
+**Two operators must not sign the call on the same band and mode at once.**
+Special event rules generally permit one signal per band per mode, which is
+exactly the granularity the checkout enforces.
+Operators check the call out for a band/mode window from the **Call Checkout**
+panel. Overlap isn't checked in application code — it's prevented by a
+PostgreSQL `EXCLUDE USING gist` constraint on `ses_reservations`, so two
+operators clicking at the same instant can't both win. The loser gets a 409
+naming the current holder.
+
+### Checkout behaviour
+
+| Action | Effect |
+|---|---|
+| **Check out** | Claims `band + mode` for the chosen length (default set per event). Rejected if anyone already holds that band/mode for an overlapping window |
+| **+15 min** | Extends the slot. Rejected if someone else already holds the window you'd extend into — the constraint protects the next holder |
+| **Release** | Frees the slot immediately rather than at its nominal end. The row is kept so the record of who had the call survives |
+| **Auto-extend** | A slot within 10 minutes of expiring is extended automatically — but only for an operator who has logged a QSO in the last 15 minutes, so a forgotten browser tab can't hold the callsign indefinitely |
+
+### Enforcement
+
+Set per event:
+
+- **Warn only** (default) — logging a QSO on a band/mode you don't hold shows a
+  warning but still records the contact. Recommended: refusing to log a
+  contact that already happened on the air loses real data, which is worse
+  than an overlap warning.
+- **Block logging** — the QSO is refused with a 409.
+
+QSOs replayed from the offline queue bypass both settings unconditionally. By
+the time a browser reconnects the slot has certainly expired, and a network
+blip must never cost a real contact.
+
+### Operator roster
+
+Operators enter their own grid and state when they join, and those feed the
+ADIF `MY_*` fields on the contacts they personally make. A coordinator can
+review and correct the roster from **ezfd-admin.sh → open event → Manage
+operator roster**, which also lists who is currently on the air.
+
+Turning on **Require operator approval** at event creation (off by default,
+matching Field Day) puts a newly-joining operator into the roster as *pending*
+— they see a warning banner and the server refuses their QSOs until a
+coordinator approves them in the admin console. As with the checkout gate,
+QSOs replayed from the offline queue are always accepted.
+
+### Merging offline logs
+
+Operators who logged in N1MM or N3FJP can merge via **Import ADIF**. Records
+already present — matched on callsign, band, mode and a ±2 minute window — are
+skipped rather than inserted, so re-importing the same file, or two operators
+importing overlapping exports, can't double the log. The import result reports
+them separately as "already in log".
+
 ---
 
 ## Admin Console
@@ -435,6 +522,34 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+### Tests
+
+CI runs these on every push and pull request; all four also run locally
+against any database with `db/schema.sql` applied.
+
+```bash
+# The AGENTS.md gate — both must be clean before finishing a change
+npx tsc --noEmit
+npm run build
+
+# The SES one-signal-per-band-per-mode guarantee lives in a database
+# constraint, so it's asserted against a real database
+psql -d ezfd -v ON_ERROR_STOP=1 -f db/test-ses-constraint.sql
+
+# Route SQL is built as strings, which the typechecker can't see into
+DATABASE_URL=postgres://localhost/ezfd node scripts/test-queries.cjs
+
+# ezfd-admin.sh's backup/restore, round-tripped for SES, FD and empty events
+PSQL="psql -h localhost -U postgres" bash scripts/test-restore.sh
+
+# End-to-end against a running server
+BASE_URL=http://localhost:3000 bash scripts/test-e2e.sh
+```
+
+`scripts/test-restore.sh` extracts the restore SQL from `ezfd-admin.sh`
+rather than copying it, so the test exercises the real code and cannot
+drift away from it.
 
 ### Project Structure
 

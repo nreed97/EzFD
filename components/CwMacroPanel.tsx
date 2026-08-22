@@ -6,6 +6,9 @@ interface FormValues {
   callsign: string;
   rcvdClass: string;
   rcvdSection: string;
+  rstSent: string;
+  rstRcvd: string;
+  rcvdName: string;
 }
 
 export type OpMode = 'RUN' | 'S&P';
@@ -24,8 +27,9 @@ interface Props {
   onStop: () => void;
   getFormValues: () => FormValues;
   myCall: string;
-  eventClass: string;
-  eventSection: string;
+  /** null for a special event station, which sends no contest exchange. */
+  eventClass: string | null;
+  eventSection: string | null;
   storageKey: string;
   cwError?: string | null;
   esm: boolean;
@@ -78,15 +82,26 @@ interface Store {
   autoCqSeconds: number;
 }
 
-function expand(text: string, values: FormValues, myCall: string, eventClass: string, eventSection: string): string {
+function expand(
+  text: string,
+  values: FormValues,
+  myCall: string,
+  eventClass: string | null,
+  eventSection: string | null,
+): string {
+  // A special event station has no class or section to send, so {exch} falls
+  // back to the signal report — which is what its operators actually send.
+  const contestExchange = `${eventClass ?? ''} ${eventSection ?? ''}`.trim();
   return text
     .replace(/\{call\}/gi, values.callsign)
     .replace(/\{class\}/gi, values.rcvdClass)
     .replace(/\{section\}/gi, values.rcvdSection)
+    .replace(/\{rst\}/gi, values.rstSent)
+    .replace(/\{name\}/gi, values.rcvdName)
     .replace(/\{mycall\}/gi, myCall)
-    .replace(/\{myclass\}/gi, eventClass)
-    .replace(/\{mysection\}/gi, eventSection)
-    .replace(/\{exch\}/gi, `${eventClass} ${eventSection}`.trim());
+    .replace(/\{myclass\}/gi, eventClass ?? '')
+    .replace(/\{mysection\}/gi, eventSection ?? '')
+    .replace(/\{exch\}/gi, contestExchange || values.rstSent);
 }
 
 function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, eventSection, storageKey, cwError, esm, onToggleEsm }: Props, ref: React.Ref<CwMacroPanelHandle>) {
@@ -438,7 +453,7 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
       </div>
       <p className="text-xs text-zinc-600 light:text-zinc-500">
         {editMode
-          ? 'Editing — placeholders: {call} {class} {section} {mycall} {exch}'
+          ? 'Editing — placeholders: {call} {class} {section} {rst} {name} {mycall} {exch}'
           : 'Click or press F1-F12 to send · Space bar or Escape stops instantly'}
       </p>
 

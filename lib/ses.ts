@@ -1,0 +1,153 @@
+import type { Pool } from 'pg';
+import type { Band, Mode, SesReservation, SlotEnforcement } from './types';
+
+/** Postgres raises this when an EXCLUDE constraint rejects a row. For
+ *  ses_reservations it means another operator already holds that band/mode
+ *  for an overlapping window — see the ses_no_overlap constraint. */
+export const EXCLUSION_VIOLATION = '23P01';
+
+/** How far ahead the coordination grid looks for upcoming slots. */
+export const UPCOMING_WINDOW_HOURS = 48;
+
+/** Reservations are stored as a single TSTZRANGE so the exclusion constraint
+ *  can test overlap directly; clients want two plain timestamps instead. */
+export const RESERVATION_COLUMNS = `
+  id, event_id, op_call, band, mode, planned_freq, note, status, created_at,
+  lower(during) AS starts_at,
+  upper(during) AS ends_at
+`;
+
+/** pg returns TIMESTAMPTZ as a JS Date, not a string, so interpolating a
+ *  reservation bound straight into a message yields the full
+ *  "Sat Aug 22 2026 02:24:29 GMT+0000 (...)" form. Operators read UTC. */
+export function formatSlotEnd(value: string | Date | null): string {
+  if (!value) return 'further notice';
+  const d = value instanceof Date ? value : new Date(value);
+  if (isNaN(d.getTime())) return 'further notice';
+  return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}Z`;
+}
+
+export interface SesEventConfig {
+  id: string;
+  join_code: string;
+  event_type: string;
+  slot_enforcement: SlotEnforcement;
+  slot_minutes: number;
+  dupe_rule: string;
+}
+
+/** Resolve an event by either id or join code. Callers accept both because
+ *  the WSJT-X bridge and offline queue submit by join code. */
+export async function loadEvent(
+  pool: Pool,
+  { event_id, join_code }: { event_id?: string; join_code?: string }
+): Promise<SesEventConfig | null> {
+  const { rows } = join_code
+    ? await pool.query(
+        `SELECT id, join_code, event_type, slot_enforcement, slot_minutes, dupe_rule
+         FROM events WHERE join_code = $1`,
+        [join_code.toUpperCase()]
+      )
+    : await pool.query(
+        `SELECT id, join_code, event_type, slot_enforcement, slot_minutes, dupe_rule
+         FROM events WHERE id = $1`,
+        [event_id]
+      );
+  return rows[0] ?? null;
+}
+
+/** The reservation covering (band, mode) right now, if any. */
+export async function currentHolder(
+  pool: Pool,
+  eventId: string,
+  band: Band | string,
+  mode: Mode | string
+): Promise<SesReservation | null> {
+  const { rows } = await pool.query(
+    `SELECT ${RESERVATION_COLUMNS}
+     FROM ses_reservations
+     WHERE event_id = $1 AND band = $2 AND mode = $3
+       AND status <> 'RELEASED'
+       AND during @> NOW()
+     LIMIT 1`,
+    [eventId, band, mode]
+  );
+  return rows[0] ?? null;
+}
+
+/** Whichever reservation overlaps the given window — used to explain a 409
+ *  after the exclusion constraint has already rejected the insert. */
+export async function overlappingHolder(
+  pool: Pool,
+  eventId: string,
+  band: Band | string,
+  mode: Mode | string,
+  startsAt: Date,
+  endsAt: Date
+): Promise<SesReservation | null> {
+  const { rows } = await pool.query(
+    `SELECT ${RESERVATION_COLUMNS}
+     FROM ses_reservations
+     WHERE event_id = $1 AND band = $2 AND mode = $3
+       AND status <> 'RELEASED'
+       AND during && tstzrange($4, $5, '[)')
+     ORDER BY lower(during) ASC
+     LIMIT 1`,
+    [eventId, band, mode, startsAt, endsAt]
+  );
+  return rows[0] ?? null;
+}
+
+/** Whether an operator is cleared to log on a gated event.
+ *
+ *  Returns true when the event doesn't require approval at all, so callers
+ *  can call this unconditionally. An operator with no roster row on a gated
+ *  event is not approved — they have to be added and approved first. */
+export async function isOperatorApproved(
+  pool: Pool,
+  eventId: string,
+  opCall: string
+): Promise<boolean> {
+  const { rows } = await pool.query(
+    'SELECT approved FROM ses_operators WHERE event_id=$1 AND op_call=$2',
+    [eventId, opCall.toUpperCase().trim()]
+  );
+  return rows[0]?.approved === true;
+}
+
+export interface SlotCheck {
+  /** True when this operator may transmit on (band, mode) right now. */
+  ok: boolean;
+  /** Set when someone *else* holds the slot. */
+  heldBy?: string;
+  /** Human-readable reason, surfaced to the operator either as a warning
+   *  (SOFT enforcement) or as the 409 error body (HARD). */
+  reason?: string;
+}
+
+/** Check whether an operator holds the call for a band/mode.
+ *
+ *  Note this is only ever advisory input to the caller: under SOFT
+ *  enforcement the QSO is logged anyway, and replayed QSOs from the offline
+ *  queue skip the check entirely. A contact that already happened on the air
+ *  must always make it into the log. */
+export async function checkSlot(
+  pool: Pool,
+  eventId: string,
+  opCall: string,
+  band: Band | string,
+  mode: Mode | string
+): Promise<SlotCheck> {
+  const holder = await currentHolder(pool, eventId, band, mode);
+  if (!holder) {
+    return { ok: false, reason: `Nobody has checked out ${band} ${mode} right now.` };
+  }
+  if (holder.op_call !== opCall.toUpperCase().trim()) {
+    return {
+      ok: false,
+      heldBy: holder.op_call,
+      reason: `${holder.op_call} holds ${band} ${mode} until ${formatSlotEnd(holder.ends_at)}.`,
+    };
+  }
+  return { ok: true };
+}

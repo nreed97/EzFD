@@ -39,6 +39,8 @@ if [[ "${1:-}" == "--json" ]]; then
         e.id, e.join_code, e.club_name, e.club_call, e.event_year,
         e.class, e.arrl_section, e.event_type, e.power, e.location,
         e.bonuses, e.created_at,
+        e.starts_at, e.ends_at, e.ses_description, e.ses_qsl_info,
+        e.slot_enforcement, e.slot_minutes, e.dupe_rule, e.require_operator_approval,
         (SELECT COUNT(*) FROM qsos q WHERE q.event_id = e.id AND NOT q.is_dupe) AS qso_count,
         (SELECT COUNT(*) FROM qsos q WHERE q.event_id = e.id AND     q.is_dupe) AS dupe_count,
         (SELECT json_agg(DISTINCT q.operator_call ORDER BY q.operator_call)
@@ -46,7 +48,20 @@ if [[ "${1:-}" == "--json" ]]; then
         ) AS operators,
         (SELECT json_agg(row_to_json(q) ORDER BY q.datetime_utc)
            FROM qsos q WHERE q.event_id = e.id
-        ) AS qsos
+        ) AS qsos,
+        -- The SES roster carries each operator's own grid/state, which is
+        -- what the ADIF MY_* fields are built from. Omitting it from a dump
+        -- would make the backup silently lossy for special event stations.
+        (SELECT json_agg(row_to_json(o) ORDER BY o.op_call)
+           FROM ses_operators o WHERE o.event_id = e.id
+        ) AS ses_operators,
+        (SELECT json_agg(json_build_object(
+                  'op_call', r.op_call, 'band', r.band, 'mode', r.mode,
+                  'starts_at', lower(r.during), 'ends_at', upper(r.during),
+                  'planned_freq', r.planned_freq, 'note', r.note,
+                  'status', r.status, 'created_at', r.created_at) ORDER BY lower(r.during))
+           FROM ses_reservations r WHERE r.event_id = e.id
+        ) AS ses_reservations
       FROM events e ORDER BY e.created_at
     ) t;"
   exit 0
@@ -97,7 +112,12 @@ fetch_events() {
   PG -c "
     SELECT
       e.join_code, e.club_name, e.club_call, e.event_year,
-      e.class, e.arrl_section, e.event_type, e.power,
+      -- An SES has no class or power category; show a dash rather than an
+      -- empty column, and mark a gated roster so it's visible at a glance.
+      COALESCE(NULLIF(e.class,''), CASE WHEN e.event_type='SES' THEN '—' ELSE '?' END),
+      COALESCE(e.arrl_section,'—'),
+      e.event_type,
+      CASE WHEN e.event_type='SES' THEN '—' ELSE e.power END,
       COALESCE(e.location,''),
       e.created_at::date,
       COUNT(q.id) FILTER (WHERE NOT q.is_dupe)  AS qsos,
@@ -125,20 +145,81 @@ view_event() {
   fi
 
   # Header row
-  local row; row=$(PG -c "
-    SELECT club_name, club_call, event_year, class, arrl_section,
-           event_type, power, COALESCE(location,''), created_at::date
+  local row=""; row=$(PG -c "
+    SELECT club_name, club_call, event_year, COALESCE(class,''), COALESCE(arrl_section,''),
+           event_type, power, COALESCE(location,''), created_at::date,
+           COALESCE(to_char(starts_at,'YYYY-MM-DD HH24:MI'),''),
+           COALESCE(to_char(ends_at,'YYYY-MM-DD HH24:MI'),''),
+           COALESCE(ses_description,''), COALESCE(ses_qsl_info,''),
+           slot_enforcement, slot_minutes, dupe_rule, require_operator_approval
     FROM events WHERE id='$uuid';" 2>/dev/null)
-  IFS='|' read -r club_name club_call year class section etype power location created <<< "$row"
+  local club_name="" club_call="" year="" class="" section="" etype="" power="" location="" created=""
+  local starts="" ends="" ses_desc="" ses_qsl="" enforce="" slotmin="" duperule="" reqappr=""
+  IFS='|' read -r club_name club_call year class section etype power location created \
+                  starts ends ses_desc ses_qsl enforce slotmin duperule reqappr <<< "$row"
 
   echo -e "  ${BOLD}${CYAN}${code}${NC}  ${BOLD}${club_name}${NC} ${DIM}(${club_call})${NC}"
   hr
-  label "Type / Power:";   echo "${etype}  ·  ${power}"
-  label "Class / Section:"; echo "${class}  ·  ${section}"
+  if [[ "$etype" == "SES" ]]; then
+    # A special event station has no contest class or power category, so
+    # printing them would just be two empty fields.
+    label "Type:";           echo "Special Event Station"
+    [[ -n "$section" ]] && { label "ARRL Section:"; echo "$section"; }
+    [[ -n "$ses_desc" ]] && { label "Description:"; echo "$ses_desc"; }
+    [[ -n "$starts" || -n "$ends" ]] && {
+      label "Runs (UTC):"; echo "${starts:-?}  →  ${ends:-?}"; }
+    label "Checkout:";       echo "${enforce}  ·  ${slotmin} min default"
+    label "Dupe rule:";      echo "$duperule"
+    if [[ "$reqappr" == "t" ]]; then
+      label "Operator gate:"; echo -e "${YELLOW}approval required${NC}"
+    else
+      label "Operator gate:"; echo "join code only"
+    fi
+    [[ -n "$ses_qsl" ]] && { label "QSL info:"; echo "$ses_qsl"; }
+  else
+    label "Type / Power:";   echo "${etype}  ·  ${power}"
+    label "Class / Section:"; echo "${class}  ·  ${section}"
+    label "Dupe rule:";      echo "$duperule"
+  fi
   label "Year / Created:"; echo "${year}  ·  ${created}"
   [[ -n "$location" ]] && { label "Location:"; echo "$location"; }
   label "Event UUID:";     echo -e "${DIM}${uuid}${NC}"
   echo
+
+  # SES roster — who may operate, and the locations the ADIF MY_* fields use.
+  if [[ "$etype" == "SES" ]]; then
+    local roster=""; roster=$(PG -c "
+      SELECT op_call, COALESCE(grid,'-'), COALESCE(state,'-'), approved
+      FROM ses_operators WHERE event_id='$uuid' ORDER BY op_call;" 2>/dev/null)
+    if [[ -n "$roster" ]]; then
+      echo -e "  ${BOLD}Operator roster${NC}"
+      local rc="" rg="" rs="" ra=""
+      while IFS='|' read -r rc rg rs ra; do
+        [[ -z "$rc" ]] && continue
+        if [[ "$ra" == "t" ]]; then
+          printf "    ${GREEN}%-10s${NC} %-8s %-4s ${DIM}approved${NC}\n" "$rc" "$rg" "$rs"
+        else
+          printf "    ${YELLOW}%-10s${NC} %-8s %-4s ${YELLOW}pending${NC}\n" "$rc" "$rg" "$rs"
+        fi
+      done <<< "$roster"
+      echo
+    fi
+
+    local live=""; live=$(PG -c "
+      SELECT op_call, band, mode, to_char(upper(during),'HH24:MI')
+      FROM ses_reservations
+      WHERE event_id='$uuid' AND status <> 'RELEASED' AND during @> NOW()
+      ORDER BY band, mode;" 2>/dev/null)
+    if [[ -n "$live" ]]; then
+      echo -e "  ${BOLD}On the air now${NC}"
+      local lc="" lb="" lm="" lu=""
+      while IFS='|' read -r lc lb lm lu; do
+        [[ -z "$lc" ]] && continue
+        printf "    ${CYAN}%-10s${NC} %-6s %-4s ${DIM}until %sZ${NC}\n" "$lc" "$lb" "$lm" "$lu"
+      done <<< "$live"
+      echo
+    fi
+  fi
 
   # Stats
   local stats; stats=$(PG -c "
@@ -197,11 +278,18 @@ view_event() {
   echo -e "  ${BOLD}Actions:${NC}"
   echo
   local choice=""
+  local settings_label="Edit event settings (power / class / section)"
+  local roster_label="Manage operator roster (SES only — not applicable)"
+  if [[ "$etype" == "SES" ]]; then
+    settings_label="Edit event settings (checkout / dupes / approval)"
+    roster_label="Manage operator roster (approve / revoke / locations)"
+  fi
   menu_pick choice \
     "Export QSOs to CSV  (/tmp/qsos_${code}.csv)" \
     "Export full backup (JSON → /tmp/ezfd_${code}_backup.json)" \
     "Change join code" \
-    "Edit event settings (power / class / section)" \
+    "$settings_label" \
+    "$roster_label" \
     "Clear all dupes (mark as non-dupe)" \
     "Delete ALL QSOs for this event" \
     "Delete this event entirely" \
@@ -221,7 +309,15 @@ view_event() {
        PG -c "
          SELECT row_to_json(t) FROM (
            SELECT e.*,
-             (SELECT json_agg(row_to_json(q) ORDER BY q.datetime_utc) FROM qsos q WHERE q.event_id=e.id) AS qsos
+             (SELECT json_agg(row_to_json(q) ORDER BY q.datetime_utc) FROM qsos q WHERE q.event_id=e.id) AS qsos,
+             (SELECT json_agg(row_to_json(o) ORDER BY o.op_call)
+                FROM ses_operators o WHERE o.event_id=e.id) AS ses_operators,
+             (SELECT json_agg(json_build_object(
+                       'op_call', r.op_call, 'band', r.band, 'mode', r.mode,
+                       'starts_at', lower(r.during), 'ends_at', upper(r.during),
+                       'planned_freq', r.planned_freq, 'note', r.note,
+                       'status', r.status, 'created_at', r.created_at) ORDER BY lower(r.during))
+                FROM ses_reservations r WHERE r.event_id=e.id) AS ses_reservations
            FROM events e WHERE e.id='$uuid'
          ) t;" > "$file"
        log "Backup written to ${file}"
@@ -247,9 +343,72 @@ view_event() {
        echo -e "  ${DIM}Leave a field blank to keep the current value.${NC}"
        echo
 
-       local cur_power cur_class cur_section
+       if [[ "$etype" == "SES" ]]; then
+         local cur_enf="" cur_slot="" cur_dupe="" cur_appr=""
+         IFS='|' read -r cur_enf cur_slot cur_dupe cur_appr < <(PG -c \
+           "SELECT slot_enforcement, slot_minutes, dupe_rule, require_operator_approval
+            FROM events WHERE id='$uuid';" 2>/dev/null)
+
+         printf "  Current checkout enforcement: ${BOLD}%s${NC}\n" "$cur_enf"
+         echo -e "  ${DIM}SOFT = warn but still log · HARD = refuse the QSO${NC}"
+         local new_enf=""
+         read -rp "$(echo -e "  New enforcement [Enter to keep]: ")" new_enf
+         new_enf="${new_enf^^}"
+         if [[ -n "$new_enf" ]]; then
+           if [[ "$new_enf" == "SOFT" || "$new_enf" == "HARD" ]]; then
+             PG -c "UPDATE events SET slot_enforcement='$new_enf' WHERE id='$uuid';" >/dev/null
+             log "Enforcement updated: ${cur_enf} → ${new_enf}"
+           else
+             warn "Invalid — must be SOFT or HARD. Skipping."
+           fi
+         fi
+         echo
+
+         printf "  Current default slot length: ${BOLD}%s${NC} min\n" "$cur_slot"
+         local new_slot=""
+         read -rp "$(echo -e "  New slot minutes [Enter to keep]: ")" new_slot
+         if [[ -n "$new_slot" ]]; then
+           if [[ "$new_slot" =~ ^[0-9]+$ ]] && [[ "$new_slot" -ge 5 ]] && [[ "$new_slot" -le 1440 ]]; then
+             PG -c "UPDATE events SET slot_minutes=$new_slot WHERE id='$uuid';" >/dev/null
+             log "Slot length updated: ${cur_slot} → ${new_slot} min"
+           else
+             warn "Invalid — expected 5–1440. Skipping."
+           fi
+         fi
+         echo
+
+         printf "  Current dupe rule: ${BOLD}%s${NC}\n" "$cur_dupe"
+         echo -e "  ${DIM}EVENT = once per band/mode all event · DAY = once per UTC day · NONE${NC}"
+         local new_dupe=""
+         read -rp "$(echo -e "  New dupe rule [Enter to keep]: ")" new_dupe
+         new_dupe="${new_dupe^^}"
+         if [[ -n "$new_dupe" ]]; then
+           if [[ "$new_dupe" == "EVENT" || "$new_dupe" == "DAY" || "$new_dupe" == "NONE" ]]; then
+             PG -c "UPDATE events SET dupe_rule='$new_dupe' WHERE id='$uuid';" >/dev/null
+             log "Dupe rule updated: ${cur_dupe} → ${new_dupe}"
+           else
+             warn "Invalid — must be EVENT, DAY, or NONE. Skipping."
+           fi
+         fi
+         echo
+
+         if [[ "$cur_appr" == "t" ]]; then
+           echo -e "  Operator approval is ${BOLD}required${NC}."
+         else
+           echo -e "  Operator approval is ${BOLD}not required${NC} (join code only)."
+         fi
+         local new_appr=""
+         read -rp "$(echo -e "  Toggle approval requirement? [y/N]: ")" new_appr
+         if [[ "$new_appr" =~ ^[Yy]$ ]]; then
+           PG -c "UPDATE events SET require_operator_approval = NOT require_operator_approval WHERE id='$uuid';" >/dev/null
+           log "Operator approval requirement toggled."
+         fi
+         pause; return
+       fi
+
+       local cur_power="" cur_class="" cur_section=""
        IFS='|' read -r cur_power cur_class cur_section < <(PG -c \
-         "SELECT power, class, arrl_section FROM events WHERE id='$uuid';" 2>/dev/null)
+         "SELECT power, COALESCE(class,''), COALESCE(arrl_section,'') FROM events WHERE id='$uuid';" 2>/dev/null)
 
        # Power
        printf "  Current power: ${BOLD}%s${NC}\n" "$cur_power"
@@ -298,7 +457,86 @@ view_event() {
        fi
        pause ;;
 
-    5) # Clear dupes
+    5) # Manage the SES operator roster
+       if [[ "$etype" != "SES" ]]; then
+         warn "The operator roster only applies to special event stations."
+         pause; return
+       fi
+       echo
+       echo -e "  ${BOLD}Operator roster for ${CYAN}${code}${NC}"
+       echo -e "  ${DIM}Grid and state here become the ADIF MY_* fields on that${NC}"
+       echo -e "  ${DIM}operator's own contacts, so they're per-operator, not per-event.${NC}"
+       echo
+       local rlist=""; rlist=$(PG -c "
+         SELECT op_call, COALESCE(grid,'-'), COALESCE(state,'-'), approved
+         FROM ses_operators WHERE event_id='$uuid' ORDER BY op_call;" 2>/dev/null)
+       if [[ -z "$rlist" ]]; then
+         warn "No operators have joined this event yet."
+         pause; return
+       fi
+       local rc="" rg="" rs="" ra=""
+       while IFS='|' read -r rc rg rs ra; do
+         [[ -z "$rc" ]] && continue
+         if [[ "$ra" == "t" ]]; then
+           printf "    ${GREEN}%-10s${NC} grid %-8s state %-4s ${DIM}approved${NC}\n" "$rc" "$rg" "$rs"
+         else
+           printf "    ${YELLOW}%-10s${NC} grid %-8s state %-4s ${YELLOW}pending${NC}\n" "$rc" "$rg" "$rs"
+         fi
+       done <<< "$rlist"
+       echo
+       local target=""
+       read -rp "$(echo -e "  Operator callsign to change [Enter to cancel]: ")" target
+       target="${target^^}"
+       if [[ -z "$target" ]]; then
+         warn "Cancelled."; pause; return
+       fi
+       local exists=""; exists=$(PG -c \
+         "SELECT 1 FROM ses_operators WHERE event_id='$uuid' AND op_call='$target';" 2>/dev/null)
+       if [[ -z "$exists" ]]; then
+         err "${target} is not on this event's roster."; pause; return
+       fi
+
+       local racts=""
+       menu_pick racts \
+         "Toggle approval (approved / pending)" \
+         "Set grid square" \
+         "Set state" \
+         "Remove from roster" \
+         "← Back"
+       case "$racts" in
+         1) PG -c "UPDATE ses_operators SET approved = NOT approved
+                   WHERE event_id='$uuid' AND op_call='$target';" >/dev/null
+            log "Approval toggled for ${target}." ;;
+         2) local g=""
+            read -rp "$(echo -e "  New grid for ${target}: ")" g
+            g="${g^^}"
+            if [[ "$g" =~ ^[A-Z]{2}[0-9]{2}([A-Z]{2})?$ ]]; then
+              PG -c "UPDATE ses_operators SET grid='$g' WHERE event_id='$uuid' AND op_call='$target';" >/dev/null
+              log "Grid set to ${g} for ${target}."
+            else
+              warn "Invalid grid (expected e.g. EN34 or EN34kl). Skipping."
+            fi ;;
+         3) local st=""
+            read -rp "$(echo -e "  New state for ${target}: ")" st
+            st="${st^^}"
+            if [[ "$st" =~ ^[A-Z]{2,3}$ ]]; then
+              PG -c "UPDATE ses_operators SET state='$st' WHERE event_id='$uuid' AND op_call='$target';" >/dev/null
+              log "State set to ${st} for ${target}."
+            else
+              warn "Invalid state. Skipping."
+            fi ;;
+         4) # Their QSOs are deliberately left alone — removing someone from
+            # the roster revokes access, it does not erase contacts they made.
+            if confirm_danger "This removes ${target} from the roster for ${code}. Their logged QSOs are kept."; then
+              PG -c "DELETE FROM ses_operators WHERE event_id='$uuid' AND op_call='$target';" >/dev/null
+              log "${target} removed from the roster."
+            else
+              warn "Cancelled."
+            fi ;;
+       esac
+       pause ;;
+
+    6) # Clear dupes
        local n; n=$(PG -c "SELECT COUNT(*) FROM qsos WHERE event_id='$uuid' AND is_dupe;" 2>/dev/null)
        if [[ "$n" == "0" ]]; then
          warn "No dupes to clear."; pause; return
@@ -311,7 +549,7 @@ view_event() {
        fi
        pause ;;
 
-    6) # Delete all QSOs
+    7) # Delete all QSOs
        local n; n=$(PG -c "SELECT COUNT(*) FROM qsos WHERE event_id='$uuid';" 2>/dev/null)
        if confirm_danger "This will permanently delete ALL ${n} QSOs for event ${code}."; then
          PG -c "DELETE FROM qsos WHERE event_id='$uuid';" >/dev/null
@@ -321,7 +559,7 @@ view_event() {
        fi
        pause ;;
 
-    7) # Delete event
+    8) # Delete event
        if confirm_danger "This will permanently delete event ${code} AND all its QSOs."; then
          PG -c "DELETE FROM events WHERE id='$uuid';" >/dev/null
          log "Event ${code} deleted."
@@ -331,7 +569,7 @@ view_event() {
          warn "Cancelled."; pause
        fi ;;
 
-    8) return 0 ;;
+    9) return 0 ;;
   esac
 
   # Re-show detail after action (unless deleted)
@@ -361,6 +599,8 @@ list_events() {
 
     # Collect codes for selection
     local -a codes=()
+    local code="" name="" call="" year="" class="" section="" etype="" power=""
+    local location="" created="" qsos="" dupes="" ops=""
     while IFS='|' read -r code name call year class section etype power location created qsos dupes ops; do
       codes+=("$code")
       printf "  ${CYAN}%-8s${NC}  %-24s %-7s %-4s  %-5s  ${GREEN}%6s${NC}  ${YELLOW}%5s${NC}  %4s\n" \
@@ -553,6 +793,8 @@ restore_from_json() {
       raw jsonb;
       ev  jsonb;
       qso jsonb;
+      op  jsonb;
+      res jsonb;
       new_id uuid;
       new_code text;
       n int;
@@ -562,30 +804,49 @@ restore_from_json() {
         raw := jsonb_build_array(raw);
       END IF;
 
+      -- json_agg over zero rows yields JSON null — a scalar, not SQL NULL —
+      -- so COALESCE(...,'[]') does not catch it and jsonb_array_elements
+      -- then fails with "cannot extract elements from a scalar". Every list
+      -- below is therefore type-checked rather than COALESCEd.
       FOR ev IN SELECT * FROM jsonb_array_elements(raw) LOOP
         new_id := gen_random_uuid();
         new_code := upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
 
         INSERT INTO events (id, join_code, club_name, club_call, event_year, class, arrl_section,
                              location, qrz_username, qrz_password, qrz_session_key, qrz_session_expires,
-                             bonuses, event_type, power, created_at)
+                             bonuses, event_type, power, created_at,
+                             starts_at, ends_at, ses_description, ses_qsl_info,
+                             slot_enforcement, slot_minutes, dupe_rule, require_operator_approval)
         VALUES (
           new_id, new_code,
           COALESCE(ev->>'club_name',''), COALESCE(ev->>'club_call',''),
           COALESCE((ev->>'event_year')::int, EXTRACT(YEAR FROM NOW())::int),
-          COALESCE(ev->>'class',''), COALESCE(ev->>'arrl_section',''),
+          -- NULLIF, not COALESCE to '': a special event station stores NULL
+          -- here, and restoring it as an empty string would put a blank
+          -- MY_ARRL_SECT into every exported ADIF record.
+          NULLIF(ev->>'class',''), NULLIF(ev->>'arrl_section',''),
           ev->>'location', ev->>'qrz_username', ev->>'qrz_password', ev->>'qrz_session_key',
           NULLIF(ev->>'qrz_session_expires','')::timestamptz,
           COALESCE(ev->'bonuses','{}'::jsonb),
           COALESCE(ev->>'event_type','FD'),
           COALESCE(ev->>'power','HIGH'),
-          COALESCE(NULLIF(ev->>'created_at','')::timestamptz, NOW())
+          COALESCE(NULLIF(ev->>'created_at','')::timestamptz, NOW()),
+          NULLIF(ev->>'starts_at','')::timestamptz,
+          NULLIF(ev->>'ends_at','')::timestamptz,
+          ev->>'ses_description', ev->>'ses_qsl_info',
+          COALESCE(ev->>'slot_enforcement','SOFT'),
+          COALESCE((ev->>'slot_minutes')::int, 120),
+          COALESCE(ev->>'dupe_rule','EVENT'),
+          COALESCE((ev->>'require_operator_approval')::boolean, false)
         );
 
         n := 0;
-        FOR qso IN SELECT * FROM jsonb_array_elements(COALESCE(ev->'qsos','[]'::jsonb)) LOOP
+        FOR qso IN SELECT * FROM jsonb_array_elements(CASE WHEN jsonb_typeof(ev->'qsos') = 'array'
+                                        THEN ev->'qsos' ELSE '[]'::jsonb END) LOOP
           INSERT INTO qsos (id, event_id, callsign, band, mode, datetime_utc, sent_class, sent_section,
-                             rcvd_class, rcvd_section, operator_call, station_number, is_dupe, created_at)
+                             rcvd_class, rcvd_section, operator_call, station_number, is_dupe, created_at,
+                             rst_sent, rst_rcvd, rcvd_name, rcvd_qth, rcvd_grid, comment,
+                             adif_mode, freq_khz)
           VALUES (
             gen_random_uuid(), new_id,
             qso->>'callsign', qso->>'band', qso->>'mode',
@@ -594,9 +855,49 @@ restore_from_json() {
             qso->>'rcvd_class', qso->>'rcvd_section',
             qso->>'operator_call', COALESCE((qso->>'station_number')::int, 1),
             COALESCE((qso->>'is_dupe')::boolean, false),
-            COALESCE(NULLIF(qso->>'created_at','')::timestamptz, NOW())
+            COALESCE(NULLIF(qso->>'created_at','')::timestamptz, NOW()),
+            qso->>'rst_sent', qso->>'rst_rcvd', qso->>'rcvd_name',
+            qso->>'rcvd_qth', qso->>'rcvd_grid', qso->>'comment',
+            qso->>'adif_mode', NULLIF(qso->>'freq_khz','')::int
           );
           n := n + 1;
+        END LOOP;
+
+        -- The SES operator roster. Losing this would strip the per-operator
+        -- grid/state that the ADIF MY_* fields are built from, leaving a
+        -- restored special event log that no longer uploads correctly.
+        FOR op IN SELECT * FROM jsonb_array_elements(CASE WHEN jsonb_typeof(ev->'ses_operators') = 'array'
+                                        THEN ev->'ses_operators' ELSE '[]'::jsonb END) LOOP
+          INSERT INTO ses_operators (event_id, op_call, op_name, grid, state, county, dxcc, approved, created_at)
+          VALUES (
+            new_id, op->>'op_call', op->>'op_name', op->>'grid', op->>'state',
+            op->>'county', NULLIF(op->>'dxcc','')::int,
+            COALESCE((op->>'approved')::boolean, true),
+            COALESCE(NULLIF(op->>'created_at','')::timestamptz, NOW())
+          )
+          ON CONFLICT (event_id, op_call) DO NOTHING;
+        END LOOP;
+
+        -- Checkout history, rebuilt from the decomposed bounds the backup
+        -- stores (a tstzrange doesn't survive a JSON round-trip intact).
+        -- Skipped where a bound is missing rather than guessed at.
+        FOR res IN SELECT * FROM jsonb_array_elements(CASE WHEN jsonb_typeof(ev->'ses_reservations') = 'array'
+                                        THEN ev->'ses_reservations' ELSE '[]'::jsonb END) LOOP
+          CONTINUE WHEN NULLIF(res->>'starts_at','') IS NULL;
+          INSERT INTO ses_reservations (event_id, op_call, band, mode, during,
+                                        planned_freq, note, status, created_at)
+          VALUES (
+            new_id, res->>'op_call', res->>'band', res->>'mode',
+            tstzrange(
+              (res->>'starts_at')::timestamptz,
+              COALESCE(NULLIF(res->>'ends_at','')::timestamptz,
+                       (res->>'starts_at')::timestamptz + interval '2 hours'),
+              '[)'
+            ),
+            res->>'planned_freq', res->>'note',
+            COALESCE(res->>'status','RELEASED'),
+            COALESCE(NULLIF(res->>'created_at','')::timestamptz, NOW())
+          );
         END LOOP;
 
         INSERT INTO _restore_summary VALUES (ev->>'join_code', new_code, n);

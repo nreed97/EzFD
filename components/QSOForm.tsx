@@ -1,12 +1,37 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
-import type { Band, Mode, DisplayQSO, QSO } from '@/lib/types';
+import type { Band, Mode, DisplayQSO, QSO, EventType, DupeRule } from '@/lib/types';
 import { ARRL_SECTIONS } from '@/lib/types';
 
 export interface QSOFormHandle {
-  getValues: () => { callsign: string; rcvdClass: string; rcvdSection: string };
+  getValues: () => {
+    callsign: string;
+    rcvdClass: string;
+    rcvdSection: string;
+    rstSent: string;
+    rstRcvd: string;
+    rcvdName: string;
+  };
 }
+
+export interface QSOSubmission {
+  callsign: string;
+  band: Band;
+  mode: Mode;
+  rcvd_class: string;
+  rcvd_section: string;
+  rst_sent?: string;
+  rst_rcvd?: string;
+  rcvd_name?: string;
+  rcvd_qth?: string;
+  rcvd_grid?: string;
+  comment?: string;
+}
+
+/** Default signal report per mode — RS for phone, RST for CW and digital.
+ *  Prefilled so the common case is a single keystroke away from logged. */
+const DEFAULT_RST: Record<Mode, string> = { PH: '59', CW: '599', DIG: '-10' };
 
 const BAND_GRID: Band[][] = [
   ['160m', '80m',  '40m'],
@@ -28,7 +53,10 @@ const WFD_CLASS_LETTERS = new Set(['H','O','I']);
 
 interface Props {
   eventId: string;
-  eventType: 'FD' | 'WFD';
+  eventType: EventType;
+  /** Governs the client-side "already worked" hint. The server is
+   *  authoritative; this only decides how far back to look. */
+  dupeRule?: DupeRule;
   hasQRZ: boolean;
   hasCallHistory: boolean;
   hasMasterCall: boolean;
@@ -36,7 +64,7 @@ interface Props {
   mode: Mode;
   onBandChange: (b: Band) => void;
   onModeChange: (m: Mode) => void;
-  onSubmit: (data: { callsign: string; band: Band; mode: Mode; rcvd_class: string; rcvd_section: string }) => Promise<void>;
+  onSubmit: (data: QSOSubmission) => Promise<void>;
   submitting: boolean;
   lastLogged: DisplayQSO | null;
   submitError: string | null;
@@ -61,17 +89,37 @@ interface Props {
 }
 
 function QSOForm({
-  eventId, eventType, hasQRZ, hasCallHistory, hasMasterCall, band, mode, onBandChange, onModeChange,
+  eventId, eventType, dupeRule = 'EVENT', hasQRZ, hasCallHistory, hasMasterCall, band, mode, onBandChange, onModeChange,
   onSubmit, submitting, lastLogged, submitError, onDigHelp, existingQSOs,
   bandOccupancy = {}, esm, onEsmCall, onEsmLog, onCallsignInput, autoFadeLoggedMs, largeQsyChip,
 }: Props, ref: React.Ref<QSOFormHandle>) {
+  const isSes = eventType === 'SES';
+
   const [callsign, setCallsign] = useState('');
   const [rcvdClass, setRcvdClass] = useState('');
   const [rcvdSection, setRcvdSection] = useState('');
+  // SES exchange — a signal report plus whatever the operator captures.
+  const [rstSent, setRstSent] = useState(DEFAULT_RST[mode]);
+  const [rstRcvd, setRstRcvd] = useState(DEFAULT_RST[mode]);
+  const [rcvdName, setRcvdName] = useState('');
+  const [rcvdQth, setRcvdQth] = useState('');
+  const [rcvdGrid, setRcvdGrid] = useState('');
+  const [comment, setComment] = useState('');
+
+  // Signal report convention follows the mode, so retrack it on QSY — but
+  // only when the operator hasn't overtyped the default for this contact.
+  const prevModeRef = useRef(mode);
+  useEffect(() => {
+    const prev = prevModeRef.current;
+    if (prev === mode) return;
+    prevModeRef.current = mode;
+    setRstSent(v => (v === DEFAULT_RST[prev] ? DEFAULT_RST[mode] : v));
+    setRstRcvd(v => (v === DEFAULT_RST[prev] ? DEFAULT_RST[mode] : v));
+  }, [mode]);
 
   useImperativeHandle(ref, () => ({
-    getValues: () => ({ callsign, rcvdClass, rcvdSection }),
-  }), [callsign, rcvdClass, rcvdSection]);
+    getValues: () => ({ callsign, rcvdClass, rcvdSection, rstSent, rstRcvd, rcvdName }),
+  }), [callsign, rcvdClass, rcvdSection, rstSent, rstRcvd, rcvdName]);
   const [qrzInfo, setQrzInfo] = useState<{ name?: string; state?: string; country?: string } | null>(null);
   const [historyInfo, setHistoryInfo] = useState<{ sentClass: string | null; section: string | null; label: string | null } | null>(null);
   const [knownMaster, setKnownMaster] = useState(false);
@@ -92,6 +140,8 @@ function QSOForm({
   const callRef    = useRef<HTMLInputElement>(null);
   const classRef   = useRef<HTMLInputElement>(null);
   const sectionRef = useRef<HTMLInputElement>(null);
+  const rstRcvdRef = useRef<HTMLInputElement>(null);
+  const nameRef    = useRef<HTMLInputElement>(null);
   const lookupTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // The callsign the form is currently on. Lookups are debounced and then
   // awaited, so a reply can arrive after the operator has already logged the
@@ -110,11 +160,19 @@ function QSOForm({
         const data = await res.json();
         if (currentCallRef.current !== call) return;
         setQrzInfo(data.name ? data : null);
+        // An SES logs name and QTH rather than a contest exchange, so a QRZ
+        // hit can fill them directly. Only empty fields, never over manual
+        // entry — same rule the call-history prefill follows.
+        if (isSes) {
+          if (data.name)  setRcvdName(prev => prev || data.name);
+          if (data.state) setRcvdQth(prev => prev || data.state);
+          if (data.grid)  setRcvdGrid(prev => prev || data.grid);
+        }
       }
     } finally {
       setLookingUp(false);
     }
-  }, [eventId, hasQRZ]);
+  }, [eventId, hasQRZ, isSes]);
 
   const lookupCallHistory = useCallback(async (call: string) => {
     if ((!hasCallHistory && !hasMasterCall) || call.length < 3) return;
@@ -132,12 +190,15 @@ function QSOForm({
       setKnownMaster(!!data.known_master);
       // Prefill class/section for a known station — only fields the operator
       // hasn't already typed into, so this never clobbers manual entry.
-      if (data.sent_class) setRcvdClass(prev => prev || data.sent_class);
-      if (data.section) setRcvdSection(prev => prev || data.section);
+      // An SES has no class/section exchange, so there is nothing to prefill.
+      if (!isSes) {
+        if (data.sent_class) setRcvdClass(prev => prev || data.sent_class);
+        if (data.section) setRcvdSection(prev => prev || data.section);
+      }
     } catch {
       // best-effort — logging must never block on this
     }
-  }, [eventId, hasCallHistory, hasMasterCall]);
+  }, [eventId, hasCallHistory, hasMasterCall, isSes]);
 
   function handleCallChange(val: string) {
     const upper = val.toUpperCase().replace(/[^A-Z0-9/]/g, '');
@@ -160,13 +221,33 @@ function QSOForm({
     e.preventDefault();
     if (!callsign || submitting) return;
     if (esm) onEsmLog?.();
-    await onSubmit({ callsign, band, mode, rcvd_class: rcvdClass, rcvd_section: rcvdSection });
+    await onSubmit({
+      callsign, band, mode,
+      rcvd_class: rcvdClass,
+      rcvd_section: rcvdSection,
+      ...(isSes ? {
+        rst_sent:  rstSent,
+        rst_rcvd:  rstRcvd,
+        rcvd_name: rcvdName,
+        rcvd_qth:  rcvdQth,
+        rcvd_grid: rcvdGrid,
+        comment,
+      } : {}),
+    });
     if (lookupTimer.current) clearTimeout(lookupTimer.current);
     currentCallRef.current = '';
     setCallsign('');
     onCallsignInput?.('');
     setRcvdClass('');
     setRcvdSection('');
+    // Signal reports go back to the mode default rather than blank — the
+    // next contact almost always gets the same report.
+    setRstSent(DEFAULT_RST[mode]);
+    setRstRcvd(DEFAULT_RST[mode]);
+    setRcvdName('');
+    setRcvdQth('');
+    setRcvdGrid('');
+    setComment('');
     setQrzInfo(null);
     setHistoryInfo(null);
     setKnownMaster(false);
@@ -178,9 +259,18 @@ function QSOForm({
     setShowQSY(false);
   }
 
-  // Client-side dupe check — server enforces authoritatively, this is just a heads-up
-  const isDupe = callsign.length >= 3 &&
-    existingQSOs.some(q => !q.is_dupe && q.callsign === callsign && q.band === band && q.mode === mode);
+  // Client-side dupe check — server enforces authoritatively, this is just a
+  // heads-up. Under the DAY rule only today's contacts count, which is what
+  // makes a multi-week special event workable: working the same station again
+  // next weekend is normal, not a mistake.
+  const todayUTC = new Date().toISOString().slice(0, 10);
+  const isDupe = dupeRule !== 'NONE' && callsign.length >= 3 &&
+    existingQSOs.some(q => {
+      if (q.is_dupe || q.callsign !== callsign || q.band !== band || q.mode !== mode) return false;
+      if (dupeRule !== 'DAY') return true;
+      const iso = typeof q.datetime_utc === 'string' ? q.datetime_utc : q.datetime_utc.toISOString();
+      return iso.slice(0, 10) === todayUTC;
+    });
 
   const callsignInvalid = callsign.length >= 3 && (() => {
     const c = callsign.replace(/\/.*/, '');
@@ -209,15 +299,16 @@ function QSOForm({
           onChange={e => handleCallChange(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'Enter') {
+              const firstExchangeField = isSes ? rstRcvdRef : classRef;
               if (esm) {
                 e.preventDefault();
                 onEsmCall?.();
-                if (callsign) classRef.current?.focus();
+                if (callsign) firstExchangeField.current?.focus();
                 return;
               }
               if (callsign) {
                 e.preventDefault();
-                classRef.current?.focus();
+                firstExchangeField.current?.focus();
               }
             }
           }}
@@ -244,7 +335,7 @@ function QSOForm({
         )}
         {isDupe && (
           <p className="mt-1 text-xs text-yellow-500">
-            Already worked on {band} {mode} — will log as dupe
+            Already worked on {band} {mode}{dupeRule === 'DAY' ? ' today' : ''} — will log as dupe
           </p>
         )}
         {callsignInvalid && !isDupe && (
@@ -254,7 +345,110 @@ function QSOForm({
         )}
       </div>
 
-      {/* Exchange */}
+      {/* Exchange — a special event station swaps the contest class/section
+          for a signal report and whatever the operator wants to capture. */}
+      {isSes ? (
+        <>
+          <div className="flex gap-2">
+            <div className="w-16">
+              <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">RST S</label>
+              <input
+                value={rstSent}
+                onChange={e => setRstSent(e.target.value.trim())}
+                className="input w-full font-mono"
+                maxLength={6}
+              />
+            </div>
+            <div className="w-16">
+              <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">RST R</label>
+              <input
+                ref={rstRcvdRef}
+                value={rstRcvd}
+                onChange={e => setRstRcvd(e.target.value.trim())}
+                onKeyDown={e => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault();
+                    nameRef.current?.focus();
+                  }
+                }}
+                className="input w-full font-mono"
+                maxLength={6}
+              />
+            </div>
+            <div className="flex-1">
+              <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Name</label>
+              <input
+                ref={nameRef}
+                value={rcvdName}
+                onChange={e => setRcvdName(e.target.value)}
+                onKeyDown={e => {
+                  if (e.key === 'Tab' && !e.shiftKey) {
+                    e.preventDefault();
+                    callRef.current?.focus();
+                  }
+                }}
+                placeholder="Dave"
+                className="input w-full"
+                maxLength={40}
+              />
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <div className="flex-1">
+              <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">QTH</label>
+              <input
+                value={rcvdQth}
+                onChange={e => setRcvdQth(e.target.value)}
+                placeholder="MN"
+                className="input w-full"
+                maxLength={60}
+              />
+            </div>
+            <div className="w-24">
+              <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Grid</label>
+              <input
+                value={rcvdGrid}
+                onChange={e => setRcvdGrid(e.target.value.toUpperCase())}
+                placeholder="EN34"
+                className="input w-full font-mono"
+                maxLength={8}
+              />
+            </div>
+            <div className="w-24">
+              <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Section</label>
+              <input
+                list="section-list"
+                value={rcvdSection}
+                onChange={e => setRcvdSection(e.target.value.toUpperCase())}
+                placeholder="MN"
+                className="input w-full font-mono"
+                maxLength={5}
+              />
+            </div>
+          </div>
+          {/* Unlike the contest form this is only a hint, never an error:
+              a special event works DX, where no ARRL section applies. */}
+          {rcvdSection.length > 0 && sectionInvalid && (
+            <p className="text-xs text-zinc-500">
+              &ldquo;{rcvdSection}&rdquo; isn&apos;t an ARRL/RAC section &mdash; fine for DX, just noting it.
+            </p>
+          )}
+          <div>
+            <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Comment</label>
+            <input
+              value={comment}
+              onChange={e => setComment(e.target.value)}
+              placeholder="optional"
+              className="input w-full"
+              maxLength={120}
+            />
+          </div>
+          <datalist id="section-list">
+            {ARRL_SECTIONS.map(sec => <option key={sec} value={sec} />)}
+          </datalist>
+        </>
+      ) : (
+      <>
       <div className="flex gap-2">
         <div className="w-20">
           <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Rcvd Class</label>
@@ -304,6 +498,8 @@ function QSOForm({
         <p className="text-xs text-orange-400">
           &ldquo;{rcvdSection}&rdquo; is not a valid ARRL/RAC section
         </p>
+      )}
+      </>
       )}
 
       {/* Server error */}

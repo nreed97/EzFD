@@ -26,7 +26,17 @@ function formatTime(dt: string | Date): string {
   return toIso(dt).slice(11, 16).replace(':', '');
 }
 
+/**
+ * Cabrillo is a contest log format — it has no meaning for a special event
+ * station, which has no contest, no exchange and no score. The export route
+ * refuses `format=cabrillo` for SES events before reaching this function;
+ * the class/section fallbacks below exist only so a mis-typed event can't
+ * throw on a null.
+ */
 export function generateCabrillo(event: Event, qsos: QSO[]): string {
+  const eventClass   = event.class ?? '1A';
+  const eventSection = event.arrl_section ?? '';
+
   const validQSOs = qsos.filter(q => !q.is_dupe).sort(
     (a, b) => new Date(a.datetime_utc).getTime() - new Date(b.datetime_utc).getTime()
   );
@@ -39,7 +49,7 @@ export function generateCabrillo(event: Event, qsos: QSO[]): string {
   }
 
   // Extract transmitter count from class string (e.g. "3A" → 3, "1D" → 1)
-  const numTx = parseInt(event.class.match(/^\d+/)?.[0] ?? '1', 10);
+  const numTx = parseInt(eventClass.match(/^\d+/)?.[0] ?? '1', 10);
 
   const header = [
     'START-OF-LOG: 3.0',
@@ -52,7 +62,7 @@ export function generateCabrillo(event: Event, qsos: QSO[]): string {
     `CATEGORY-TRANSMITTER: ${numTx}`,
     `CLAIMED-SCORE: ${qsoPoints * sections.size}`,
     `CLUB: ${event.club_name}`,
-    `ARRL-SECTION: ${event.arrl_section}`,
+    `ARRL-SECTION: ${eventSection}`,
     `CERTIFICATE: YES`,
     `CREATED-BY: EzFD`,
   ];
@@ -63,8 +73,8 @@ export function generateCabrillo(event: Event, qsos: QSO[]): string {
     const date  = formatDate(q.datetime_utc);
     const time  = formatTime(q.datetime_utc);
     const myCall    = event.club_call.padEnd(13);
-    const myClass   = event.class.padEnd(6);
-    const mySect    = event.arrl_section.padEnd(6);
+    const myClass   = eventClass.padEnd(6);
+    const mySect    = eventSection.padEnd(6);
     const theirCall = q.callsign.padEnd(13);
     const theirClass= (q.rcvd_class ?? '?').padEnd(6);
     const theirSect = (q.rcvd_section ?? '?').padEnd(6);

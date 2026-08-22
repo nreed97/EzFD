@@ -14,6 +14,10 @@ export default function EventJoinPage() {
   const [opCall, setOpCall] = useState('');
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
+  // A distributed special event station has one location per operator, and
+  // these feed the ADIF MY_* fields for that operator's own contacts.
+  const [opGrid, setOpGrid] = useState('');
+  const [opState, setOpState] = useState('');
 
   useEffect(() => {
     fetch(`/api/events/${code}`)
@@ -32,11 +36,28 @@ export default function EventJoinPage() {
       });
   }, [code, router]);
 
-  function handleJoin(e: React.FormEvent) {
+  async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
     const call = opCall.toUpperCase().trim();
     if (!call) return;
     sessionStorage.setItem(`ezfd_op_${code}`, JSON.stringify({ call }));
+
+    // Best effort — a failed roster save must never block an operator from
+    // getting on the air. It only degrades the MY_* fields in their export,
+    // which they can correct later.
+    if (event && event.event_type === 'SES' && (opGrid || opState)) {
+      await fetch('/api/ses/operators', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: event.id,
+          op_call: call,
+          grid: opGrid,
+          state: opState,
+        }),
+      }).catch(() => {});
+    }
+
     router.push(`/event/${code}/log?op=${call}`);
   }
 
@@ -56,7 +77,15 @@ export default function EventJoinPage() {
         <div className="mb-6 text-center">
           <p className="text-sm font-mono text-amber-400 tracking-widest">{code}</p>
           <h1 className="mt-1 text-2xl font-bold text-zinc-100 light:text-zinc-900">{event.club_name}</h1>
-          <p className="text-zinc-400 light:text-zinc-600">{event.club_call} &bull; {event.class} &bull; {event.arrl_section}</p>
+          <p className="text-zinc-400 light:text-zinc-600">
+            {event.club_call}
+            {event.event_type === 'SES'
+              ? ' • Special Event Station'
+              : ` • ${event.class} • ${event.arrl_section}`}
+          </p>
+          {event.ses_description && (
+            <p className="mt-1 text-sm text-zinc-400 light:text-zinc-600">{event.ses_description}</p>
+          )}
           {event.location && <p className="mt-1 text-sm text-zinc-500 light:text-zinc-500">{event.location}</p>}
         </div>
 
@@ -74,6 +103,37 @@ export default function EventJoinPage() {
                 autoFocus
               />
             </label>
+            {event.event_type === 'SES' && (
+              <div className="flex gap-3">
+                <label className="flex flex-1 flex-col gap-1">
+                  <span className="text-sm text-zinc-400">Your Grid</span>
+                  <input
+                    value={opGrid}
+                    onChange={e => setOpGrid(e.target.value.toUpperCase())}
+                    placeholder="EN34"
+                    className="input font-mono"
+                    maxLength={8}
+                  />
+                </label>
+                <label className="flex flex-1 flex-col gap-1">
+                  <span className="text-sm text-zinc-400">Your State</span>
+                  <input
+                    value={opState}
+                    onChange={e => setOpState(e.target.value.toUpperCase())}
+                    placeholder="MN"
+                    className="input font-mono"
+                    maxLength={4}
+                  />
+                </label>
+              </div>
+            )}
+            {event.event_type === 'SES' && (
+              <p className="text-xs text-zinc-500">
+                Your own location, not the event&apos;s — it becomes the MY_GRIDSQUARE
+                and MY_STATE on the contacts you make, which is what LoTW needs
+                for a station operated from several places.
+              </p>
+            )}
             <button
               type="submit"
               className="mt-2 rounded-lg bg-amber-400 py-2 font-semibold text-zinc-900 hover:bg-amber-300"

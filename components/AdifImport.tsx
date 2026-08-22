@@ -13,6 +13,10 @@ interface ImportResult {
   imported: number;
   dupes: number;
   skipped: number;
+  /** Records already in the log — a re-import of the same file, or two
+   *  operators importing overlapping exports. Matched on callsign, band, mode
+   *  and a ±2 minute time window, and skipped rather than inserted. */
+  already_present?: number;
   total: number;
 }
 
@@ -115,6 +119,9 @@ export default function AdifImport({ eventId, operatorCall, stationNumber, onClo
             <span className="font-bold">{result.imported}</span> QSO{result.imported !== 1 ? 's' : ''} imported
             {result.dupes > 0 && (
               <span className="ml-2 text-yellow-400">· <span className="font-bold">{result.dupes}</span> dupe{result.dupes !== 1 ? 's' : ''}</span>
+            )}
+            {!!result.already_present && result.already_present > 0 && (
+              <span className="ml-2 text-zinc-400">· {result.already_present} already in log</span>
             )}
             {result.skipped > 0 && (
               <span className="ml-2 text-zinc-500">· {result.skipped} skipped (unknown band)</span>
