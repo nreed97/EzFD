@@ -344,7 +344,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           {rigConnected && rig.canCw && (
             <button
               onClick={() => window.open(
-                `/event/${event.join_code}/cw?op=${encodeURIComponent(operatorCall)}`,
+                `/event/${event.join_code}/cw?op=${encodeURIComponent(operatorCall)}&station=${stationNumber}`,
                 `ezfd_cw_${event.join_code}`,
                 'width=520,height=880,noopener'
               )}

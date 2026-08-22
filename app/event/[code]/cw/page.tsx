@@ -8,10 +8,11 @@ export default async function CwPage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ op?: string }>;
+  searchParams: Promise<{ op?: string; station?: string }>;
 }) {
   const { code } = await params;
-  const { op } = await searchParams;
+  const { op, station } = await searchParams;
+  const stationNumber = Math.max(1, parseInt(station ?? '1', 10) || 1);
   const pool = getPool();
 
   const { rows: evRows } = await pool.query(
@@ -31,7 +32,7 @@ export default async function CwPage({
       event={evRows[0]}
       initialQSOs={qsos}
       operatorCall={op.toUpperCase()}
-      stationNumber={1}
+      stationNumber={stationNumber}
     />
   );
 }

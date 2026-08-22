@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { eventTypeLabel } from '@/lib/types';
+import { eventTypeLabel, transmitterCount } from '@/lib/types';
 import type { Event } from '@/lib/types';
 
 export default function EventJoinPage() {
@@ -19,6 +19,12 @@ export default function EventJoinPage() {
   // these feed the ADIF MY_* fields for that operator's own contacts.
   const [opGrid, setOpGrid] = useState('');
   const [opState, setOpState] = useState('');
+  const [station, setStation] = useState(1);
+
+  // Multi-transmitter events (2A/3A+) need to know which station an operator
+  // is at — otherwise every QSO reports transmitter 0 in the Cabrillo export
+  // regardless of which rig actually worked it.
+  const numTx = event ? transmitterCount(event.class) : 1;
 
   useEffect(() => {
     fetch(`/api/events/${code}`)
@@ -31,8 +37,8 @@ export default function EventJoinPage() {
         // If already joined, go straight to log
         const saved = sessionStorage.getItem(`ezfd_op_${code}`);
         if (saved) {
-          const { call } = JSON.parse(saved);
-          if (call) router.replace(`/event/${code}/log?op=${call}`);
+          const { call, station: savedStation } = JSON.parse(saved);
+          if (call) router.replace(`/event/${code}/log?op=${call}&station=${savedStation ?? 1}`);
         }
       });
   }, [code, router]);
@@ -41,7 +47,7 @@ export default function EventJoinPage() {
     e.preventDefault();
     const call = opCall.toUpperCase().trim();
     if (!call) return;
-    sessionStorage.setItem(`ezfd_op_${code}`, JSON.stringify({ call }));
+    sessionStorage.setItem(`ezfd_op_${code}`, JSON.stringify({ call, station }));
 
     // Best effort — a failed roster save must never block an operator from
     // getting on the air. It only degrades the MY_* fields in their export,
@@ -59,7 +65,7 @@ export default function EventJoinPage() {
       }).catch(() => {});
     }
 
-    router.push(`/event/${code}/log?op=${call}`);
+    router.push(`/event/${code}/log?op=${call}&station=${station}`);
   }
 
   if (loading) return <div className="flex min-h-screen items-center justify-center text-zinc-400">Loading...</div>;
@@ -105,6 +111,20 @@ export default function EventJoinPage() {
                 autoFocus
               />
             </label>
+            {numTx > 1 && (
+              <label className="flex min-w-0 flex-col gap-1">
+                <span className="text-sm text-zinc-400">Your Station</span>
+                <select
+                  value={station}
+                  onChange={e => setStation(Number(e.target.value))}
+                  className="input w-full font-mono"
+                >
+                  {Array.from({ length: numTx }, (_, i) => i + 1).map(n => (
+                    <option key={n} value={n}>Station {n}</option>
+                  ))}
+                </select>
+              </label>
+            )}
             {event.event_type === 'SES' && (
               <div className="flex gap-3">
                 <label className="flex min-w-0 flex-1 flex-col gap-1">

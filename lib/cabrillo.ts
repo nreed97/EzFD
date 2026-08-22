@@ -1,5 +1,6 @@
 import type { QSO, Event } from './types';
-import { MODE_POINTS } from './types';
+import { transmitterCount } from './types';
+import { calculateScore } from './scoring';
 
 function bandToKhz(band: string): string {
   const map: Record<string, string> = {
@@ -41,15 +42,9 @@ export function generateCabrillo(event: Event, qsos: QSO[]): string {
     (a, b) => new Date(a.datetime_utc).getTime() - new Date(b.datetime_utc).getTime()
   );
 
-  let qsoPoints = 0;
-  const sections = new Set<string>();
-  for (const q of validQSOs) {
-    qsoPoints += MODE_POINTS[q.mode] ?? 1;
-    if (q.rcvd_section) sections.add(q.rcvd_section.toUpperCase());
-  }
+  const score = calculateScore(qsos, event.bonuses ?? {}, event.power ?? 'HIGH');
 
-  // Extract transmitter count from class string (e.g. "3A" → 3, "1D" → 1)
-  const numTx = parseInt(eventClass.match(/^\d+/)?.[0] ?? '1', 10);
+  const numTx = transmitterCount(eventClass);
 
   const header = [
     'START-OF-LOG: 3.0',
@@ -60,7 +55,7 @@ export function generateCabrillo(event: Event, qsos: QSO[]): string {
     `CATEGORY-POWER: ${event.power ?? 'HIGH'}`,
     `CATEGORY-MODE: MIXED`,
     `CATEGORY-TRANSMITTER: ${numTx}`,
-    `CLAIMED-SCORE: ${qsoPoints * sections.size}`,
+    `CLAIMED-SCORE: ${score.claimed_score}`,
     `CLUB: ${event.club_name}`,
     `ARRL-SECTION: ${eventSection}`,
     `CERTIFICATE: YES`,
