@@ -6,7 +6,7 @@
 // Modeled on the Material Design 24h clock: hours 0-11 sit on the outer
 // ring, 12-23 on the inner ring; picking an hour advances to minutes.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 
 function pad2(n: number) {
   return String(n).padStart(2, '0');
@@ -179,6 +179,33 @@ export default function ClockTimePicker({
   const hour = Number.isFinite(h) ? h : 0;
   const minute = Number.isFinite(m) ? m : 0;
 
+  // Popover width the panel below is given explicitly (w-64) so this can
+  // clamp against it exactly, and it's positioned `fixed` from the trigger's
+  // own viewport rect rather than `absolute` under it — a field near the
+  // right edge of a narrow column (the two-up Starts/Ends row, or the SES
+  // sidebar) would otherwise push the clock face off the page.
+  const POPOVER_W = 256;
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+
+  useLayoutEffect(() => {
+    if (!open) { setPos(null); return; }
+    function reposition() {
+      const rect = wrapRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const margin = 8;
+      const left = clamp(rect.left, margin, Math.max(margin, window.innerWidth - POPOVER_W - margin));
+      const top = clamp(rect.bottom + 4, margin, Math.max(margin, window.innerHeight - margin));
+      setPos({ top, left });
+    }
+    reposition();
+    window.addEventListener('resize', reposition);
+    window.addEventListener('scroll', reposition, true);
+    return () => {
+      window.removeEventListener('resize', reposition);
+      window.removeEventListener('scroll', reposition, true);
+    };
+  }, [open]);
+
   useEffect(() => {
     if (!open) return;
     function onDocDown(e: MouseEvent) {
@@ -247,8 +274,11 @@ export default function ClockTimePicker({
           </svg>
         </button>
       </div>
-      {open && (
-        <div className="absolute z-50 mt-2 rounded-xl border border-zinc-700 bg-zinc-900 p-4 shadow-xl light:border-zinc-300 light:bg-white">
+      {open && pos && (
+        <div
+          style={{ position: 'fixed', top: pos.top, left: pos.left, width: POPOVER_W }}
+          className="z-50 rounded-xl border border-zinc-700 bg-zinc-900 p-4 shadow-xl light:border-zinc-300 light:bg-white"
+        >
           <ClockFace
             hour={hour}
             minute={minute}
