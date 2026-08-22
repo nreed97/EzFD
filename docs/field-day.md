@@ -103,6 +103,8 @@ Contest QSOs carry `MY_ARRL_SECT`, `STX_STRING` (your class and section) and
 totals by mode, the score calculation with the power multiplier shown as its
 own line, active bonuses itemised, sections worked, and the operator list.
 
+![Field Day summary sheet: QSO totals by mode, score calculation and sections worked](images/summary-sheet.png)
+
 > **Known bug.** The Cabrillo `CLAIMED-SCORE` header is wrong — it multiplies
 > by sections worked, ignores the power multiplier, and omits bonus points,
 > because it reimplements the formula instead of using the shared scoring

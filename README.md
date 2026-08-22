@@ -9,6 +9,8 @@ it will — logging carries on locally and syncs when it comes back.
 
 📖 **[Full documentation](docs/)**
 
+![The logging screen: entry form, band/mode, operators and live score](docs/images/logging-screen.png)
+
 ---
 
 ## What it does

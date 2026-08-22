@@ -3,6 +3,8 @@
 This walks from an empty server to a logged QSO. If someone else runs the
 server and you just want to operate, skip to [Joining an event](#joining-an-event).
 
+![EzFD home page: join an event with a code, or start a new one](images/home.png)
+
 ## Install the server
 
 You need a Ubuntu or Debian machine with a public hostname pointing at it. A
@@ -53,11 +55,15 @@ Optional, and all safe to skip:
 Submitting gives you a **six-character join code**. That code is how operators
 get in — there are no accounts.
 
+![Create Field Day event form: club info, class, section and power category](images/create-event-fd.png)
+
 ## Joining an event
 
 Operators go to the site, enter the join code, and type their own callsign.
 That's the whole sign-in. The callsign identifies who logged each QSO; the
 event's callsign is what goes on the air.
+
+![Join screen for an event: enter your callsign, or view visitor stats](images/join-event.png)
 
 On a special event, operators also enter their own grid and state, because a
 distributed activation has one location per operator rather than one per

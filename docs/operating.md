@@ -6,6 +6,8 @@ noted; the exchange fields differ, which is covered per type in
 
 ## The entry form
 
+![The logging screen: entry form, QSY drawer, operators, score and QSO log](images/logging-screen.png)
+
 Focus starts in the callsign field and returns there after every logged QSO.
 The keyboard path is designed so a run never requires the mouse:
 
@@ -127,6 +129,8 @@ toggle and persists across sessions.
 A special event shows only the QSO count — there is no contest score.
 
 ## The dashboard
+
+![The dashboard: section map, live score, sections worked and operators](images/dashboard.png)
 
 A separate read-only view for a second screen:
 
