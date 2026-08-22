@@ -19,6 +19,7 @@ set -uo pipefail
 
 PSQL="${PSQL:-psql -h 127.0.0.1 -p 5432 -U postgres}"
 DB="${DB:-ezfd}"
+REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 WORK="$(mktemp -d)"
 FAILURES=0
 
@@ -91,6 +92,18 @@ SELECT id,'K1XYZ','20m','PH','3A','MN','2A','EPA' FROM e;" >/dev/null
 # 3. An event with no QSOs at all — the case that used to abort the restore.
 q "INSERT INTO events (join_code, club_name, club_call, event_type, class, arrl_section)
    VALUES ('RTNIL','No QSOs','W0NQ','FD','1D','MN');" >/dev/null
+
+# The export query was copied four times before it was made a function, and
+# every copy had drifted. Two of them used SELECT e.*, which is what leaked the
+# encrypted QRZ credentials into files under /tmp. Nothing but this stops a
+# fifth appearing.
+echo "── one export definition ──"
+STRAY=$(grep -n "SELECT e\.\*" "$REPO/ezfd-admin.sh" | grep -v "^[0-9]*: *#" || true)
+if [[ -z "$STRAY" ]]; then
+  ok "  ezfd-admin.sh builds no event export of its own"
+else
+  no "  ezfd-admin.sh builds no event export of its own" "$STRAY"
+fi
 
 echo "── round trips ──"
 

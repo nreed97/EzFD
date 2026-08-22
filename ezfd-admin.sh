@@ -279,20 +279,10 @@ view_event() {
 
     2) # JSON backup
        local file="/tmp/ezfd_${code}_backup.json"
-       PG -c "
-         SELECT row_to_json(t) FROM (
-           SELECT e.*,
-             (SELECT json_agg(row_to_json(q) ORDER BY q.datetime_utc) FROM qsos q WHERE q.event_id=e.id) AS qsos,
-             (SELECT json_agg(row_to_json(o) ORDER BY o.op_call)
-                FROM ses_operators o WHERE o.event_id=e.id) AS ses_operators,
-             (SELECT json_agg(json_build_object(
-                       'op_call', r.op_call, 'band', r.band, 'mode', r.mode,
-                       'starts_at', lower(r.during), 'ends_at', upper(r.during),
-                       'planned_freq', r.planned_freq, 'note', r.note,
-                       'status', r.status, 'created_at', r.created_at) ORDER BY lower(r.during))
-                FROM ses_reservations r WHERE r.event_id=e.id) AS ses_reservations
-           FROM events e WHERE e.id='$uuid'
-         ) t;" > "$file"
+       # The fourth copy of the export query, and the second that used
+       # SELECT e.* -- so this too wrote the encrypted QRZ credentials into
+       # a file under /tmp. Same shared function, scoped to one event.
+       PG -c "SELECT ezfd_export_events('$uuid');" > "$file"
        log "Backup written to ${file}"
        pause ;;
 
