@@ -1,15 +1,20 @@
 #!/usr/bin/env node
 // Guards the ARRL/RAC section list against the two ways it has gone wrong:
 //
-//   1. The three places that enumerate sections drifting apart —
-//      ARRL_SECTIONS (lib/types.ts), SECTION_DATA (lib/sections.ts) and the
-//      GROUPS grid (components/SectionGrid.tsx).
+//   1. The places that enumerate sections drifting apart — ARRL_SECTIONS
+//      (lib/types.ts), SECTION_DATA (lib/sections.ts) and SECTION_GROUPS
+//      (lib/sections.ts, the call-area layout).
 //   2. A section total written out as a literal instead of derived from
 //      ARRL_SECTIONS.length. That is what issue #14 was: scoring awarded the
 //      Worked All Sections bonus at the list length while the summary sheet
 //      and the "Sections Needed" button compared against a hardcoded 84, so
 //      the sheet an operator transcribes onto their ARRL entry omitted a
 //      bonus its own claimed score already included.
+//   3. A component growing its own private copy of the section list. That is
+//      how the first fix missed a place: SectionGrid and SectionsNeeded each
+//      had their own grid, only one was corrected, and the panel operators
+//      read to know what to chase kept listing retired sections. The layout
+//      now lives once in SECTION_GROUPS, and check 3 fails if a copy reappears.
 //
 // Parses the sources rather than importing them: these are TS/TSX modules and
 // the check needs to run without a build step.
@@ -39,10 +44,10 @@ const sectionSet = new Set(sections);
 const dataKeys = [...read('lib/sections.ts').matchAll(/^ {2}([A-Z0-9]+): +\{/gm)].map(m => m[1]);
 const dataSet = new Set(dataKeys);
 
-const gridSrc = read('components/SectionGrid.tsx');
-const gridBody = gridSrc.match(/const GROUPS = \[([\s\S]*?)\n\];/);
-const gridKeys = gridBody
-  ? [...gridBody[1].matchAll(/sections: \[([^\]]*)\]/g)]
+const sectionsSrc = read('lib/sections.ts');
+const groupsBody = sectionsSrc.match(/export const SECTION_GROUPS[^=]*= \[([\s\S]*?)\n\];/);
+const gridKeys = groupsBody
+  ? [...groupsBody[1].matchAll(/sections: \[([^\]]*)\]/g)]
       .flatMap(g => [...g[1].matchAll(/'([A-Z0-9]+)'/g)].map(m => m[1]))
   : [];
 const gridSet = new Set(gridKeys);
@@ -67,10 +72,13 @@ if (sectionSet.size === dataSet.size && [...sectionSet].every(s => dataSet.has(s
      `missing from SECTION_DATA: ${diff(sectionSet, dataSet)} | not a section: ${diff(dataSet, sectionSet)}`);
 }
 
+if (gridKeys.length === gridSet.size) ok('SECTION_GROUPS lists no section twice');
+else no('SECTION_GROUPS lists no section twice');
+
 if (sectionSet.size === gridSet.size && [...sectionSet].every(s => gridSet.has(s))) {
-  ok('the SectionGrid GROUPS grid covers exactly ARRL_SECTIONS');
+  ok('SECTION_GROUPS covers exactly ARRL_SECTIONS');
 } else {
-  no('the SectionGrid GROUPS grid covers exactly ARRL_SECTIONS',
+  no('SECTION_GROUPS covers exactly ARRL_SECTIONS',
      `missing from the grid: ${diff(sectionSet, gridSet)} | not a section: ${diff(gridSet, sectionSet)}`);
 }
 
@@ -99,6 +107,43 @@ for (const file of ['lib/scoring.ts', 'components/SummarySheet.tsx', 'components
   const hits = [...read(file).matchAll(/sections?_?[Ww]orked\s*(?:>=|<=|>|<|-|===|!==)\s*(\d+)|(\d+)\s*(?:>=|<=|>|<|-)\s*(?:score\.)?sections?_?[Ww]orked/g)];
   if (hits.length === 0) ok(`${file} has no hardcoded section total`);
   else no(`${file} has no hardcoded section total`, `literal(s): ${hits.map(h => h[1] ?? h[2]).join(', ')}`);
+}
+
+// --- no private copies of the list ------------------------------------
+//
+// The check that would have caught the SectionsNeeded miss. Any file other
+// than the two canonical ones holding an array literal of three or more
+// section abbreviations is a second copy of the list, and a second copy is
+// how it goes stale.
+console.log('\nThe section list exists in one place');
+
+const canonical = new Set(['lib/types.ts', 'lib/sections.ts', 'scripts/test-sections.cjs']);
+const searchDirs = ['components', 'lib', 'app'];
+
+const walk = dir => fs.readdirSync(path.join(root, dir), { withFileTypes: true })
+  .flatMap(e => {
+    const rel = `${dir}/${e.name}`;
+    if (e.isDirectory()) return walk(rel);
+    return /\.(ts|tsx)$/.test(e.name) ? [rel] : [];
+  });
+
+const offenders = [];
+for (const file of searchDirs.flatMap(walk)) {
+  if (canonical.has(file)) continue;
+  for (const m of read(file).matchAll(/\[((?:\s*'[A-Z0-9]{2,4}'\s*,){2,}\s*'[A-Z0-9]{2,4}'\s*,?)\s*\]/g)) {
+    const entries = [...m[1].matchAll(/'([A-Z0-9]+)'/g)].map(x => x[1]);
+    const hits = entries.filter(e => sectionSet.has(e));
+    // Three or more real sections in one literal is a section list, not a
+    // coincidental array of short uppercase strings (bands, modes, classes).
+    if (hits.length >= 3) offenders.push(`${file}: [${entries.slice(0, 6).join(', ')}${entries.length > 6 ? ', …' : ''}]`);
+  }
+}
+
+if (offenders.length === 0) {
+  ok('no file outside lib/types.ts and lib/sections.ts hardcodes a section list');
+} else {
+  no('no file outside lib/types.ts and lib/sections.ts hardcodes a section list',
+     offenders.join('\n       ') + '\n       Use ARRL_SECTIONS or SECTION_GROUPS instead.');
 }
 
 console.log('');

@@ -251,7 +251,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         }`}>
           {mainView === 'map'      && <MapView workedSections={score.sections} />}
           {mainView === 'sections' && <SectionGrid workedSections={score.sections} />}
-          {mainView === 'needed'   && <SectionsNeeded workedSections={score.sections} />}
+          {mainView === 'needed'   && <SectionsNeeded workedSections={score.sections} unknownSections={score.unknown_sections} />}
           {mainView === 'rate'     && <RateChart qsos={qsos} />}
           {mainView === 'bands'    && <BandBreakdown score={score} />}
           {mainView === 'checkouts' && (

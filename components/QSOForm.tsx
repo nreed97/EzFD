@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import type { Band, Mode, DisplayQSO, QSO, EventType, DupeRule } from '@/lib/types';
-import { ARRL_SECTIONS } from '@/lib/types';
+import { VALID_EXCHANGES, isValidExchange } from '@/lib/types';
 
 export interface QSOFormHandle {
   getValues: () => {
@@ -304,8 +304,10 @@ function QSOForm({
     return parseInt(num, 10) < 1 || !validLetters.has(letter);
   })();
 
-  const sectionInvalid = rcvdSection.length > 0 &&
-    !(ARRL_SECTIONS as readonly string[]).includes(rcvdSection);
+  // Checked against VALID_EXCHANGES, not ARRL_SECTIONS: a station outside the
+  // US and Canada correctly sends DX, and warning on it sends the operator
+  // back to retype an exchange that was right the first time.
+  const sectionInvalid = rcvdSection.length > 0 && !isValidExchange(rcvdSection);
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -483,7 +485,7 @@ function QSOForm({
             />
           </div>
           <datalist id="section-list">
-            {ARRL_SECTIONS.map(sec => <option key={sec} value={sec} />)}
+            {VALID_EXCHANGES.map(sec => <option key={sec} value={sec} />)}
           </datalist>
         </>
       ) : (
@@ -524,7 +526,7 @@ function QSOForm({
             maxLength={5}
           />
           <datalist id="section-list">
-            {ARRL_SECTIONS.map(s => <option key={s} value={s} />)}
+            {VALID_EXCHANGES.map(s => <option key={s} value={s} />)}
           </datalist>
         </div>
       </div>

@@ -1,5 +1,5 @@
 import type { QSO, Score, Band, BandStats, Bonuses } from './types';
-import { MODE_POINTS, ARRL_SECTIONS } from './types';
+import { MODE_POINTS, ARRL_SECTIONS, DX_EXCHANGE, isARRLSection } from './types';
 
 // ARRL Field Day power multiplier
 // QRP (≤5 W) = ×5, Low Power (≤150 W) = ×2, High Power = ×1
@@ -51,7 +51,13 @@ export function calculateScore(
   power: 'HIGH' | 'LOW' | 'QRP' | string = 'HIGH',
 ): Score {
   const validQSOs = qsos.filter(q => !q.is_dupe);
+  // Only recognised sections count. The entry form warns on anything else but
+  // still logs the QSO — correctly, since the exchange is what was actually
+  // sent — so unrecognised values do reach the log, and counting them would
+  // let a handful of typos push a station over the Worked All Sections
+  // threshold and claim 100 points it never earned.
   const sections = new Set<string>();
+  const unknownSections = new Set<string>();
   const byBand: Partial<Record<Band, BandStats>> = {};
 
   let phoneQSOs = 0;
@@ -67,7 +73,14 @@ export function calculateScore(
     else if (qso.mode === 'CW')  cwQSOs++;
     else if (qso.mode === 'DIG') digitalQSOs++;
 
-    if (qso.rcvd_section) sections.add(qso.rcvd_section.toUpperCase());
+    if (qso.rcvd_section) {
+      const sec = qso.rcvd_section.toUpperCase();
+      if (isARRLSection(sec)) sections.add(sec);
+      // DX is a legal Field Day exchange from outside the US and Canada. It
+      // isn't a section, so it doesn't count — but it isn't a mistake either,
+      // so it doesn't get flagged as one.
+      else if (sec !== DX_EXCHANGE) unknownSections.add(sec);
+    }
 
     if (!byBand[qso.band]) byBand[qso.band] = { ph: 0, cw: 0, dig: 0 };
     const bs = byBand[qso.band]!;
@@ -95,5 +108,6 @@ export function calculateScore(
     claimed_score:   totalScore + bonusPoints,
     by_band:         byBand,
     sections:        Array.from(sections).sort(),
+    unknown_sections: Array.from(unknownSections).sort(),
   };
 }

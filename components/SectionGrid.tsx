@@ -1,20 +1,7 @@
 'use client';
 
-import { SECTION_DATA } from '@/lib/sections';
+import { SECTION_DATA, SECTION_GROUPS } from '@/lib/sections';
 
-const GROUPS = [
-  { label: '1',        sections: ['CT','EMA','ME','NH','RI','VT','WMA'] },
-  { label: '2',        sections: ['ENY','NLI','NNJ','NNY','SNJ','WNY'] },
-  { label: '3',        sections: ['DE','EPA','MDC','WPA'] },
-  { label: '4',        sections: ['AL','GA','KY','NC','NFL','SFL','SC','TN','VA','WCF','PR','VI'] },
-  { label: '5',        sections: ['AR','LA','MS','NM','NTX','OK','STX','WTX'] },
-  { label: '6',        sections: ['EB','LAX','ORG','SB','SCV','SDG','SF','SJV','SV','PAC'] },
-  { label: '7',        sections: ['AK','AZ','EWA','ID','MT','NV','OR','UT','WWA','WY'] },
-  { label: '8',        sections: ['MI','OH','WV'] },
-  { label: '9',        sections: ['IL','IN','WI'] },
-  { label: '10',       sections: ['CO','IA','KS','MN','MO','ND','NE','SD'] },
-  { label: 'Canada',   sections: ['AB','BC','GH','MB','NB','NL','NS','NT','ONE','ONN','ONS','PE','QC','SK'] },
-];
 
 interface Props {
   workedSections: string[];
@@ -36,10 +23,10 @@ export default function SectionGrid({ workedSections }: Props) {
       </div>
 
       <div className="flex flex-col gap-3">
-        {GROUPS.map(group => (
+        {SECTION_GROUPS.map(group => (
           <div key={group.label}>
             <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-600 light:text-zinc-400">
-              {group.label === 'Canada' ? 'Canada' : `${group.label}${group.label === '1' ? 'st' : group.label === '2' ? 'nd' : group.label === '3' ? 'rd' : 'th'} District`}
+              {group.title}
             </div>
             <div className="flex flex-wrap gap-1">
               {group.sections.map(s => {

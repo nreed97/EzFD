@@ -634,7 +634,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
                 Close
               </button>
             </div>
-            <SectionsNeeded workedSections={score.sections} />
+            <SectionsNeeded workedSections={score.sections} unknownSections={score.unknown_sections} />
           </div>
         </div>
       )}

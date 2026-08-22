@@ -148,6 +148,72 @@ CAB=$(req GET "/api/export/$FD?format=cabrillo")
 [[ "$(req GET "/api/export/$FD")" == *"STX_STRING:5>3A MN"* ]] \
   && ok "  FD ADIF still carries the contest exchange" || no "  FD ADIF still carries the contest exchange"
 
+# ── Worked All Sections accounting ───────────────────────────────────────────
+#
+# calculateScore runs server-side for the Cabrillo CLAIMED-SCORE header, so the
+# bonus gate is reachable end to end. Two things are asserted here that used to
+# be wrong: an unrecognised exchange must not count toward the 100-point bonus
+# (a handful of typos could otherwise push a log over the line), and DX — the
+# legal exchange from outside the US and Canada — must be accepted without
+# counting as a section.
+echo "── Worked All Sections ──"
+
+# Build an ADIF holding one QSO per section, straight from the app's own list
+# so this can never drift from it. Each is 1 point (phone), power LOW = x2.
+SECTIONS=$(node -e "
+const s=require('fs').readFileSync('lib/types.ts','utf8');
+const b=s.match(/export const ARRL_SECTIONS = \[([\s\S]*?)\] as const;/)[1];
+console.log([...b.matchAll(/'([A-Z0-9]+)'/g)].map(m=>m[1]).join(' '));
+")
+N_SECTIONS=$(echo "$SECTIONS" | wc -w)
+
+adif_for() {
+  # $1 = space-separated exchanges; one QSO each, unique callsign and minute.
+  local i=0 out="EzFD test<EOH>\n"
+  for sec in $1; do
+    out="${out}<CALL:6>T${i}AAAA<BAND:3>20m<MODE:3>SSB<QSO_DATE:8>20260627<TIME_ON:6>$(printf '%06d' $((120000 + i)))<ARRL_SECT:${#sec}>${sec}<CLASS:2>1A<EOR>\n"
+    i=$((i + 1))
+  done
+  printf '%b' "$out"
+}
+
+claimed_score() {  # $1 = join code
+  req GET "/api/export/$1?format=cabrillo" | sed -n 's/^CLAIMED-SCORE: //p'
+}
+
+# (a) every real section worked → the bonus is awarded
+ALL=$(req POST /api/events '{"club_name":"E2E WAS","club_call":"W0WAS","event_type":"FD","class":"1A","arrl_section":"MN","power":"LOW"}' | jq_get join_code)
+ALL_ID=$(req GET "/api/events/$ALL" | jq_get id)
+ADIF_ALL=$(adif_for "$SECTIONS" | python3 -c "import sys,json;print(json.dumps(sys.stdin.read()))")
+req POST /api/import/adif "{\"event_id\":\"$ALL_ID\",\"adif\":$ADIF_ALL,\"operator_call\":\"W0AAA\"}" > /dev/null
+FULL=$(claimed_score "$ALL")
+# N QSOs x 1 pt x 2 (LOW) + 100 Worked All Sections
+EXPECT_FULL=$(( N_SECTIONS * 2 + 100 ))
+[[ "$FULL" == "$EXPECT_FULL" ]] \
+  && ok "  working all $N_SECTIONS sections awards the 100-point bonus" \
+  || no "  working all $N_SECTIONS sections awards the 100-point bonus" "got $FULL, expected $EXPECT_FULL"
+
+# (b) one section swapped for a typo → same QSO count, no bonus
+TYPO_LIST="$(echo "$SECTIONS" | cut -d" " -f2-) ZZZ"
+TYPO=$(req POST /api/events '{"club_name":"E2E Typo","club_call":"W0TYP","event_type":"FD","class":"1A","arrl_section":"MN","power":"LOW"}' | jq_get join_code)
+TYPO_ID=$(req GET "/api/events/$TYPO" | jq_get id)
+ADIF_TYPO=$(adif_for "$TYPO_LIST" | python3 -c "import sys,json;print(json.dumps(sys.stdin.read()))")
+req POST /api/import/adif "{\"event_id\":\"$TYPO_ID\",\"adif\":$ADIF_TYPO,\"operator_call\":\"W0AAA\"}" > /dev/null
+TYPO_SCORE=$(claimed_score "$TYPO")
+EXPECT_TYPO=$(( N_SECTIONS * 2 ))
+[[ "$TYPO_SCORE" == "$EXPECT_TYPO" ]] \
+  && ok "  an unrecognised exchange does not count toward the bonus" \
+  || no "  an unrecognised exchange does not count toward the bonus" "got $TYPO_SCORE, expected $EXPECT_TYPO"
+
+# (c) DX is accepted and logged, but is not a section
+DXE=$(req POST /api/events '{"club_name":"E2E DX","club_call":"W0DX","event_type":"FD","class":"1A","arrl_section":"MN","power":"HIGH"}' | jq_get join_code)
+DX_ID=$(req GET "/api/events/$DXE" | jq_get id)
+DXQ=$(req POST /api/qso "{\"event_id\":\"$DX_ID\",\"callsign\":\"G0XYZ\",\"band\":\"20m\",\"mode\":\"PH\",\"rcvd_class\":\"1D\",\"rcvd_section\":\"DX\",\"operator_call\":\"W0AAA\"}")
+[[ "$(echo "$DXQ" | jq_get rcvd_section)" == "DX" ]] \
+  && ok "  a DX exchange is accepted and stored" || no "  a DX exchange is accepted and stored"
+[[ "$(req GET "/api/export/$DXE?format=cabrillo")" == *"DX"* ]] \
+  && ok "  DX survives into the Cabrillo log" || no "  DX survives into the Cabrillo log"
+
 # ── Server clock endpoint ────────────────────────────────────────────────────
 #
 # The clock-skew banner is only as good as this endpoint. A field server with
