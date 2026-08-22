@@ -16,9 +16,37 @@ PostgreSQL isn't reachable.
 |---|---|
 | List / manage events | Browse events, open one for detail and per-event actions |
 | Server statistics | Totals across all events, QSOs by event type |
+| Server time / clock | Show the system, database and NTP state; set the clock by hand |
 | Full JSON backup | Every event and QSO to one file |
 | Restore from JSON backup | Recreate events from a backup file |
 | Update application | `git pull`, rebuild and restart |
+
+## Server time
+
+QSOs are timestamped by the database, so the server's clock is the log's clock.
+That is fine on a hosted instance with NTP and a problem on a field server: a
+Raspberry Pi has no battery-backed real-time clock, so with no internet it
+comes up holding the time of its last shutdown, or an epoch date. Every contact
+then gets a plausible-looking but wrong time, which corrupts the log's
+chronology, the Cabrillo output, and the ±2-minute window ADIF import uses to
+skip contacts it has already seen. None of that is repairable afterwards.
+
+**Server time / clock** shows the system clock, the database's clock and
+whether NTP is synchronised, then offers to set the clock by hand (UTC, read
+off a phone or GPS) or to re-enable NTP. Setting by hand disables NTP first —
+`systemd-timesyncd` refuses the set otherwise — and writes the result to the
+hardware clock if one is fitted.
+
+Operators see this from the other side: the logging page shows a standing
+banner when the server's clock and their device's disagree by more than a
+minute.
+
+Setting the clock only fixes contacts logged from that point on. **QSOs already
+in the log keep the timestamps they were given** — they aren't rewritten.
+So check the clock before an event starts, not after.
+
+For anything more than a casual activation, fit a hardware RTC module. See
+[Deployment](deployment.md#offline-field-servers).
 
 ## Per-event actions
 

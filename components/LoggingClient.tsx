@@ -13,6 +13,7 @@ import SesCoordination from './SesCoordination';
 import QSOTable from './QSOTable';
 import Scoreboard from './Scoreboard';
 import BandActivity from './BandActivity';
+import ClockSkewBanner from './ClockSkewBanner';
 import UTCClock from './UTCClock';
 import AdifImport from './AdifImport';
 import WsjtxSetupHelp from './WsjtxSetupHelp';
@@ -498,6 +499,9 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           {/* For an SES the checkout panel is authoritative about who may
               transmit, so the presence-based conflict warning would just be
               noise on top of it. */}
+          {/* A wrong server clock mis-stamps every QSO and looks like nothing is
+              wrong, so it outranks the band/slot warnings below it. */}
+          <ClockSkewBanner />
           {bandConflict && !isSes && (
             <div className="flex items-center gap-2 rounded-lg border border-yellow-600 bg-yellow-900/30 px-3 py-2 text-xs text-yellow-400">
               <span className="text-base">⚠</span>

@@ -203,6 +203,25 @@ and grid where available.
 The station's usual class and section from the N1MM file, plus
 `known_master` indicating whether the callsign appears in `MASTER.SCP`.
 
+## Server
+
+### `GET /api/time`
+
+The server's current time, so a client can tell when its own clock disagrees.
+
+```json
+{ "app_time": "2026-06-27T18:04:11.204Z", "db_time": "2026-06-27T18:04:11.207Z" }
+```
+
+`db_time` is PostgreSQL's clock — the one that actually stamps QSOs — and is
+`null` if the database can't be reached, which is not treated as an error. The
+two are reported separately because the app process and the database need not
+be on the same host.
+
+This doesn't change who is authoritative: QSOs are still stamped by the server.
+It exists so a wrong server clock is visible rather than silent. Clients should
+halve the round-trip time when comparing, so a slow link doesn't read as skew.
+
 ## Downloads
 
 ### `GET /api/download/wsjtx-bridge`

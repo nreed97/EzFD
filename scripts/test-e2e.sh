@@ -148,6 +148,34 @@ CAB=$(req GET "/api/export/$FD?format=cabrillo")
 [[ "$(req GET "/api/export/$FD")" == *"STX_STRING:5>3A MN"* ]] \
   && ok "  FD ADIF still carries the contest exchange" || no "  FD ADIF still carries the contest exchange"
 
+# ── Server clock endpoint ────────────────────────────────────────────────────
+#
+# The clock-skew banner is only as good as this endpoint. A field server with
+# no RTC stamps every QSO with a wrong time and nothing else notices, so the
+# check needs to keep working — including the database clock, which is what
+# actually stamps the QSOs.
+echo "── server clock ──"
+TIME_JSON=$(req GET /api/time)
+APP_TIME=$(echo "$TIME_JSON" | jq_get app_time)
+DB_TIME=$(echo "$TIME_JSON" | jq_get db_time)
+[[ "$(status GET /api/time)" == "200" ]] \
+  && ok "  /api/time responds" || no "  /api/time responds"
+[[ "$APP_TIME" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]] \
+  && ok "  it reports the app clock as an ISO timestamp" || no "  it reports the app clock as an ISO timestamp" "$APP_TIME"
+[[ "$DB_TIME" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T ]] \
+  && ok "  it reports the database clock too" || no "  it reports the database clock too" "$DB_TIME"
+# Both clocks are read within one request, so any real gap between them means
+# the app and the database are on hosts whose clocks disagree.
+SKEW=$(python3 -c "
+import sys
+from datetime import datetime
+a = datetime.fromisoformat('$APP_TIME'.replace('Z','+00:00'))
+d = datetime.fromisoformat('$DB_TIME'.replace('Z','+00:00'))
+print(int(abs((a-d).total_seconds())))
+" 2>/dev/null)
+[[ -n "$SKEW" && "$SKEW" -lt 60 ]] \
+  && ok "  the app and database clocks agree" || no "  the app and database clocks agree" "${SKEW:-unparseable}s apart"
+
 echo
 if [[ "$FAILURES" -eq 0 ]]; then
   echo "All end-to-end tests passed."

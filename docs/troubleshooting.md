@@ -61,6 +61,23 @@ The event requires roster approval and this operator is pending. A coordinator
 approves them in the admin console: **List / manage events** → open the event
 → **Manage operator roster** → **Toggle approval**.
 
+## "This server's clock is N ahead of / behind this device"
+
+The server and the browser disagree about the time by more than a minute. QSOs
+are timestamped by the server, so contacts logged while this is showing carry
+that wrong time.
+
+Usually the server is the wrong one — a field server with no real-time clock
+and no NTP. Fix it from the admin console: `bash ezfd-admin.sh` → **Server time
+/ clock**. See [Administration](administration.md#server-time).
+
+It can also be the operator's device that's wrong, if their laptop has been
+offline a long time. If one operator sees the banner and the others don't, it's
+that device.
+
+Either way, **QSOs already logged keep the timestamps they were given.** Fixing
+the clock only corrects contacts from that point on.
+
 ## A section is rejected as invalid
 
 The entry form warns when a received section isn't one of the 85 current
