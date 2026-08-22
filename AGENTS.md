@@ -12,8 +12,8 @@ EzFD is a real-time, multi-operator ARRL Field Day / Winter Field Day logger. Ne
 Run `npm run lint`, `npx tsc --noEmit` and `npm run build` — all three must be clean.
 CI gates on all of them, plus `shellcheck` for any shell change.
 
-Changes touching the schema, the SES routes, or `ezfd-admin.sh` should also run
-the relevant suite (CI runs all of them — see the Tests section in `README.md`):
+Changes touching the schema, the SES routes, `lib/scoring.ts` or `ezfd-admin.sh`
+should also run the relevant suite (CI runs all of them — see the Tests section in `README.md`):
 
 | Script | Covers |
 |---|---|
@@ -22,6 +22,7 @@ the relevant suite (CI runs all of them — see the Tests section in `README.md`
 | `scripts/test-restore.sh` | `ezfd-admin.sh` backup/restore for SES, FD and empty events |
 | `scripts/test-e2e.sh` | The API end to end, including Field Day regressions |
 | `scripts/test-sections.cjs` | The ARRL/RAC section list — the three enumerations agree, no hardcoded totals |
+| `scripts/test-scoring.cjs` | The ARRL scoring formula — multipliers, every bonus and its cap, dupes, Worked All Sections |
 
 When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
