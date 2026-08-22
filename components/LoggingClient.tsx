@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
 import { useRigBridge } from '@/lib/useRigBridge';
 import { enqueue, dequeue, loadQueue, type PendingQSO } from '@/lib/offline-queue';
+import { ARRL_SECTIONS } from '@/lib/types';
 import type { Event, QSO, Band, Mode, DisplayQSO, SesReservation } from '@/lib/types';
 import type { QSOSubmission } from './QSOForm';
 import QSOForm from './QSOForm';
@@ -577,7 +578,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
                 onClick={() => setShowNeeds(true)}
                 className="w-full rounded-lg border border-zinc-700 py-2 text-xs font-semibold text-zinc-400 hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
               >
-                Sections Needed ({Math.max(0, 84 - score.sections_worked)})
+                Sections Needed ({Math.max(0, ARRL_SECTIONS.length - score.sections_worked)})
               </button>
             </>
           )}

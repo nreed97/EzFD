@@ -36,6 +36,8 @@ export const SECTION_DATA: Record<string, SectionInfo> = {
   TN:  { name: 'Tennessee',             lat: 35.9,  lon: -86.6 },
   VA:  { name: 'Virginia',              lat: 37.7,  lon: -78.6 },
   WCF: { name: 'West Central Florida',  lat: 28.1,  lon: -82.5 },
+  PR:  { name: 'Puerto Rico',           lat: 18.2,  lon: -66.5 },
+  VI:  { name: 'US Virgin Islands',     lat: 18.3,  lon: -64.9 },
   // 5th Call District
   AR:  { name: 'Arkansas',              lat: 34.8,  lon: -92.3 },
   LA:  { name: 'Louisiana',             lat: 30.9,  lon: -91.8 },
@@ -87,14 +89,17 @@ export const SECTION_DATA: Record<string, SectionInfo> = {
   // Canada (RAC sections)
   AB:  { name: 'Alberta',               lat: 53.9,  lon: -116.6 },
   BC:  { name: 'British Columbia',      lat: 53.7,  lon: -127.6 },
+  GH:  { name: 'Golden Horseshoe',      lat: 43.5,  lon: -79.6 },
   MB:  { name: 'Manitoba',              lat: 53.8,  lon: -98.8 },
   NB:  { name: 'New Brunswick',         lat: 46.6,  lon: -66.5 },
-  NL:  { name: 'Newfoundland',          lat: 53.1,  lon: -56.3 },
+  NL:  { name: 'Newfoundland/Labrador', lat: 53.1,  lon: -56.3 },
   NS:  { name: 'Nova Scotia',           lat: 44.7,  lon: -63.7 },
-  NT:  { name: 'NWT',                   lat: 64.8,  lon: -124.8 },
-  ON:  { name: 'Ontario',               lat: 50.0,  lon: -85.8 },
-  PEI: { name: 'Prince Edward Island',  lat: 46.4,  lon: -63.2 },
+  // Yukon, Northwest Territories and Nunavut are one section, not three.
+  NT:  { name: 'Northern Territories',  lat: 64.5,  lon: -115.0 },
+  ONE: { name: 'Ontario East',          lat: 45.2,  lon: -76.4 },
+  ONN: { name: 'Ontario North',         lat: 49.7,  lon: -87.0 },
+  ONS: { name: 'Ontario South',         lat: 43.8,  lon: -81.3 },
+  PE:  { name: 'Prince Edward Island',  lat: 46.4,  lon: -63.2 },
   QC:  { name: 'Quebec',                lat: 53.0,  lon: -71.6 },
   SK:  { name: 'Saskatchewan',          lat: 52.9,  lon: -106.5 },
-  YT:  { name: 'Yukon',                 lat: 64.3,  lon: -135.0 },
 };

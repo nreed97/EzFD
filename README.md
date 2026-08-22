@@ -144,8 +144,8 @@ Tailwind v4 · Leaflet · Hamlib
 
 `AGENTS.md` documents the conventions and the accumulated gotchas — worth
 reading before changing anything non-obvious. `npx tsc --noEmit` and
-`npm run build` must both be clean; CI additionally runs the schema,
-query, restore and end-to-end suites.
+`npm run build` must both be clean; CI additionally runs the section-list,
+schema, query, restore and end-to-end suites.
 
 When adding a test, break the thing it guards and watch it fail before
 trusting it. That practice has already caught a bug the test was written to
@@ -153,12 +153,5 @@ prevent.
 
 ## Known issues
 
-- [#12](https://github.com/nreed97/EzFD/issues/12) — the Cabrillo
-  `CLAIMED-SCORE` header is computed separately from the app's scoring and is
-  wrong. The score shown in the app is correct.
 - [#13](https://github.com/nreed97/EzFD/issues/13) — eslint and shellcheck
   backlogs, keeping those CI gates advisory for now.
-- [#14](https://github.com/nreed97/EzFD/issues/14) — the Worked All Sections
-  bonus is awarded at the app's section-list length (81) while the summary
-  sheet checks a hardcoded 84, so the worksheet can omit a bonus the score
-  includes.
