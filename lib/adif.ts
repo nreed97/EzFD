@@ -1,4 +1,4 @@
-import type { QSO, Event, Band, Mode } from './types';
+import type { QSO, Event, Band, Mode, SesOperator } from './types';
 
 // ──────────────────────────────────────────────
 // ADIF import / parsing
@@ -141,9 +141,26 @@ function modeToAdif(mode: string): string {
   return mode === 'PH' ? 'SSB' : mode === 'DIG' ? 'FT8' : 'CW';
 }
 
-export function generateADIF(event: Event, qsos: QSO[]): string {
+/**
+ * Per-operator station identity, keyed by operator callsign.
+ *
+ * A distributed special event station has one location *per operator*, not
+ * one per event. LoTW signs by station callsign and location, so the MY_*
+ * fields have to follow whoever actually made the contact — taking them from
+ * events.location would stamp every operator's QSOs with the same wrong
+ * location and produce a log that won't upload cleanly.
+ */
+export type OperatorLocations = Record<string, Pick<SesOperator, 'grid' | 'state' | 'county' | 'dxcc'>>;
+
+export function generateADIF(
+  event: Event,
+  qsos: QSO[],
+  operatorLocations: OperatorLocations = {},
+): string {
+  const isSes = event.event_type === 'SES';
+
   const header = [
-    'ADIF exported by EzFD',
+    `ADIF exported by EzFD`,
     `<PROGRAMID:4>EzFD`,
     `<PROGRAMVERSION:5>1.0.0`,
     '<EOH>',
@@ -152,18 +169,48 @@ export function generateADIF(event: Event, qsos: QSO[]): string {
   const records = qsos
     .filter(q => !q.is_dupe)
     .map(q => {
+      // The operator's own location, for a distributed SES. Falls back to
+      // nothing rather than to the event's location, so a missing roster
+      // entry produces an incomplete record instead of a wrong one.
+      const loc = q.operator_call ? operatorLocations[q.operator_call] : undefined;
+
       const fields = [
         adifField('CALL', q.callsign),
         adifField('BAND', q.band),
-        adifField('FREQ', bandToFreq(q.band)),
-        adifField('MODE', modeToAdif(q.mode)),
+        adifField('FREQ', q.freq_khz ? (q.freq_khz / 1000).toFixed(4) : bandToFreq(q.band)),
+        // adif_mode carries the real submode (FT8, RTTY...) when the PH/CW/DIG
+        // bucket that scoring uses isn't specific enough for an ADIF importer.
+        adifField('MODE', q.adif_mode || modeToAdif(q.mode)),
         adifField('QSO_DATE', formatDate(q.datetime_utc)),
         adifField('TIME_ON', formatTime(q.datetime_utc)),
+
+        // STATION_CALLSIGN is the call that was signed on the air — the club
+        // or special event call. OPERATOR is the individual at the key.
         adifField('STATION_CALLSIGN', event.club_call),
-        adifField('MY_ARRL_SECT', event.arrl_section),
-        q.rcvd_class ? adifField('SRX_STRING', `${q.rcvd_class} ${q.rcvd_section ?? ''}`.trim()) : '',
-        adifField('STX_STRING', `${event.class} ${event.arrl_section}`),
         q.operator_call ? adifField('OPERATOR', q.operator_call) : '',
+
+        loc?.grid   ? adifField('MY_GRIDSQUARE', loc.grid)          : '',
+        loc?.state  ? adifField('MY_STATE', loc.state)              : '',
+        loc?.county ? adifField('MY_CNTY', loc.county)              : '',
+        loc?.dxcc   ? adifField('MY_DXCC', String(loc.dxcc))        : '',
+
+        // Contest exchange — omitted entirely for an SES, which has none.
+        !isSes && event.arrl_section ? adifField('MY_ARRL_SECT', event.arrl_section) : '',
+        !isSes && q.rcvd_class
+          ? adifField('SRX_STRING', `${q.rcvd_class} ${q.rcvd_section ?? ''}`.trim())
+          : '',
+        !isSes && event.class
+          ? adifField('STX_STRING', `${event.class} ${event.arrl_section ?? ''}`.trim())
+          : '',
+
+        // SES exchange — signal report plus whatever the operator captured.
+        q.rst_sent  ? adifField('RST_SENT', q.rst_sent)   : '',
+        q.rst_rcvd  ? adifField('RST_RCVD', q.rst_rcvd)   : '',
+        q.rcvd_name ? adifField('NAME', q.rcvd_name)      : '',
+        q.rcvd_qth  ? adifField('QTH', q.rcvd_qth)        : '',
+        q.rcvd_grid ? adifField('GRIDSQUARE', q.rcvd_grid): '',
+        q.comment   ? adifField('COMMENT', q.comment)     : '',
+
         '<EOR>',
       ].filter(Boolean);
       return fields.join(' ');

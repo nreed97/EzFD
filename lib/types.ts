@@ -1,6 +1,19 @@
 export type Band = '160m' | '80m' | '40m' | '20m' | '15m' | '10m' | '6m' | '2m' | '1.25m' | '70cm' | 'SAT';
 export type Mode = 'PH' | 'CW' | 'DIG';
 
+/** FD and WFD are ARRL contests. SES is a Special Event Station — a
+ *  distributed activation of one callsign, with no contest exchange and no
+ *  score, coordinated by band/mode checkout instead. */
+export type EventType = 'FD' | 'WFD' | 'SES';
+
+/** SOFT logs the QSO and warns; HARD refuses it. Offline replays bypass both. */
+export type SlotEnforcement = 'SOFT' | 'HARD';
+
+/** EVENT = once per band/mode for the whole event (the ARRL contest rule).
+ *  DAY   = once per band/mode per UTC day (the sane default for a multi-week SES).
+ *  NONE  = never flag a dupe. */
+export type DupeRule = 'EVENT' | 'DAY' | 'NONE';
+
 export interface Bonuses {
   emergency_power?: boolean;
   w1aw_bulletin?: boolean;
@@ -27,15 +40,63 @@ export interface Event {
   club_name: string;
   club_call: string;
   event_year: number;
-  event_type: 'FD' | 'WFD';
+  event_type: EventType;
   power: 'HIGH' | 'LOW' | 'QRP';
-  class: string;
-  arrl_section: string;
+  /** null for SES — there is no contest class. */
+  class: string | null;
+  /** null for SES — there is no contest section. */
+  arrl_section: string | null;
   location: string | null;
   qrz_username: string | null;
   use_call_history: boolean;
   use_master_callsign_file: boolean;
   bonuses: Bonuses;
+  created_at: string;
+  // SES-only fields — null/default on FD and WFD events.
+  starts_at: string | Date | null;
+  ends_at: string | Date | null;
+  ses_description: string | null;
+  ses_qsl_info: string | null;
+  slot_enforcement: SlotEnforcement;
+  slot_minutes: number;
+  dupe_rule: DupeRule;
+}
+
+/** True when the event is a Special Event Station, i.e. contest scoring,
+ *  the class/section exchange and Cabrillo export do not apply. */
+export function isSES(event: Pick<Event, 'event_type'>): boolean {
+  return event.event_type === 'SES';
+}
+
+/** One operator's claim on the shared callsign for a band/mode over a time
+ *  window. Overlap is prevented by an exclusion constraint in the database,
+ *  not by the application — see db/schema.sql. */
+export interface SesReservation {
+  id: string;
+  event_id: string;
+  op_call: string;
+  band: Band;
+  mode: Mode;
+  starts_at: string;
+  ends_at: string | null;
+  planned_freq: string | null;
+  note: string | null;
+  status: 'RESERVED' | 'RELEASED';
+  created_at: string;
+}
+
+/** Per-operator station identity. A distributed SES has one location per
+ *  operator, and LoTW signs by station callsign *and* location, so these
+ *  feed the ADIF MY_* fields per QSO rather than per event. */
+export interface SesOperator {
+  event_id: string;
+  op_call: string;
+  op_name: string | null;
+  grid: string | null;
+  state: string | null;
+  county: string | null;
+  dxcc: number | null;
+  approved: boolean;
   created_at: string;
 }
 
@@ -54,6 +115,17 @@ export interface QSO {
   station_number: number;
   is_dupe: boolean;
   created_at: string;
+  // SES exchange — null on contest QSOs.
+  rst_sent: string | null;
+  rst_rcvd: string | null;
+  rcvd_name: string | null;
+  rcvd_qth: string | null;
+  rcvd_grid: string | null;
+  comment: string | null;
+  /** The real ADIF submode (FT8, RTTY, ...) when it differs from the
+   *  PH/CW/DIG bucket that scoring and dupe detection use. */
+  adif_mode: string | null;
+  freq_khz: number | null;
 }
 
 export interface QSOFormData {
@@ -64,6 +136,12 @@ export interface QSOFormData {
   rcvd_section: string;
   operator_call: string;
   station_number: number;
+  rst_sent?: string;
+  rst_rcvd?: string;
+  rcvd_name?: string;
+  rcvd_qth?: string;
+  rcvd_grid?: string;
+  comment?: string;
 }
 
 export interface BandStats {

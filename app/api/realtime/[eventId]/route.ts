@@ -8,8 +8,11 @@ export async function GET(
   { params }: { params: Promise<{ eventId: string }> }
 ) {
   const { eventId } = await params;
-  // pg_notify channel — UUID hyphens are fine in text channel names
-  const channel = `qsos_${eventId}`;
+  // pg_notify channels — UUID hyphens are fine in text channel names.
+  // Both are served over one connection: QSO inserts/updates/deletes, and
+  // SES call checkouts, so the coordination grid is live rather than polled.
+  const qsoChannel = `qsos_${eventId}`;
+  const sesChannel = `ses_${eventId}`;
 
   const encoder = new TextEncoder();
   let pgClient: Client | null = null;
@@ -31,8 +34,9 @@ export async function GET(
 
       try {
         await pgClient.connect();
-        // Double-quote the channel name so hyphens in the UUID are safe
-        await pgClient.query(`LISTEN "${channel}"`);
+        // Double-quote the channel names so hyphens in the UUID are safe
+        await pgClient.query(`LISTEN "${qsoChannel}"`);
+        await pgClient.query(`LISTEN "${sesChannel}"`);
 
         // Initial heartbeat so the browser knows the stream is live
         controller.enqueue(encoder.encode(': connected\n\n'));
@@ -44,7 +48,8 @@ export async function GET(
 
         pgClient.on('notification', (msg) => {
           if (closed || !msg.payload) return;
-          controller.enqueue(encoder.encode(`event: qso\ndata: ${msg.payload}\n\n`));
+          const name = msg.channel === sesChannel ? 'reservation' : 'qso';
+          controller.enqueue(encoder.encode(`event: ${name}\ndata: ${msg.payload}\n\n`));
         });
 
         pgClient.on('error', () => cleanup());

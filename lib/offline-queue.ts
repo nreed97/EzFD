@@ -13,6 +13,13 @@ export interface PendingQSO {
   rcvd_section: string;
   operator_call: string;
   station_number: number;
+  // SES exchange — absent on contest QSOs.
+  rst_sent?: string;
+  rst_rcvd?: string;
+  rcvd_name?: string;
+  rcvd_qth?: string;
+  rcvd_grid?: string;
+  comment?: string;
 }
 
 function queueKey(eventId: string) {

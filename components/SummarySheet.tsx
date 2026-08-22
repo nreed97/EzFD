@@ -91,9 +91,9 @@ export default function SummarySheet({ event, score, bonuses, operators, onClose
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1">
                   <Row label="Club name"    value={event.club_name} />
                   <Row label="Callsign"     value={event.club_call} />
-                  <Row label="Class"        value={event.class} />
+                  <Row label="Class"        value={event.class ?? '—'} />
                   <Row label="Power"        value={event.power ?? 'HIGH'} />
-                  <Row label="ARRL section" value={event.arrl_section} />
+                  <Row label="ARRL section" value={event.arrl_section ?? '—'} />
                   {event.location && <Row label="Location" value={event.location} className="col-span-2" />}
                 </div>
               </section>
