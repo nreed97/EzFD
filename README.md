@@ -9,6 +9,10 @@ it will — logging carries on locally and syncs when it comes back.
 
 📖 **[Full documentation](docs/)**
 
+<p align="center">
+  <img src="docs/images/logging-screen.png" alt="The logging screen: entry form, band/mode, operators and live score" width="100%">
+</p>
+
 ---
 
 ## What it does
@@ -50,6 +54,29 @@ LoTW needs from a station operated from several places.
 **Exports that go where you need them.** ADIF for LoTW and QRZ, Cabrillo for
 ARRL submission, a printable summary worksheet, and per-operator or
 date-filtered ADIF slices.
+
+<table>
+<tr>
+<td width="50%">
+  <img src="docs/images/dashboard.png" alt="Live dashboard: section map, score, sections worked and operators"><br>
+  <sub>Live dashboard — section map, score, and every operator's rate on a second screen</sub>
+</td>
+<td width="50%">
+  <img src="docs/images/ses-checkout.png" alt="Special event call checkout panel, holding 20m PH"><br>
+  <sub>Special event call checkout — one signal per band/mode, enforced by the database</sub>
+</td>
+</tr>
+<tr>
+<td width="50%">
+  <img src="docs/images/summary-sheet.png" alt="Printable ARRL Field Day summary sheet"><br>
+  <sub>Printable ARRL summary sheet — QSO totals, score calculation, bonuses and sections</sub>
+</td>
+<td width="50%">
+  <img src="docs/images/create-event-ses.png" alt="Create event form for a special event station"><br>
+  <sub>One event type for Field Day, Winter Field Day, or a special event station</sub>
+</td>
+</tr>
+</table>
 
 ---
 

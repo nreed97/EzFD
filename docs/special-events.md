@@ -29,6 +29,8 @@ part that needs real enforcement, and it's the reason the checkout exists.
 
 ## Setting up
 
+![Create Special Event Station form: activation window, coordination and QSL info](images/create-event-ses.png)
+
 Choose **Special Event** as the event type. You get:
 
 | Field | Meaning |
@@ -47,6 +49,8 @@ special event, working the same station again next weekend is normal rather
 than a mistake.
 
 ## The call checkout
+
+![Call Checkout panel: an operator holding 20m PH, with the on-the-air list](images/ses-checkout.png)
 
 Operators claim the callsign for a band and mode from the **Call Checkout**
 panel.
