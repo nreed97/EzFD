@@ -189,6 +189,11 @@ export default function ClockTimePicker({
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
 
   useLayoutEffect(() => {
+    // the position is measured from laid-out DOM (the panel's real height, see
+    // below), which by definition is not knowable during render. Measuring in
+    // a layout effect and setting state is exactly the case useLayoutEffect
+    // exists for, and it commits before paint so there is no visible reflow.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     if (!open) { setPos(null); return; }
     function reposition() {
       const rect = wrapRef.current?.getBoundingClientRect();

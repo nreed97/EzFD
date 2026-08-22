@@ -1,11 +1,12 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
 import L from 'leaflet';
 import type { LatLngExpression } from 'leaflet';
 import 'leaflet/dist/leaflet.css';
 import { SECTION_DATA } from '@/lib/sections';
+import { useLightMode } from '@/lib/useLightMode';
 
 interface Props {
   workedSections: string[];
@@ -56,16 +57,7 @@ function sectionIcon(section: string, worked: boolean, lightMode: boolean) {
 
 export default function MapView({ workedSections }: Props) {
   const workedSet = new Set(workedSections.map(s => s.toUpperCase()));
-  const [lightMode, setLightMode] = useState(false);
-
-  useEffect(() => {
-    setLightMode(document.documentElement.classList.contains('light'));
-    const observer = new MutationObserver(() => {
-      setLightMode(document.documentElement.classList.contains('light'));
-    });
-    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] });
-    return () => observer.disconnect();
-  }, []);
+  const lightMode = useLightMode();
 
   const tileUrl = lightMode
     ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'

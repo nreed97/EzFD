@@ -1,16 +1,13 @@
 # The checks AGENTS.md already requires before finishing a change, plus the
 # ones that would have caught bugs this project has actually hit:
 #
-#   build   — the section-list consistency check, then typecheck and the
-#             production build (the AGENTS.md gate), then the end-to-end API
-#             flow against the real server
+#   build   — the section-list and scoring unit checks, then lint, typecheck
+#             and the production build (the AGENTS.md gate), then the
+#             end-to-end API flow against the real server
 #   schema  — schema idempotency, the SES exclusion constraint, the route-level
 #             SQL, and the admin console's backup/restore round trip
 #   shell   — syntax-checks the shell scripts and gates on shellcheck
-#
-# `npm run lint` is still ungated: the mechanical eslint findings are cleared,
-# but 25 react-hooks findings remain and want individual judgement rather than
-# a blanket suppression. Tracked in #13.
+
 name: CI
 
 on:
@@ -54,6 +51,18 @@ jobs:
       # written out as a literal instead of derived from ARRL_SECTIONS.length.
       - name: Section list consistency
         run: node scripts/test-sections.cjs
+
+      # The scoring formula decides the number a club submits to the ARRL, so
+      # it gets asserted directly rather than only through the Cabrillo header
+      # in the end-to-end suite. Compiles lib/scoring.ts with the project's own
+      # tsc — no runner, no database, no server.
+      - name: Scoring tests
+        run: node scripts/test-scoring.cjs
+
+      # Gated now that the react-hooks backlog is worked through. Anything it
+      # reports is new.
+      - name: Lint
+        run: npm run lint
 
       - name: Typecheck
         run: npx tsc --noEmit

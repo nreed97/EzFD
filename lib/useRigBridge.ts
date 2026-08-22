@@ -16,10 +16,21 @@ export function useRigBridge({ onBand, onMode }: Options = {}) {
   const [canCw, setCanCw] = useState(false);
   const [cwError, setCwError] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  // The callbacks live in refs, not in the socket effect's dependency list.
+  // LoggingClient re-renders on every rig frequency tick (~4/sec), so an
+  // inline arrow prop gets a fresh identity that often; depending on it
+  // directly would tear down and reopen the WebSocket each time. AGENTS.md
+  // records this pattern because losing it once stopped an auto-CQ timer from
+  // ever completing its interval.
+  //
+  // The assignment belongs in an effect rather than in the render body — the
+  // same shape SesCoordination already uses for activeRef. Writing a ref
+  // during render is what `react-hooks/refs` objects to, and it makes the
+  // render non-idempotent under StrictMode's double-invoke.
   const onBandRef = useRef(onBand);
   const onModeRef = useRef(onMode);
-  onBandRef.current = onBand;
-  onModeRef.current = onMode;
+  useEffect(() => { onBandRef.current = onBand; }, [onBand]);
+  useEffect(() => { onModeRef.current = onMode; }, [onMode]);
 
   useEffect(() => {
     let ws: WebSocket | null = null;

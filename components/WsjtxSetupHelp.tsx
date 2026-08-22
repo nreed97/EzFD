@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 
 interface Props {
   joinCode: string;
@@ -9,12 +9,19 @@ interface Props {
   onClose: () => void;
 }
 
+const subscribeNever = () => () => {};
+const getOrigin = () => window.location.origin;
+const getNoOrigin = () => '';
+
 export default function WsjtxSetupHelp({ joinCode, operatorCall, stationNumber, onClose }: Props) {
-  const [apiUrl, setApiUrl] = useState('');
   const [showAdif, setShowAdif] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
 
-  useEffect(() => { setApiUrl(window.location.origin); }, []);
+  // The relay .bat needs an absolute URL to reach this server, and the origin
+  // is only knowable in the browser. Subscribing with a no-op (it never
+  // changes for the life of the document) reads it on the first client render
+  // instead of rendering a dead link and correcting it in an effect.
+  const apiUrl = useSyncExternalStore(subscribeNever, getOrigin, getNoOrigin);
 
   const relayUrl = apiUrl
     ? `/api/download/relay?join_code=${encodeURIComponent(joinCode)}&operator=${encodeURIComponent(operatorCall)}&station=${stationNumber}&api_url=${encodeURIComponent(apiUrl)}`

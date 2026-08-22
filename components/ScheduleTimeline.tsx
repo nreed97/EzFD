@@ -17,6 +17,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Band, Mode, SesReservation } from '@/lib/types';
 import { BANDS, MODES } from '@/lib/types';
+import { useNow } from '@/lib/useNow';
 
 interface Props {
   eventId: string;
@@ -59,7 +60,6 @@ function stampUTC(iso: string | null): string {
 export default function ScheduleTimeline({ eventId, myOpCall, refreshToken }: Props) {
   const [rows, setRows] = useState<SesReservation[]>([]);
   const [spanHours, setSpanHours] = useState<number>(12);
-  const [, setTick] = useState(0);
 
   const span = SPANS.find(s => s.hours === spanHours) ?? SPANS[1];
   const pastHours = Math.ceil(span.hours * PAST_FRACTION);
@@ -74,14 +74,19 @@ export default function ScheduleTimeline({ eventId, myOpCall, refreshToken }: Pr
     if (res?.ok) setRows(await res.json());
   }, [eventId, pastHours]);
 
-  useEffect(() => { load(); }, [load, refreshToken]);
-
   useEffect(() => {
-    const id = setInterval(() => setTick(t => t + 1), TICK_MS);
-    return () => clearInterval(id);
-  }, []);
+    // the loader is async: whatever state it sets happens in a promise
+    // continuation after an await, never synchronously during the effect, so
+    // it cannot cascade a render. The rule cannot see through the async
+    // boundary.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    load();
+  }, [load, refreshToken]);
 
-  const now = Date.now();
+  // Was a bare tick counter whose only job was to force a re-render so the
+  // Date.now() below would be re-read. useNow is that, with the clock value
+  // itself in state so render stays pure.
+  const now = useNow(TICK_MS);
   const windowStart = now - span.hours * PAST_FRACTION * 3_600_000;
   const windowEnd = windowStart + span.hours * 3_600_000;
   const windowMs = windowEnd - windowStart;
