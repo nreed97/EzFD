@@ -130,6 +130,10 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
   // Auto CQ is intentionally NOT restored from storage — it always starts
   // OFF and must be manually enabled each session, even if it was left on
   // in a previous one.
+  // Web storage does not exist during SSR, so this genuinely cannot be read
+  // while rendering and has to happen on mount. It runs once and settles; the
+  // extra render is the unavoidable cost of the value being client-only.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     try {
       const raw = localStorage.getItem(storageKey);
@@ -143,6 +147,8 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
       }
     } catch { /* ignore malformed storage */ }
   }, [storageKey]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
 
   const persist = useCallback((next: Partial<Store>) => {
     try {

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useNow } from '@/lib/useNow';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { calculateScore } from '@/lib/scoring';
@@ -65,6 +66,10 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   // the checkout board prefill "assign to me" for whoever is viewing.
   const [myOpCall, setMyOpCall] = useState('');
 
+  // Web storage does not exist during SSR, so this genuinely cannot be read
+  // while rendering and has to happen on mount. It runs once and settles; the
+  // extra render is the unavoidable cost of the value being client-only.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const saved = sessionStorage.getItem(`ezfd_op_${event.join_code}`);
     if (saved) {
@@ -74,6 +79,8 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
       } catch {}
     }
   }, [event.join_code]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
 
   // Bumped whenever checkouts change, so the timeline (which fetches its own
   // wider window, including past and released slots) reloads in step without
@@ -105,6 +112,11 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
 
   useEffect(() => {
     if (!isSes) return;
+    // the loader is async: whatever state it sets happens in a promise
+    // continuation after an await, never synchronously during the effect, so
+    // it cannot cascade a render. The rule cannot see through the async
+    // boundary.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshReservations();
     const id = setInterval(refreshReservations, PRESENCE_POLL_MS);
     return () => clearInterval(id);
@@ -124,8 +136,13 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
     return () => { cancelled = true; clearInterval(id); };
   }, [event.id]);
 
+  // One ticking clock for the whole dashboard: the "last hour" QSO count, the
+  // active-reservation filter and the per-operator active dot all read it, and
+  // all three previously only updated when something else forced a render.
+  const nowMs = useNow(PRESENCE_POLL_MS);
+
   const score = calculateScore(qsos, bonuses, event.power);
-  const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000).toISOString();
+  const oneHourAgo = new Date(nowMs - 60 * 60 * 1000).toISOString();
   const recentQSOs = qsos.filter(q => !q.is_dupe && (typeof q.datetime_utc === 'string' ? q.datetime_utc : q.datetime_utc.toISOString()) > oneHourAgo).length;
 
   const opStats: Record<string, { total: number; ph: number; cw: number; dig: number; first: number; last: number }> = {};
@@ -151,7 +168,6 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   // haven't logged one yet (e.g. just signed on) — everyone gets a row.
   const allOpCalls = Array.from(new Set([...Object.keys(opStats), ...presence.map(p => p.op_call)]));
 
-  const nowMs = Date.now();
   const activeReservations = reservations.filter(r => {
     const start = new Date(r.starts_at).getTime();
     const end = r.ends_at ? new Date(r.ends_at).getTime() : Infinity;
@@ -357,7 +373,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
                   const windowHours = Math.max((s.last - s.first) / 3_600_000, 1);
                   const qhr = s.total > 0 ? Math.round(s.total / windowHours) : 0;
                   const p = presenceByOp[op];
-                  const active = p ? (Date.now() - new Date(p.updated_at).getTime()) <= INACTIVE_MS : false;
+                  const active = p ? (nowMs - new Date(p.updated_at).getTime()) <= INACTIVE_MS : false;
                   return (
                     <div key={op} className={`py-1 border-b border-zinc-800/50 last:border-0 light:border-zinc-200 ${p && !active ? 'opacity-40' : ''}`}>
                       <div className="flex items-baseline justify-between gap-2">

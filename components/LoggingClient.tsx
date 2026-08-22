@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useStoredFlag } from '@/lib/useStoredFlag';
+import { useOnline } from '@/lib/useOnline';
 import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
 import { useRigBridge } from '@/lib/useRigBridge';
@@ -112,12 +114,12 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const router = useRouter();
   const [confirmedQSOs, setConfirmedQSOs] = useState<QSO[]>(initialQSOs);
   const [pendingQSOs, setPendingQSOs] = useState<DisplayQSO[]>([]);
-  const [isOnline, setIsOnline] = useState(true);
+  const isOnline = useOnline();
   const [pendingCount, setPendingCount] = useState(0);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [lastLogged, setLastLogged] = useState<DisplayQSO | null>(null);
-  const [nightMode, setNightMode] = useState(false);
+  const [nightMode, setNightMode] = useStoredFlag('ezfd_night');
   const [currentBand, setCurrentBand] = useState<Band>('20m');
   const [currentMode, setCurrentMode] = useState<Mode>('PH');
   const [mobileTab, setMobileTab] = useState<'log' | 'qsos'>('log');
@@ -142,19 +144,15 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const rigConnected = rig.connected;
   const rigFreq = rig.freq;
 
-  useEffect(() => {
-    setNightMode(localStorage.getItem('ezfd_night') === '1');
-  }, []);
-
   function toggleNight() {
-    setNightMode(prev => {
-      const next = !prev;
-      localStorage.setItem('ezfd_night', next ? '1' : '0');
-      return next;
-    });
+    setNightMode(prev => !prev);
   }
 
   // Restore any pending QSOs from localStorage on mount
+  // Web storage does not exist during SSR, so this genuinely cannot be read
+  // while rendering and has to happen on mount. It runs once and settles; the
+  // extra render is the unavoidable cost of the value being client-only.
+  /* eslint-disable react-hooks/set-state-in-effect */
   useEffect(() => {
     const stored = loadQueue(event.id);
     if (stored.length > 0) {
@@ -162,6 +160,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       setPendingCount(stored.length);
     }
   }, [event.id, event.class, event.arrl_section]);
+  /* eslint-enable react-hooks/set-state-in-effect */
+
 
   // SSE subscription for real-time QSO updates
   useEffect(() => {
@@ -234,17 +234,17 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     syncingRef.current = false;
   }, [event.id]);
 
+  // The connectivity *value* comes from useOnline; this effect exists only
+  // for the side effect of draining the offline queue on the transition back
+  // to online. flushQueue is deliberately not in the deps — see its own note.
   useEffect(() => {
-    const onOnline  = () => { setIsOnline(true); flushQueue(); };
-    const onOffline = () => setIsOnline(false);
-    setIsOnline(navigator.onLine);
-    window.addEventListener('online', onOnline);
-    window.addEventListener('offline', onOffline);
-    return () => {
-      window.removeEventListener('online', onOnline);
-      window.removeEventListener('offline', onOffline);
-    };
-  }, [flushQueue]);
+    // the loader is async: whatever state it sets happens in a promise
+    // continuation after an await, never synchronously during the effect, so
+    // it cannot cascade a render. The rule cannot see through the async
+    // boundary.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    if (isOnline) flushQueue();
+  }, [isOnline, flushQueue]);
 
   const logQSO = useCallback(async (data: QSOSubmission) => {
     setSubmitting(true);

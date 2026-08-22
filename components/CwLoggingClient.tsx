@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { useStoredFlag } from '@/lib/useStoredFlag';
 import { useRigBridge } from '@/lib/useRigBridge';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
 import QSOForm, { type QSOFormHandle } from './QSOForm';
@@ -20,22 +21,16 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [lastLogged, setLastLogged] = useState<DisplayQSO | null>(null);
-  const [esm, setEsm] = useState(true);
   const formRef = useRef<QSOFormHandle>(null);
   const macroPanelRef = useRef<CwMacroPanelHandle>(null);
 
   const esmStorageKey = `ezfd_cw_esm_${event.id}_${operatorCall}`;
-  useEffect(() => {
-    const saved = localStorage.getItem(esmStorageKey);
-    if (saved !== null) setEsm(saved === '1');
-  }, [esmStorageKey]);
+  // Defaults to on, as before, and now also stays in step with the main
+  // logging window rather than each document holding its own copy.
+  const [esm, setEsm] = useStoredFlag(esmStorageKey, true);
 
   function toggleEsm() {
-    setEsm(prev => {
-      const next = !prev;
-      localStorage.setItem(esmStorageKey, next ? '1' : '0');
-      return next;
-    });
+    setEsm(prev => !prev);
   }
 
   const rig = useRigBridge({ onBand: setCurrentBand, onMode: setCurrentMode });

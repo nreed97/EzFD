@@ -7,6 +7,7 @@
 // meant for a coordinator managing the whole roster from one screen.
 
 import { useMemo, useState } from 'react';
+import { useNow } from '@/lib/useNow';
 import type { Band, Mode, SesReservation } from '@/lib/types';
 import { BANDS, MODES } from '@/lib/types';
 import DateTimeField from './DateTimeField';
@@ -74,7 +75,8 @@ export default function CheckoutBoard({
   const eventMinDate = eventStartsAt ? new Date(eventStartsAt).toISOString().slice(0, 10) : undefined;
   const eventMaxDate = eventEndsAt ? new Date(eventEndsAt).toISOString().slice(0, 10) : undefined;
 
-  const now = Date.now();
+  // Ticking, so a slot visibly stops being 'active' when it expires.
+  const now = useNow();
   const active = useMemo(() => reservations.filter(r => {
     const start = new Date(r.starts_at).getTime();
     const end = r.ends_at ? new Date(r.ends_at).getTime() : Infinity;

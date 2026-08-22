@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useNow } from '@/lib/useNow';
 import type { Band, Mode, SesReservation } from '@/lib/types';
 import { BANDS, MODES } from '@/lib/types';
 import DateTimeField from './DateTimeField';
@@ -93,7 +94,14 @@ export default function SesCoordination({
     if (res?.ok) setReservations(await res.json());
   }, [eventId]);
 
-  useEffect(() => { fetchReservations(); }, [fetchReservations, refreshToken]);
+  useEffect(() => {
+    // the loader is async: whatever state it sets happens in a promise
+    // continuation after an await, never synchronously during the effect, so
+    // it cannot cascade a render. The rule cannot see through the async
+    // boundary.
+    // eslint-disable-next-line react-hooks/set-state-in-effect
+    fetchReservations();
+  }, [fetchReservations, refreshToken]);
 
   useEffect(() => {
     const id = setInterval(fetchReservations, POLL_MS);
@@ -111,7 +119,8 @@ export default function SesCoordination({
   const eventMinDate = eventStartsAt ? new Date(eventStartsAt).toISOString().slice(0, 10) : undefined;
   const eventMaxDate = eventEndsAt ? new Date(eventEndsAt).toISOString().slice(0, 10) : undefined;
 
-  const now = Date.now();
+  // Ticking, so a slot visibly stops being 'active' when it expires.
+  const now = useNow();
   const active = reservations.filter(r => {
     const start = new Date(r.starts_at).getTime();
     const end = r.ends_at ? new Date(r.ends_at).getTime() : Infinity;
