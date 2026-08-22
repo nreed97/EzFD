@@ -1,4 +1,8 @@
-export type Band = '160m' | '80m' | '40m' | '20m' | '15m' | '10m' | '6m' | '2m' | '1.25m' | '70cm' | 'SAT';
+// 60m/30m/17m/12m (WARC + 60m) are excluded from ARRL FD/WFD scoring, but a
+// special event station has no contest exchange and isn't bound by that
+// rule — SesCoordination/CheckoutBoard offer them, QSOForm's band grid does
+// not for FD/WFD.
+export type Band = '160m' | '80m' | '60m' | '40m' | '30m' | '20m' | '17m' | '15m' | '12m' | '10m' | '6m' | '2m' | '1.25m' | '70cm' | 'SAT';
 export type Mode = 'PH' | 'CW' | 'DIG';
 
 /** FD and WFD are ARRL contests. SES is a Special Event Station — a
@@ -215,7 +219,7 @@ export interface CallHistoryLookup {
   known_master: boolean;
 }
 
-export const BANDS: Band[] = ['160m', '80m', '40m', '20m', '15m', '10m', '6m', '2m', '1.25m', '70cm', 'SAT'];
+export const BANDS: Band[] = ['160m', '80m', '60m', '40m', '30m', '20m', '17m', '15m', '12m', '10m', '6m', '2m', '1.25m', '70cm', 'SAT'];
 export const MODES: Mode[] = ['PH', 'CW', 'DIG'];
 
 export const MODE_POINTS: Record<Mode, number> = {

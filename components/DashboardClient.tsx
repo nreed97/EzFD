@@ -14,10 +14,11 @@ import RateChart from './RateChart';
 import BandBreakdown from './BandBreakdown';
 import SummarySheet from './SummarySheet';
 import SectionsNeeded from './SectionsNeeded';
+import CheckoutBoard from './CheckoutBoard';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
-type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed';
+type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed' | 'checkouts';
 
 interface StationPresence {
   op_call: string;
@@ -60,6 +61,19 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   const [bonuses, setBonuses] = useState<Bonuses>(event.bonuses ?? {});
   const [showSummary, setShowSummary] = useState(false);
   const [presence, setPresence] = useState<StationPresence[]>([]);
+  // Recovered from sessionStorage, same convention the join page uses — lets
+  // the checkout board prefill "assign to me" for whoever is viewing.
+  const [myOpCall, setMyOpCall] = useState('');
+
+  useEffect(() => {
+    const saved = sessionStorage.getItem(`ezfd_op_${event.join_code}`);
+    if (saved) {
+      try {
+        const { call } = JSON.parse(saved);
+        if (call) setMyOpCall(call);
+      } catch {}
+    }
+  }, [event.join_code]);
 
   const refreshReservations = useCallback(async () => {
     if (!isSes) return;
@@ -138,8 +152,9 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
 
   const VIEW_TABS: { id: MainView; label: string }[] = isSes
     ? [
-        { id: 'rate',  label: 'Rate' },
-        { id: 'bands', label: 'Bands' },
+        { id: 'rate',      label: 'Rate' },
+        { id: 'bands',     label: 'Bands' },
+        { id: 'checkouts', label: 'Checkouts' },
       ]
     : [
         { id: 'map',      label: 'Map' },
@@ -224,6 +239,19 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
           {mainView === 'needed'   && <SectionsNeeded workedSections={score.sections} />}
           {mainView === 'rate'     && <RateChart qsos={qsos} />}
           {mainView === 'bands'    && <BandBreakdown score={score} />}
+          {mainView === 'checkouts' && (
+            <CheckoutBoard
+              eventId={event.id}
+              slotMinutes={event.slot_minutes ?? 120}
+              eventStartsAt={event.starts_at}
+              eventEndsAt={event.ends_at}
+              reservations={reservations}
+              onRefresh={refreshReservations}
+              myOpCall={myOpCall}
+              knownOperators={allOpCalls}
+              readOnly={isVisitor}
+            />
+          )}
         </div>
 
         <aside className="w-full md:w-72 flex flex-col gap-3 overflow-y-auto border-t md:border-t-0 md:border-l border-zinc-800 bg-zinc-900 p-4 light:border-zinc-200 light:bg-zinc-50">

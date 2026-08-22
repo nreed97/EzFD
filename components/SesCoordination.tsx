@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Band, Mode, SesReservation } from '@/lib/types';
 import { BANDS, MODES } from '@/lib/types';
+import DateTimeField from './DateTimeField';
 
 interface Props {
   eventId: string;
@@ -11,6 +12,9 @@ interface Props {
   currentMode: Mode;
   /** Default checkout length for this event, in minutes. */
   slotMinutes: number;
+  /** The event's own window — scheduling ahead can only pick a date inside it. */
+  eventStartsAt: string | Date | null;
+  eventEndsAt: string | Date | null;
   /** Bumped by the parent on every SSE `reservation` event. The parent
    *  already holds an EventSource for this event, so this component refetches
    *  off that rather than opening a second stream. */
@@ -64,11 +68,15 @@ function minutesUntil(iso: string | null): number | null {
 
 export default function SesCoordination({
   eventId, myOpCall, currentBand, currentMode, slotMinutes,
-  refreshToken, lastQsoAt, onHoldingChange,
+  eventStartsAt, eventEndsAt, refreshToken, lastQsoAt, onHoldingChange,
 }: Props) {
   const [reservations, setReservations] = useState<SesReservation[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Background info, distinct from `error`: a failed auto-extend or an
+  // approaching expiry. Shown as a non-disruptive inline banner rather than
+  // interrupting logging.
+  const [notice, setNotice] = useState<string | null>(null);
   const [minutes, setMinutes] = useState(slotMinutes);
   // Booking ahead. The API and the tstzrange model already accept a
   // starts_at, so this is purely a second entry point into the same call.
@@ -96,6 +104,12 @@ export default function SesCoordination({
     const id = setInterval(() => setTick(t => t + 1), 30_000);
     return () => clearInterval(id);
   }, []);
+
+  // Bound the "schedule ahead" date picker to the event's own window — an
+  // SES has no meaning outside it, and it keeps the picker from opening on
+  // an unrelated date months away.
+  const eventMinDate = eventStartsAt ? new Date(eventStartsAt).toISOString().slice(0, 10) : undefined;
+  const eventMaxDate = eventEndsAt ? new Date(eventEndsAt).toISOString().slice(0, 10) : undefined;
 
   const now = Date.now();
   const active = reservations.filter(r => {
@@ -133,15 +147,46 @@ export default function SesCoordination({
       // hold the callsign forever and nobody else could check it out.
       if (!lastQso || Date.now() - new Date(lastQso).getTime() > ACTIVE_WINDOW_MS) return;
 
-      await fetch(`/api/ses/reservations/${slot.id}`, {
+      const res = await fetch(`/api/ses/reservations/${slot.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action: 'extend', op_call: myOpCall, minutes: EXTEND_MINUTES }),
-      }).catch(() => {});
+      }).catch(() => null);
+      if (res && !res.ok) {
+        // Someone else already booked the next window — surface it instead
+        // of silently letting the hold lapse without explanation.
+        const data = await res.json().catch(() => ({}));
+        setNotice(data.error ?? 'Could not auto-extend your slot — it may run out soon.');
+      } else if (res?.ok) {
+        setNotice(null);
+      }
       fetchReservations();
     }, AUTO_EXTEND_CHECK_MS);
     return () => clearInterval(id);
   }, [myOpCall, fetchReservations]);
+
+  // ── Auto-release on band/mode change ───────────────────────────────────
+  // Moving to a different band/mode implicitly abandons whatever slot was
+  // held at the one just left, so it becomes available immediately rather
+  // than sitting held-but-idle until it times out.
+  const activeRef = useRef(active);
+  useEffect(() => { activeRef.current = active; }, [active]);
+
+  const prevBandModeRef = useRef({ band: currentBand, mode: currentMode });
+  useEffect(() => {
+    const prev = prevBandModeRef.current;
+    prevBandModeRef.current = { band: currentBand, mode: currentMode };
+    if (prev.band === currentBand && prev.mode === currentMode) return;
+    const left = activeRef.current.find(
+      r => r.op_call === myOpCall && r.band === prev.band && r.mode === prev.mode
+    );
+    if (!left) return;
+    fetch(`/api/ses/reservations/${left.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action: 'release', op_call: myOpCall }),
+    }).then(() => fetchReservations()).catch(() => {});
+  }, [currentBand, currentMode, myOpCall, fetchReservations]);
 
   async function checkOut() {
     setBusy(true);
@@ -168,6 +213,15 @@ export default function SesCoordination({
 
   async function schedule() {
     if (!planStart) { setError('Pick a start time first.'); return; }
+    const planMs = new Date(`${planStart}:00Z`).getTime();
+    if (eventStartsAt && planMs < new Date(eventStartsAt).getTime()) {
+      setError('That start time is before the event begins.');
+      return;
+    }
+    if (eventEndsAt && planMs > new Date(eventEndsAt).getTime()) {
+      setError('That start time is after the event ends.');
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -244,6 +298,35 @@ export default function SesCoordination({
           <>Nobody holds <strong>{currentBand} {currentMode}</strong> right now</>
         )}
       </div>
+
+      {(() => {
+        const remaining = mySlot?.ends_at ? new Date(mySlot.ends_at).getTime() - now : null;
+        const nearExpiry = !!mySlot && remaining !== null && remaining > 0 && remaining <= EXTEND_THRESHOLD_MS;
+        if (notice) {
+          return (
+            <div className="mb-2 flex items-center justify-between gap-2 rounded border border-amber-700 bg-amber-900/20 px-2 py-1.5 text-[11px] text-amber-400 light:border-amber-500 light:bg-amber-50 light:text-amber-700">
+              <span>{notice}</span>
+              <button type="button" onClick={() => setNotice(null)} className="shrink-0 hover:opacity-70">&times;</button>
+            </div>
+          );
+        }
+        if (nearExpiry) {
+          return (
+            <div className="mb-2 flex items-center justify-between gap-2 rounded border border-amber-700 bg-amber-900/20 px-2 py-1.5 text-[11px] text-amber-400 light:border-amber-500 light:bg-amber-50 light:text-amber-700">
+              <span>Your {mySlot!.band} {mySlot!.mode} hold expires in {Math.max(1, Math.round(remaining! / 60_000))}m.</span>
+              <button
+                type="button"
+                disabled={busy}
+                onClick={() => patchSlot(mySlot!.id, 'extend')}
+                className="shrink-0 font-semibold underline hover:no-underline disabled:opacity-50"
+              >
+                Extend
+              </button>
+            </div>
+          );
+        }
+        return null;
+      })()}
 
       {error && (
         <div className="mb-2 rounded border border-red-800 bg-red-900/25 px-2 py-1 text-[11px] text-red-400">
@@ -331,11 +414,13 @@ export default function SesCoordination({
                 ))}
               </select>
             </div>
-            <input
-              type="datetime-local"
+            <DateTimeField
+              compact
+              label="Start"
               value={planStart}
-              onChange={e => setPlanStart(e.target.value)}
-              className="w-full rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
+              onChange={setPlanStart}
+              minDate={eventMinDate}
+              maxDate={eventMaxDate}
             />
             <button
               type="button"

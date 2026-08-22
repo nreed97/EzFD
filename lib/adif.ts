@@ -17,9 +17,13 @@ function mhzToBand(mhz: number): Band | null {
   const khz = mhz * 1000;
   if (khz >= 1800  && khz < 2000)    return '160m';
   if (khz >= 3500  && khz < 4000)    return '80m';
+  if (khz >= 5330  && khz < 5410)    return '60m';
   if (khz >= 7000  && khz < 7300)    return '40m';
+  if (khz >= 10100 && khz < 10150)   return '30m';
   if (khz >= 14000 && khz < 14350)   return '20m';
+  if (khz >= 18068 && khz < 18168)   return '17m';
   if (khz >= 21000 && khz < 21450)   return '15m';
+  if (khz >= 24890 && khz < 24990)   return '12m';
   if (khz >= 28000 && khz < 29700)   return '10m';
   if (khz >= 50000 && khz < 54000)   return '6m';
   if (khz >= 144000 && khz < 148000) return '2m';
@@ -29,9 +33,9 @@ function mhzToBand(mhz: number): Band | null {
 }
 
 const ADIF_BAND_MAP: Record<string, Band> = {
-  '160m': '160m', '80m': '80m', '40m': '40m', '20m': '20m',
-  '15m': '15m', '10m': '10m', '6m': '6m', '2m': '2m',
-  '1.25m': '1.25m', '70cm': '70cm',
+  '160m': '160m', '80m': '80m', '60m': '60m', '40m': '40m', '30m': '30m',
+  '20m': '20m', '17m': '17m', '15m': '15m', '12m': '12m', '10m': '10m',
+  '6m': '6m', '2m': '2m', '1.25m': '1.25m', '70cm': '70cm',
 };
 
 export function adifModeToEzfd(mode: string): Mode {
@@ -130,9 +134,9 @@ function formatTime(dt: string | Date): string {
 
 function bandToFreq(band: string): string {
   const map: Record<string, string> = {
-    '160m': '1.8', '80m': '3.5', '40m': '7.0', '20m': '14.0',
-    '15m': '21.0', '10m': '28.0', '6m': '50.0', '2m': '144.0',
-    '1.25m': '222.0', '70cm': '432.0', 'SAT': '145.825',
+    '160m': '1.8', '80m': '3.5', '60m': '5.3305', '40m': '7.0', '30m': '10.1',
+    '20m': '14.0', '17m': '18.068', '15m': '21.0', '12m': '24.89', '10m': '28.0',
+    '6m': '50.0', '2m': '144.0', '1.25m': '222.0', '70cm': '432.0', 'SAT': '145.825',
   };
   return map[band] ?? '14.0';
 }

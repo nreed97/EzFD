@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ARRL_SECTIONS, EVENT_TYPE_LABELS, eventTypeLabel } from '@/lib/types';
 import type { EventType, SlotEnforcement, DupeRule } from '@/lib/types';
+import DateTimeField from '@/components/DateTimeField';
 
 // ARRL Field Day entry classes (rule 4). The number in front is the count of
 // simultaneously-transmitting stations, not the operator count.
@@ -218,24 +219,22 @@ export default function NewEventPage() {
             {isSes ? (
               <>
                 <div className="flex flex-col gap-3 sm:flex-row">
-                  <label className="flex flex-1 flex-col gap-1">
+                  <div className="flex flex-1 flex-col gap-1">
                     <span className="text-sm text-zinc-400">Starts (UTC)</span>
-                    <input
-                      type="datetime-local"
+                    <DateTimeField
+                      label="Start"
                       value={sesForm.starts_at}
-                      onChange={e => setSes('starts_at', e.target.value)}
-                      className="input"
+                      onChange={v => setSes('starts_at', v)}
                     />
-                  </label>
-                  <label className="flex flex-1 flex-col gap-1">
+                  </div>
+                  <div className="flex flex-1 flex-col gap-1">
                     <span className="text-sm text-zinc-400">Ends (UTC)</span>
-                    <input
-                      type="datetime-local"
+                    <DateTimeField
+                      label="End"
                       value={sesForm.ends_at}
-                      onChange={e => setSes('ends_at', e.target.value)}
-                      className="input"
+                      onChange={v => setSes('ends_at', v)}
                     />
-                  </label>
+                  </div>
                 </div>
                 <label className="flex flex-col gap-1">
                   <span className="text-sm text-zinc-400">Description (optional)</span>
@@ -245,22 +244,6 @@ export default function NewEventPage() {
                     placeholder="Commemorating the 150th anniversary of ..."
                     className="input"
                   />
-                </label>
-                <label className="flex flex-col gap-1">
-                  <span className="text-sm text-zinc-400">ARRL Section (optional)</span>
-                  <select
-                    value={form.arrl_section}
-                    onChange={e => set('arrl_section', e.target.value)}
-                    className="input"
-                  >
-                    <option value="">&mdash; none &mdash;</option>
-                    {ARRL_SECTIONS.map(sec => <option key={sec} value={sec}>{sec}</option>)}
-                  </select>
-                  <span className="text-xs text-zinc-500">
-                    Not required &mdash; a special event has no contest exchange and
-                    usually runs outside Field Day entirely. Set it if your operators
-                    trade sections; it becomes MY_ARRL_SECT in the exported ADIF.
-                  </span>
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-sm text-zinc-400">QSL Info (optional)</span>
