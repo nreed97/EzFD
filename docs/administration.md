@@ -17,7 +17,7 @@ PostgreSQL isn't reachable.
 | List / manage events | Browse events, open one for detail and per-event actions |
 | Server statistics | Totals across all events, QSOs by event type |
 | Server time / clock | Show the system, database and NTP state; set the clock by hand |
-| Full JSON backup | Every event and QSO to one file |
+| Full JSON backup | Every event with its QSOs, SES roster and checkout history, to one file |
 | Restore from JSON backup | Recreate events from a backup file |
 | Update application | `git pull`, rebuild and restart |
 
@@ -81,6 +81,13 @@ status, then lets you act on one:
   kept; contacts they made were still real contacts.
 
 ## Backups
+
+Event owners can also take a backup without shell access: the dashboard's
+**Backup** button downloads the same JSON this console writes, and the home
+page restores one. Both call the same `ezfd_export_events()` /
+`ezfd_restore_events()` functions in `db/schema.sql`, so the two paths cannot
+produce or accept different shapes.
+
 
 ### Per-event
 

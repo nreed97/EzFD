@@ -250,6 +250,15 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
                   Cabrillo
                 </a>
               )}
+              {/* The whole event, not just the contacts: settings, bonuses,
+                  the SES roster and checkout history. This is what moves an
+                  event to another instance, so it's worth being able to take
+                  one without shell access on the server. */}
+              <a href={`/api/export/${event.join_code}?format=json`}
+                title="Full event backup — settings, QSOs, roster and checkout history. Restorable on any EzFD instance."
+                className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
+                Backup
+              </a>
             </>
           )}
           <ThemeToggle />
