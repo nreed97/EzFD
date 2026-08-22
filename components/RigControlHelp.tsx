@@ -29,7 +29,6 @@ export default function RigControlHelp({ rigConnected, canCw, onClose }: Props) 
   const [showPlatform, setShowPlatform] = useState<'win' | 'mac' | 'linux'>('win');
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
-  const runCmd = showPlatform === 'win' ? 'python ezfd-rig-bridge.py' : 'python3 ezfd-rig-bridge.py';
 
   return (
     <div

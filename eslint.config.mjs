@@ -13,6 +13,17 @@ const eslintConfig = defineConfig([
     "build/**",
     "next-env.d.ts",
   ]),
+  // The .cjs files under scripts/ are standalone CommonJS: wsjtx-bridge.cjs
+  // ships to operators and runs under plain `node` on their machine, and the
+  // test scripts are invoked directly by CI. `require()` is correct there, so
+  // the rule is switched off for those files rather than the files being
+  // exempted from linting altogether.
+  {
+    files: ["scripts/**/*.cjs"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
+    },
+  },
 ]);
 
 export default eslintConfig;

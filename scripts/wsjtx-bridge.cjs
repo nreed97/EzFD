@@ -281,7 +281,7 @@ sock.on('message', async (msg) => {
   let parsed;
   try {
     parsed = parseLoggedQso(msg);
-  } catch (err) {
+  } catch {
     // Not a LOGGED_QSO or corrupt packet — ignore silently
     return;
   }

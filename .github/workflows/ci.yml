@@ -6,10 +6,11 @@
 #             flow against the real server
 #   schema  — schema idempotency, the SES exclusion constraint, the route-level
 #             SQL, and the admin console's backup/restore round trip
-#   shell   — syntax-checks the shell scripts, which nothing else validates
+#   shell   — syntax-checks the shell scripts and gates on shellcheck
 #
-# Deliberately not gating on `npm run lint`: eslint reports 22 pre-existing
-# errors on master, so it would fail every PR. Worth adding once cleared.
+# `npm run lint` is still ungated: the mechanical eslint findings are cleared,
+# but 25 react-hooks findings remain and want individual judgement rather than
+# a blanket suppression. Tracked in #13.
 name: CI
 
 on:
@@ -142,10 +143,9 @@ jobs:
             bash -n "$f"
           done
 
-      # Advisory: the existing scripts predate this and would fail a gate,
-      # but new problems are still worth surfacing in the log.
-      - name: shellcheck (advisory)
-        continue-on-error: true
+      # Gated, at every severity. The backlog that kept this advisory is
+      # cleared, so anything it reports now is new.
+      - name: shellcheck
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
-          shellcheck --severity=error $(git ls-files '*.sh') || true
+          shellcheck $(git ls-files '*.sh')
