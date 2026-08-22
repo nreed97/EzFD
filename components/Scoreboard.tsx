@@ -31,8 +31,16 @@ export default function Scoreboard({ score, bonusPoints = 0 }: Props) {
         <span className="text-zinc-400 light:text-zinc-600">QSO pts</span>
         <span className="font-mono text-zinc-200 light:text-zinc-800">{score.qso_points}</span>
       </div>
+      {/* Power is the only multiplier: score = QSO points × power multiplier.
+          Sections are shown because operators chase them for Worked All
+          Sections, but they must never read as part of the product — sections
+          multiplying the score was a real bug in this file's history. */}
       <div className="flex items-baseline justify-between mb-1">
-        <span className="text-zinc-400 light:text-zinc-600">× Sections</span>
+        <span className="text-zinc-400 light:text-zinc-600">× Power</span>
+        <span className="font-mono text-zinc-200 light:text-zinc-800">{score.power_multiplier}×</span>
+      </div>
+      <div className="flex items-baseline justify-between mb-1">
+        <span className="text-zinc-400 light:text-zinc-600">Sections</span>
         <span className="font-mono text-zinc-200 light:text-zinc-800">{score.sections_worked}</span>
       </div>
       <div className="flex items-baseline justify-between border-t border-zinc-700 pt-2 light:border-zinc-200">

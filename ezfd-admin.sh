@@ -1011,6 +1011,144 @@ update_app() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Server time / clock
+#
+# QSOs are stamped by the database, so the server's clock is the log's clock.
+# A field server — typically a Raspberry Pi — has no battery-backed RTC, so
+# with no internet it comes up holding the time of its last shutdown or an
+# epoch date, and every contact gets a plausible-looking but wrong time. That
+# is unrecoverable after the fact, and an operator with no shell has no way to
+# fix it. Hence this.
+# ─────────────────────────────────────────────────────────────────────────────
+server_time() {
+  banner
+  echo -e "  ${BOLD}Server Time / Clock${NC}"
+  echo
+  hr
+
+  local app_now=""; app_now=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+  # The database's clock is the one that actually stamps QSOs; it is normally
+  # the same host, but say so explicitly rather than assuming.
+  local db_now=""; db_now=$(PG -c "SELECT to_char(NOW() AT TIME ZONE 'UTC','YYYY-MM-DD HH24:MI:SS') || ' UTC';" 2>/dev/null)
+
+  label "System clock (UTC):"; echo "$app_now"
+  label "Database clock:";     echo "${db_now:-unavailable}"
+  label "Local time:";         echo "$(date '+%Y-%m-%d %H:%M:%S %Z')"
+
+  local synced="" ntp_service=""
+  if command -v timedatectl >/dev/null 2>&1; then
+    synced=$(timedatectl show -p NTPSynchronized --value 2>/dev/null)
+    ntp_service=$(timedatectl show -p NTP --value 2>/dev/null)
+    label "NTP enabled:";   echo "${ntp_service:-unknown}"
+    label "NTP synced:";    echo "${synced:-unknown}"
+  else
+    label "NTP:"; echo "timedatectl not available"
+  fi
+  echo
+
+  if [[ "$synced" == "yes" ]]; then
+    log "Clock is synchronised with NTP — nothing to do."
+  else
+    warn "Clock is NOT synchronised with a time source."
+    echo -e "    ${DIM}On a server with no internet this is expected. Set it by hand${NC}"
+    echo -e "    ${DIM}before operating, or fit a hardware RTC module — see${NC}"
+    echo -e "    ${DIM}docs/deployment.md for the offline field-server setup.${NC}"
+  fi
+  echo
+  hr
+
+  local choice=""
+  menu_pick choice \
+    "Set the clock by hand (UTC)" \
+    "Re-enable NTP synchronisation" \
+    "Back"
+
+  case "$choice" in
+    1) set_clock_manually ;;
+    2)
+      if ! command -v timedatectl >/dev/null 2>&1; then
+        err "timedatectl is not available on this system."
+      elif timedatectl set-ntp true; then
+        log "NTP synchronisation enabled. It may take a minute to step the clock."
+      else
+        err "Could not enable NTP synchronisation."
+      fi
+      pause
+      ;;
+    3) return ;;
+  esac
+}
+
+set_clock_manually() {
+  echo
+  echo -e "  ${BOLD}Enter the current UTC time.${NC}"
+  echo -e "  ${DIM}Format: YYYY-MM-DD HH:MM:SS  (24-hour, UTC — not local time)${NC}"
+  echo -e "  ${DIM}Read it off a phone, a GPS receiver or an HF time signal.${NC}"
+  echo -e "  ${DIM}Leave blank to cancel.${NC}"
+  echo
+
+  local entered=""
+  read -rp "  UTC > " entered
+  if [[ -z "$entered" ]]; then
+    warn "Cancelled — the clock was not changed."
+    pause
+    return
+  fi
+
+  if [[ ! "$entered" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}\ [0-9]{2}:[0-9]{2}:[0-9]{2}$ ]]; then
+    err "Not in YYYY-MM-DD HH:MM:SS form — the clock was not changed."
+    pause
+    return
+  fi
+
+  # Reject a value the system can't parse as a real date (2026-02-31, 25:00:00)
+  # before touching the clock.
+  if ! date -u -d "$entered" >/dev/null 2>&1; then
+    err "'$entered' is not a valid date/time — the clock was not changed."
+    pause
+    return
+  fi
+
+  echo
+  warn "QSOs already logged keep the timestamps they were given."
+  echo -e "    ${DIM}Setting the clock fixes contacts from here on. Contacts already${NC}"
+  echo -e "    ${DIM}in the log were stamped with the old time and are not rewritten.${NC}"
+  if ! confirm_danger "Set the system clock to ${entered} UTC?"; then
+    warn "Cancelled — the clock was not changed."
+    pause
+    return
+  fi
+
+  # NTP has to be off first: with it enabled, systemd-timesyncd refuses the
+  # set outright and would leave the operator thinking it worked.
+  if command -v timedatectl >/dev/null 2>&1; then
+    if [[ "$(timedatectl show -p NTP --value 2>/dev/null)" == "yes" ]]; then
+      log "Disabling NTP synchronisation so the clock can be set by hand."
+      timedatectl set-ntp false || warn "Could not disable NTP — the set below may be refused."
+    fi
+    if timedatectl set-time "$entered"; then
+      log "Clock set. System time is now $(date -u '+%Y-%m-%d %H:%M:%S UTC')."
+    else
+      err "timedatectl refused to set the clock."
+    fi
+  elif date -u -s "$entered" >/dev/null; then
+    log "Clock set. System time is now $(date -u '+%Y-%m-%d %H:%M:%S UTC')."
+  else
+    err "Could not set the clock."
+  fi
+
+  # The clock is the hardware RTC's to keep across a reboot, if one is fitted.
+  if command -v hwclock >/dev/null 2>&1; then
+    if hwclock --systohc 2>/dev/null; then
+      log "Wrote the new time to the hardware clock."
+    else
+      echo -e "    ${DIM}No hardware clock to write to — the time will be lost on reboot.${NC}"
+    fi
+  fi
+  pause
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Main menu loop
 # ─────────────────────────────────────────────────────────────────────────────
 main_menu() {
@@ -1030,6 +1168,7 @@ main_menu() {
     menu_pick choice \
       "List / manage events" \
       "Server statistics" \
+      "Server time / clock" \
       "Full JSON backup (all events + QSOs)" \
       "Restore from JSON backup" \
       "Update application (git pull + rebuild)" \
@@ -1038,10 +1177,11 @@ main_menu() {
     case "$choice" in
       1) list_events ;;
       2) server_stats ;;
-      3) backup_all ;;
-      4) restore_from_json ;;
-      5) update_app ;;
-      6) echo; exit 0 ;;
+      3) server_time ;;
+      4) backup_all ;;
+      5) restore_from_json ;;
+      6) update_app ;;
+      7) echo; exit 0 ;;
     esac
   done
 }

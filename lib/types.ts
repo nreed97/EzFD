@@ -234,21 +234,28 @@ export const MODE_POINTS: Record<Mode, number> = {
   DIG: 2,
 };
 
+// The 85 current ARRL/RAC sections: 71 US + 14 Canadian. Kept in sync with
+// SECTION_DATA in lib/sections.ts and the GROUPS grid in components/SectionGrid.tsx
+// — scripts/test-sections.cjs fails if the three ever disagree.
+//
+// RAC has moved twice recently and older lists are still circulating: Maritime
+// (MAR) became NB/NS/PE, Ontario split into ONE/ONN/ONS plus GH (Golden
+// Horseshoe, briefly abbreviated GTA), and Yukon is part of Northern
+// Territories (NT) rather than a section of its own.
 export const ARRL_SECTIONS = [
   'AB','AK','AL','AR','AZ',
   'BC','CO','CT',
   'DE','EB','EMA','ENY','EPA','EWA',
-  'GA','IA','ID','IL','IN',
+  'GA','GH','IA','ID','IL','IN',
   'KS','KY','LA','LAX',
   'MB','MDC','ME','MI','MN','MO','MS','MT',
   'NB','NC','ND','NE','NFL','NH','NL','NLI','NM','NNJ','NNY','NS','NT','NTX','NV',
-  'OH','OK','ON','OR','ORG',
-  'PAC','PEI','QC',
+  'OH','OK','ONE','ONN','ONS','OR','ORG',
+  'PAC','PE','PR','QC',
   'RI','SB','SC','SCV','SD','SDG','SF','SFL','SJV','SK','SNJ','STX','SV',
   'TN','UT',
-  'VA','VT',
+  'VA','VI','VT',
   'WCF','WI','WMA','WNY','WPA','WTX','WV','WWA','WY',
-  'YT',
 ] as const;
 
 export type ARRLSection = typeof ARRL_SECTIONS[number];

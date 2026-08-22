@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
 import { useRigBridge } from '@/lib/useRigBridge';
 import { enqueue, dequeue, loadQueue, type PendingQSO } from '@/lib/offline-queue';
+import { ARRL_SECTIONS } from '@/lib/types';
 import type { Event, QSO, Band, Mode, DisplayQSO, SesReservation } from '@/lib/types';
 import type { QSOSubmission } from './QSOForm';
 import QSOForm from './QSOForm';
@@ -12,6 +13,7 @@ import SesCoordination from './SesCoordination';
 import QSOTable from './QSOTable';
 import Scoreboard from './Scoreboard';
 import BandActivity from './BandActivity';
+import ClockSkewBanner from './ClockSkewBanner';
 import UTCClock from './UTCClock';
 import AdifImport from './AdifImport';
 import WsjtxSetupHelp from './WsjtxSetupHelp';
@@ -497,6 +499,9 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
           {/* For an SES the checkout panel is authoritative about who may
               transmit, so the presence-based conflict warning would just be
               noise on top of it. */}
+          {/* A wrong server clock mis-stamps every QSO and looks like nothing is
+              wrong, so it outranks the band/slot warnings below it. */}
+          <ClockSkewBanner />
           {bandConflict && !isSes && (
             <div className="flex items-center gap-2 rounded-lg border border-yellow-600 bg-yellow-900/30 px-3 py-2 text-xs text-yellow-400">
               <span className="text-base">⚠</span>
@@ -577,7 +582,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
                 onClick={() => setShowNeeds(true)}
                 className="w-full rounded-lg border border-zinc-700 py-2 text-xs font-semibold text-zinc-400 hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
               >
-                Sections Needed ({Math.max(0, 84 - score.sections_worked)})
+                Sections Needed ({Math.max(0, ARRL_SECTIONS.length - score.sections_worked)})
               </button>
             </>
           )}

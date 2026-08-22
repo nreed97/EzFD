@@ -61,18 +61,39 @@ The event requires roster approval and this operator is pending. A coordinator
 approves them in the admin console: **List / manage events** → open the event
 → **Manage operator roster** → **Toggle approval**.
 
-## Section counts disagree
+## "This server's clock is N ahead of / behind this device"
 
-**Known bug.** The scoring code awards the Worked All Sections bonus when
-every section in the app's list is worked — currently 81. The "Sections
-Needed" button and the summary sheet compare against a hardcoded 84 instead.
+The server and the browser disagree about the time by more than a minute. QSOs
+are timestamped by the server, so contacts logged while this is showing carry
+that wrong time.
 
-Effects: the button can show a non-zero count when the section grid says all
-sections are worked, and the printed worksheet can omit a bonus the score
-already includes.
+Usually the server is the wrong one — a field server with no real-time clock
+and no NTP. Fix it from the admin console: `bash ezfd-admin.sh` → **Server time
+/ clock**. See [Administration](administration.md#server-time).
 
-The score shown in the app is correct. Check the worksheet by hand until this
-is fixed. Tracked as [#14](https://github.com/nreed97/EzFD/issues/14).
+It can also be the operator's device that's wrong, if their laptop has been
+offline a long time. If one operator sees the banner and the others don't, it's
+that device.
+
+Either way, **QSOs already logged keep the timestamps they were given.** Fixing
+the clock only corrects contacts from that point on.
+
+## A section is rejected as invalid
+
+The entry form warns when a received section isn't one of the 85 current
+ARRL/RAC sections. The QSO still logs and the exchange is stored exactly as
+typed, so nothing is lost — but the section won't count toward Worked All
+Sections or appear on the map.
+
+Usually this is a typo. The other cause is an abbreviation RAC has retired:
+Maritime (`MAR`) is now `NB` / `NS` / `PE`, plain Ontario (`ON`) is now `ONE` /
+`ONN` / `ONS` / `GH`, `GTA` was renamed `GH`, and Yukon is part of Northern
+Territories (`NT`) rather than a section of its own. Log the current
+abbreviation.
+
+Logs recorded before EzFD tracked the current list may contain those retired
+abbreviations. They export as recorded, but they no longer match a section, so
+a very old log can show a lower worked-section count than it did at the time.
 
 ## Cabrillo claimed score looks wrong
 

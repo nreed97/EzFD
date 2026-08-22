@@ -1,5 +1,6 @@
 'use client';
 
+import { ARRL_SECTIONS } from '@/lib/types';
 import type { Event, Score, Bonuses } from '@/lib/types';
 
 const BOOL_LABELS: Partial<Record<keyof Bonuses, string>> = {
@@ -38,7 +39,10 @@ function bonusLineItems(bonuses: Bonuses, score: Score): { label: string; pts: n
   if (bonuses.gota_qsos)    items.push({ label: `GOTA QSOs (${bonuses.gota_qsos})`,              pts: Math.min(bonuses.gota_qsos * 10, 1000) });
   if (bonuses.served_agency) items.push({ label: `Served agency reps (${bonuses.served_agency})`, pts: Math.min(bonuses.served_agency * 10, 100) });
   if (bonuses.nts_traffic)  items.push({ label: `NTS messages (${bonuses.nts_traffic})`,          pts: Math.min(bonuses.nts_traffic * 10, 100) });
-  if (score.sections_worked >= 84) items.push({ label: 'Worked all 84 sections', pts: 100 });
+  // Derived from ARRL_SECTIONS so this line item can never disagree with the
+  // bonus lib/scoring.ts actually awarded.
+  if (score.sections_worked >= ARRL_SECTIONS.length)
+    items.push({ label: `Worked all ${ARRL_SECTIONS.length} sections`, pts: 100 });
   return items;
 }
 

@@ -39,7 +39,7 @@ export function calculateBonusPoints(bonuses: Bonuses, baseScore: number, sectio
   pts += Math.min((bonuses.served_agency ?? 0) * 10, 100);
   pts += Math.min((bonuses.nts_traffic  ?? 0) * 10, 100);
 
-  // Worked All Sections — 100 pts for working all 84 ARRL/RAC sections
+  // Worked All Sections — 100 pts for working every ARRL/RAC section
   if (sectionsWorked >= ARRL_SECTIONS.length) pts += 100;
 
   return pts;

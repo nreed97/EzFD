@@ -6,14 +6,14 @@ const GROUPS = [
   { label: '1',        sections: ['CT','EMA','ME','NH','RI','VT','WMA'] },
   { label: '2',        sections: ['ENY','NLI','NNJ','NNY','SNJ','WNY'] },
   { label: '3',        sections: ['DE','EPA','MDC','WPA'] },
-  { label: '4',        sections: ['AL','GA','KY','NC','NFL','SFL','SC','TN','VA','WCF'] },
+  { label: '4',        sections: ['AL','GA','KY','NC','NFL','SFL','SC','TN','VA','WCF','PR','VI'] },
   { label: '5',        sections: ['AR','LA','MS','NM','NTX','OK','STX','WTX'] },
   { label: '6',        sections: ['EB','LAX','ORG','SB','SCV','SDG','SF','SJV','SV','PAC'] },
   { label: '7',        sections: ['AK','AZ','EWA','ID','MT','NV','OR','UT','WWA','WY'] },
   { label: '8',        sections: ['MI','OH','WV'] },
   { label: '9',        sections: ['IL','IN','WI'] },
   { label: '10',       sections: ['CO','IA','KS','MN','MO','ND','NE','SD'] },
-  { label: 'Canada',   sections: ['AB','BC','MB','NB','NL','NS','NT','ON','PEI','QC','SK','YT'] },
+  { label: 'Canada',   sections: ['AB','BC','GH','MB','NB','NL','NS','NT','ONE','ONN','ONS','PE','QC','SK'] },
 ];
 
 interface Props {

@@ -81,12 +81,10 @@ appear on every connected screen.
 Emergency power is the one that isn't a flat number: it adds the entire base
 score again, so it roughly doubles a typical entry.
 
-> **Known inconsistency.** The Worked All Sections bonus is awarded by the
-> scoring code when every section in the app's list is worked — currently 81.
-> The summary sheet and the "Sections Needed" button instead compare against a
-> hardcoded 84, so the worksheet can omit a bonus the score already includes.
-> Tracked as [#14](https://github.com/nreed97/EzFD/issues/14); see also
-> [Troubleshooting](troubleshooting.md#section-counts-disagree).
+Worked All Sections is worth 100 points for working all **85** ARRL/RAC
+sections. The scoring code, the summary sheet, the "Sections Needed" button and
+the section grid all derive that total from a single list, so they cannot
+disagree with each other.
 
 ## Submitting
 

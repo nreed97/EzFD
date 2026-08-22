@@ -1,8 +1,9 @@
 # The checks AGENTS.md already requires before finishing a change, plus the
 # ones that would have caught bugs this project has actually hit:
 #
-#   build   — typecheck and production build (the AGENTS.md gate), then the
-#             end-to-end API flow against the real server
+#   build   — the section-list consistency check, then typecheck and the
+#             production build (the AGENTS.md gate), then the end-to-end API
+#             flow against the real server
 #   schema  — schema idempotency, the SES exclusion constraint, the route-level
 #             SQL, and the admin console's backup/restore round trip
 #   shell   — syntax-checks the shell scripts, which nothing else validates
@@ -45,6 +46,13 @@ jobs:
       # `npm ci` fails loudly if the lockfile has drifted from package.json,
       # which is what we want in CI rather than silently resolving new versions.
       - run: npm ci
+
+      # Pure source check — no build or database needed, so it runs first and
+      # fails fast. Guards the ARRL/RAC section list against drifting between
+      # the three places that enumerate it, and against a section total being
+      # written out as a literal instead of derived from ARRL_SECTIONS.length.
+      - name: Section list consistency
+        run: node scripts/test-sections.cjs
 
       - name: Typecheck
         run: npx tsc --noEmit
