@@ -60,6 +60,9 @@ export interface Event {
   slot_enforcement: SlotEnforcement;
   slot_minutes: number;
   dupe_rule: DupeRule;
+  /** When true, an operator must be approved in the roster before they can
+   *  log. Off by default — the join code remains the only gate. */
+  require_operator_approval: boolean;
 }
 
 /** True when the event is a Special Event Station, i.e. contest scoring,

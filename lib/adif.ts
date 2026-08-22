@@ -194,8 +194,13 @@ export function generateADIF(
         loc?.county ? adifField('MY_CNTY', loc.county)              : '',
         loc?.dxcc   ? adifField('MY_DXCC', String(loc.dxcc))        : '',
 
-        // Contest exchange — omitted entirely for an SES, which has none.
-        !isSes && event.arrl_section ? adifField('MY_ARRL_SECT', event.arrl_section) : '',
+        // Section applies to both event types when set — it's the contest
+        // multiplier for FD/WFD, and an optional informational field for an
+        // SES, which may well be run outside either contest.
+        event.arrl_section ? adifField('MY_ARRL_SECT', event.arrl_section) : '',
+        q.rcvd_section ? adifField('ARRL_SECT', q.rcvd_section) : '',
+
+        // The class exchange is contest-only.
         !isSes && q.rcvd_class
           ? adifField('SRX_STRING', `${q.rcvd_class} ${q.rcvd_section ?? ''}`.trim())
           : '',

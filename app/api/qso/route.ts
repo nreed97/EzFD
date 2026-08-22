@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
-import { checkSlot } from '@/lib/ses';
+import { checkSlot, isOperatorApproved } from '@/lib/ses';
 import { isDupeQSO } from '@/lib/events';
 
 export async function POST(request: Request) {
@@ -20,10 +20,12 @@ export async function POST(request: Request) {
 
   const { rows: evRows } = join_code
     ? await pool.query(
-        `SELECT id, class, arrl_section, event_type, dupe_rule, slot_enforcement
+        `SELECT id, class, arrl_section, event_type, dupe_rule, slot_enforcement,
+                require_operator_approval
          FROM events WHERE join_code = $1`, [join_code.toUpperCase()])
     : await pool.query(
-        `SELECT id, class, arrl_section, event_type, dupe_rule, slot_enforcement
+        `SELECT id, class, arrl_section, event_type, dupe_rule, slot_enforcement,
+                require_operator_approval
          FROM events WHERE id = $1`, [event_id]);
   if (!evRows[0]) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   const event = evRows[0];
@@ -33,6 +35,21 @@ export async function POST(request: Request) {
   const call = callsign.toUpperCase().trim();
   const opCall = operator_call?.toUpperCase().trim() ?? null;
   const now = new Date();
+
+  // ── Roster approval gate (SES, opt-in per event) ──────────────────────
+  //
+  // Replays bypass this for the same reason they bypass the slot gate: the
+  // contact already happened on the air under the event's callsign, and
+  // refusing it only loses the record. A coordinator who didn't want that
+  // operator on the air can delete the QSOs; they can't un-transmit them.
+  if (isSes && event.require_operator_approval && opCall && !replay) {
+    if (!(await isOperatorApproved(pool, resolvedEventId, opCall))) {
+      return NextResponse.json(
+        { error: `${opCall} is not yet approved to operate this event. Ask the coordinator to approve you.` },
+        { status: 403 }
+      );
+    }
+  }
 
   // ── Band/mode checkout gate (SES only) ────────────────────────────────
   //
@@ -71,12 +88,14 @@ export async function POST(request: Request) {
       call,
       band,
       mode,
-      // An SES has no contest exchange to send; these stay NULL rather than
-      // stamping every contact with a class and section that don't exist.
+      // An SES has no contest class, so that stays NULL rather than stamping
+      // every contact with one that doesn't exist. The section is different:
+      // it's optional on an SES but still worth recording, since special
+      // events run outside FD/WFD and operators still trade sections.
       isSes ? null : event.class,
-      isSes ? null : event.arrl_section,
+      event.arrl_section ?? null,
       isSes ? null : (rcvd_class?.toUpperCase().trim() ?? null),
-      isSes ? null : (rcvd_section?.toUpperCase().trim() ?? null),
+      rcvd_section?.toUpperCase().trim() || null,
       opCall,
       station_number ?? 1,
       is_dupe,

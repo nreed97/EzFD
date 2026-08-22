@@ -26,12 +26,24 @@ export default async function LogPage({
     [evRows[0].id]
   );
 
+  // Resolved here rather than in the client so a pending operator is told up
+  // front, instead of finding out when their first QSO comes back a 403.
+  let approvalPending = false;
+  if (evRows[0].event_type === 'SES' && evRows[0].require_operator_approval) {
+    const { rows: opRows } = await pool.query(
+      'SELECT approved FROM ses_operators WHERE event_id=$1 AND op_call=$2',
+      [evRows[0].id, op.toUpperCase()]
+    );
+    approvalPending = opRows[0]?.approved !== true;
+  }
+
   return (
     <LoggingClient
       event={evRows[0]}
       initialQSOs={qsos}
       operatorCall={op.toUpperCase()}
       stationNumber={1}
+      approvalPending={approvalPending}
     />
   );
 }

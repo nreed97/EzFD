@@ -414,7 +414,25 @@ function QSOForm({
                 maxLength={8}
               />
             </div>
+            <div className="w-24">
+              <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Section</label>
+              <input
+                list="section-list"
+                value={rcvdSection}
+                onChange={e => setRcvdSection(e.target.value.toUpperCase())}
+                placeholder="MN"
+                className="input w-full font-mono"
+                maxLength={5}
+              />
+            </div>
           </div>
+          {/* Unlike the contest form this is only a hint, never an error:
+              a special event works DX, where no ARRL section applies. */}
+          {rcvdSection.length > 0 && sectionInvalid && (
+            <p className="text-xs text-zinc-500">
+              &ldquo;{rcvdSection}&rdquo; isn&apos;t an ARRL/RAC section &mdash; fine for DX, just noting it.
+            </p>
+          )}
           <div>
             <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Comment</label>
             <input
@@ -425,6 +443,9 @@ function QSOForm({
               maxLength={120}
             />
           </div>
+          <datalist id="section-list">
+            {ARRL_SECTIONS.map(sec => <option key={sec} value={sec} />)}
+          </datalist>
         </>
       ) : (
       <>

@@ -24,6 +24,9 @@ interface Props {
   initialQSOs: QSO[];
   operatorCall: string;
   stationNumber: number;
+  /** SES with roster approval on, and this operator isn't approved yet.
+   *  The server rejects their QSOs; this is the up-front warning. */
+  approvalPending?: boolean;
 }
 
 function pendingToDisplay(p: PendingQSO, sentClass: string | null, sentSection: string | null): DisplayQSO {
@@ -103,7 +106,7 @@ async function submitQSOToServer(
   }
 }
 
-export default function LoggingClient({ event, initialQSOs, operatorCall, stationNumber }: Props) {
+export default function LoggingClient({ event, initialQSOs, operatorCall, stationNumber, approvalPending = false }: Props) {
   const router = useRouter();
   const [confirmedQSOs, setConfirmedQSOs] = useState<QSO[]>(initialQSOs);
   const [pendingQSOs, setPendingQSOs] = useState<DisplayQSO[]>([]);
@@ -471,6 +474,15 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             <div className="flex items-center gap-2 rounded-lg border border-yellow-600 bg-yellow-900/30 px-3 py-2 text-xs text-yellow-400">
               <span className="text-base">⚠</span>
               <span>Another station is on <strong>{currentBand} {currentMode}</strong> — band conflict!</span>
+            </div>
+          )}
+          {approvalPending && (
+            <div className="flex items-start gap-2 rounded-lg border border-red-700 bg-red-900/30 px-3 py-2 text-xs text-red-400">
+              <span className="text-base leading-none">⛔</span>
+              <span>
+                <strong>{operatorCall}</strong> isn&apos;t approved to operate this event yet.
+                QSOs will be refused until the coordinator approves you.
+              </span>
             </div>
           )}
           {isSes && slotWarning && (

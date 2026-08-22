@@ -168,6 +168,11 @@ ALTER TABLE events ADD COLUMN IF NOT EXISTS slot_minutes     INTEGER NOT NULL DE
 -- DAY:   once per band/mode per UTC day (sane for a multi-week SES).
 -- NONE:  never flag a dupe.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS dupe_rule        TEXT NOT NULL DEFAULT 'EVENT';
+-- Opt-in. Off by default so an existing event's behaviour is unchanged: the
+-- join code stays the only gate unless a coordinator asks for more. When on,
+-- an operator joining lands in the roster as unapproved and cannot log until
+-- someone approves them in ezfd-admin.sh.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS require_operator_approval BOOLEAN NOT NULL DEFAULT FALSE;
 
 -- ---------------------------------------------------------------------------
 -- SES operator roster — per-operator station identity.
@@ -221,6 +226,30 @@ CREATE TABLE IF NOT EXISTS ses_reservations (
     during   WITH &&
   ) WHERE (status <> 'RELEASED')
 );
+
+-- The constraint above is declared inline in CREATE TABLE, which Postgres
+-- skips entirely once the table exists — so re-applying this file would not
+-- restore the constraint if it were ever dropped, or if the table were
+-- created by a partial earlier run. deploy.sh and ezfd-admin.sh both re-apply
+-- schema.sql as the repair path, so it has to be able to heal this: without
+-- the guard below, the one invariant the whole feature rests on could stay
+-- silently missing while every migration reported success.
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT FROM pg_constraint
+    WHERE conname = 'ses_no_overlap'
+      AND conrelid = 'ses_reservations'::regclass
+  ) THEN
+    ALTER TABLE ses_reservations ADD CONSTRAINT ses_no_overlap EXCLUDE USING gist (
+      event_id WITH =,
+      band     WITH =,
+      mode     WITH =,
+      during   WITH &&
+    ) WHERE (status <> 'RELEASED');
+  END IF;
+END
+$$;
 
 CREATE INDEX IF NOT EXISTS ses_res_event_idx ON ses_reservations(event_id, during);
 CREATE INDEX IF NOT EXISTS ses_res_op_idx    ON ses_reservations(event_id, op_call);

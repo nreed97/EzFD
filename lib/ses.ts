@@ -98,6 +98,23 @@ export async function overlappingHolder(
   return rows[0] ?? null;
 }
 
+/** Whether an operator is cleared to log on a gated event.
+ *
+ *  Returns true when the event doesn't require approval at all, so callers
+ *  can call this unconditionally. An operator with no roster row on a gated
+ *  event is not approved — they have to be added and approved first. */
+export async function isOperatorApproved(
+  pool: Pool,
+  eventId: string,
+  opCall: string
+): Promise<boolean> {
+  const { rows } = await pool.query(
+    'SELECT approved FROM ses_operators WHERE event_id=$1 AND op_call=$2',
+    [eventId, opCall.toUpperCase().trim()]
+  );
+  return rows[0]?.approved === true;
+}
+
 export interface SlotCheck {
   /** True when this operator may transmit on (band, mode) right now. */
   ok: boolean;

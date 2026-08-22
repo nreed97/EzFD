@@ -30,14 +30,21 @@ export async function POST(request: Request) {
   }
 
   const pool = getPool();
-  const { rows: evRows } = await pool.query('SELECT id FROM events WHERE id = $1', [event_id]);
+  const { rows: evRows } = await pool.query(
+    'SELECT id, require_operator_approval FROM events WHERE id = $1', [event_id]);
   if (!evRows[0]) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
+
+  // On a gated event a newly-seen operator starts unapproved and can't log
+  // until a coordinator approves them. Existing rows keep whatever approval
+  // state they already have — re-saving your grid must never silently
+  // re-approve you, nor un-approve you.
+  const approved = !evRows[0].require_operator_approval;
 
   // COALESCE on update so an operator saving just their grid doesn't blank
   // out the name/state they entered earlier.
   const { rows } = await pool.query(
-    `INSERT INTO ses_operators (event_id, op_call, op_name, grid, state, county, dxcc)
-     VALUES ($1,$2,$3,$4,$5,$6,$7)
+    `INSERT INTO ses_operators (event_id, op_call, op_name, grid, state, county, dxcc, approved)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8)
      ON CONFLICT (event_id, op_call) DO UPDATE SET
        op_name = COALESCE(EXCLUDED.op_name, ses_operators.op_name),
        grid    = COALESCE(EXCLUDED.grid,    ses_operators.grid),
@@ -53,6 +60,7 @@ export async function POST(request: Request) {
       state?.toUpperCase().trim() || null,
       county?.trim() || null,
       Number.isFinite(Number(dxcc)) && dxcc !== null && dxcc !== '' ? Number(dxcc) : null,
+      approved,
     ]
   );
   return NextResponse.json(rows[0]);

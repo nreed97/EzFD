@@ -369,6 +369,19 @@ QSOs replayed from the offline queue bypass both settings unconditionally. By
 the time a browser reconnects the slot has certainly expired, and a network
 blip must never cost a real contact.
 
+### Operator roster
+
+Operators enter their own grid and state when they join, and those feed the
+ADIF `MY_*` fields on the contacts they personally make. A coordinator can
+review and correct the roster from **ezfd-admin.sh → open event → Manage
+operator roster**, which also lists who is currently on the air.
+
+Turning on **Require operator approval** at event creation (off by default,
+matching Field Day) puts a newly-joining operator into the roster as *pending*
+— they see a warning banner and the server refuses their QSOs until a
+coordinator approves them in the admin console. As with the checkout gate,
+QSOs replayed from the offline queue are always accepted.
+
 ### Merging offline logs
 
 Operators who logged in N1MM or N3FJP can merge via **Import ADIF**. Records

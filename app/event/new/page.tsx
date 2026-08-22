@@ -49,6 +49,7 @@ export default function NewEventPage() {
   const [slotEnforcement, setSlotEnforcement] = useState<SlotEnforcement>('SOFT');
   const [slotMinutes, setSlotMinutes] = useState(120);
   const [dupeRule, setDupeRule] = useState<DupeRule>('DAY');
+  const [requireApproval, setRequireApproval] = useState(false);
 
   const isSes = eventType === 'SES';
 
@@ -93,6 +94,7 @@ export default function NewEventPage() {
         slot_enforcement: slotEnforcement,
         slot_minutes: slotMinutes,
         dupe_rule: dupeRule,
+        require_operator_approval: requireApproval,
       }),
     });
 
@@ -177,6 +179,8 @@ export default function NewEventPage() {
                     onClick={() => {
                       setEventType(type);
                       if (type !== 'SES') setClassLetter(type === 'WFD' ? 'H' : 'A');
+                      // FD/WFD require a section; an SES defaults to none.
+                      set('arrl_section', type === 'SES' ? '' : 'EPA');
                       // Contest dupes are once per event; a special event may
                       // run for weeks, where working someone again on another
                       // day is normal.
@@ -223,6 +227,22 @@ export default function NewEventPage() {
                     placeholder="Commemorating the 150th anniversary of ..."
                     className="input"
                   />
+                </label>
+                <label className="flex flex-col gap-1">
+                  <span className="text-sm text-zinc-400">ARRL Section (optional)</span>
+                  <select
+                    value={form.arrl_section}
+                    onChange={e => set('arrl_section', e.target.value)}
+                    className="input"
+                  >
+                    <option value="">&mdash; none &mdash;</option>
+                    {ARRL_SECTIONS.map(sec => <option key={sec} value={sec}>{sec}</option>)}
+                  </select>
+                  <span className="text-xs text-zinc-500">
+                    Not required &mdash; special events often run outside Field Day
+                    entirely. Set it if your operators trade sections; it becomes
+                    MY_ARRL_SECT in the exported ADIF.
+                  </span>
                 </label>
                 <label className="flex flex-col gap-1">
                   <span className="text-sm text-zinc-400">QSL Info (optional)</span>
@@ -371,6 +391,26 @@ export default function NewEventPage() {
                   </select>
                 </label>
               </div>
+              <label className="flex items-start gap-2">
+                <input
+                  type="checkbox"
+                  checked={requireApproval}
+                  onChange={e => setRequireApproval(e.target.checked)}
+                  className="mt-1"
+                />
+                <span>
+                  <span className="block text-sm text-zinc-300 light:text-zinc-700">
+                    Require operator approval
+                  </span>
+                  <span className="block text-xs text-zinc-500">
+                    Off by default, matching Field Day: anyone with the join code can
+                    log. Turn this on and a new operator lands in the roster as
+                    pending and can&apos;t log until you approve them in
+                    <code className="mx-1 rounded bg-zinc-800 px-1 light:bg-zinc-200">ezfd-admin.sh</code>
+                    &mdash; worth it when a shared special event callsign is at stake.
+                  </span>
+                </span>
+              </label>
             </div>
           </div>
         )}

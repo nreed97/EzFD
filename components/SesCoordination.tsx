@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { Band, Mode, SesReservation } from '@/lib/types';
+import { BANDS, MODES } from '@/lib/types';
 
 interface Props {
   eventId: string;
@@ -44,6 +45,17 @@ function clockUTC(iso: string | null): string {
   return `${String(d.getUTCHours()).padStart(2, '0')}:${String(d.getUTCMinutes()).padStart(2, '0')}Z`;
 }
 
+/** Upcoming slots can be days out, so the day is as load-bearing as the time. */
+function dayClockUTC(iso: string | null): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (isNaN(d.getTime())) return '—';
+  const today = new Date();
+  const sameDay = d.getUTCDate() === today.getUTCDate() && d.getUTCMonth() === today.getUTCMonth();
+  const hhmm = clockUTC(iso);
+  return sameDay ? hhmm : `${d.getUTCDate()} ${d.toLocaleString('en', { month: 'short', timeZone: 'UTC' })} ${hhmm}`;
+}
+
 function minutesUntil(iso: string | null): number | null {
   if (!iso) return null;
   const ms = new Date(iso).getTime() - Date.now();
@@ -58,6 +70,13 @@ export default function SesCoordination({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [minutes, setMinutes] = useState(slotMinutes);
+  // Booking ahead. The API and the tstzrange model already accept a
+  // starts_at, so this is purely a second entry point into the same call.
+  const [showSchedule, setShowSchedule] = useState(false);
+  const [planBand, setPlanBand] = useState<Band>(currentBand);
+  const [planMode, setPlanMode] = useState<Mode>(currentMode);
+  const [planStart, setPlanStart] = useState('');
+  const [planMinutes, setPlanMinutes] = useState(slotMinutes);
   // Re-render once a minute so the countdown stays honest without a refetch.
   const [, setTick] = useState(0);
 
@@ -141,6 +160,38 @@ export default function SesCoordination({
       });
       const data = await res.json().catch(() => ({}));
       if (!res.ok) setError(data.error ?? `Checkout failed (${res.status})`);
+      await fetchReservations();
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function schedule() {
+    if (!planStart) { setError('Pick a start time first.'); return; }
+    setBusy(true);
+    setError(null);
+    try {
+      const res = await fetch('/api/ses/reservations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          event_id: eventId,
+          op_call: myOpCall,
+          band: planBand,
+          mode: planMode,
+          // datetime-local has no timezone; operators plan in UTC during an
+          // event, so it's read as UTC rather than as browser-local.
+          starts_at: `${planStart}:00Z`,
+          minutes: planMinutes,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setError(data.error ?? `Could not schedule (${res.status})`);
+      } else {
+        setShowSchedule(false);
+        setPlanStart('');
+      }
       await fetchReservations();
     } finally {
       setBusy(false);
@@ -243,6 +294,64 @@ export default function SesCoordination({
         </div>
       )}
 
+      {/* Book a slot ahead of time */}
+      <div className="mt-2">
+        <button
+          type="button"
+          onClick={() => setShowSchedule(v => !v)}
+          className="w-full rounded border border-zinc-700 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 hover:border-zinc-500 hover:text-zinc-300 light:border-zinc-300 light:text-zinc-500 light:hover:text-zinc-700"
+        >
+          {showSchedule ? '\u25b2 Close' : '\u25bc Schedule ahead'}
+        </button>
+
+        {showSchedule && (
+          <div className="mt-2 flex flex-col gap-1.5 rounded border border-zinc-800 bg-zinc-950/60 p-2 light:border-zinc-200 light:bg-white">
+            <div className="flex gap-1.5">
+              <select
+                value={planBand}
+                onChange={e => setPlanBand(e.target.value as Band)}
+                className="flex-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
+              >
+                {BANDS.map(b => <option key={b} value={b}>{b}</option>)}
+              </select>
+              <select
+                value={planMode}
+                onChange={e => setPlanMode(e.target.value as Mode)}
+                className="flex-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
+              >
+                {MODES.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+              <select
+                value={planMinutes}
+                onChange={e => setPlanMinutes(Number(e.target.value))}
+                className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
+              >
+                {[30, 60, 120, 180, 240].map(m => (
+                  <option key={m} value={m}>{m >= 60 ? `${m / 60}h` : `${m}m`}</option>
+                ))}
+              </select>
+            </div>
+            <input
+              type="datetime-local"
+              value={planStart}
+              onChange={e => setPlanStart(e.target.value)}
+              className="w-full rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
+            />
+            <button
+              type="button"
+              disabled={busy}
+              onClick={schedule}
+              className="rounded border border-amber-700 bg-amber-400/10 py-1.5 text-[11px] font-semibold text-amber-400 hover:bg-amber-400/20 disabled:opacity-50 light:border-amber-600 light:text-amber-700"
+            >
+              Book {planBand} {planMode} (UTC)
+            </button>
+            <p className="text-[10px] text-zinc-600 light:text-zinc-500">
+              Times are UTC. Overlapping a slot someone already holds is refused.
+            </p>
+          </div>
+        )}
+      </div>
+
       {/* Who has what right now */}
       <div className="mt-2.5">
         <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">
@@ -290,12 +399,23 @@ export default function SesCoordination({
             Scheduled ({upcoming.length})
           </div>
           <div className="flex flex-col gap-1">
-            {upcoming.slice(0, 6).map(r => (
+            {upcoming.slice(0, 8).map(r => (
               <div key={r.id} className="flex items-center justify-between rounded px-2 py-0.5 text-[11px] text-zinc-500">
                 <span className="font-mono">{r.op_call}</span>
                 <span className="flex items-center gap-2">
                   <span className="font-mono">{r.band} {r.mode}</span>
-                  <span className="font-mono text-[10px]">{clockUTC(r.starts_at)}</span>
+                  <span className="font-mono text-[10px]">{dayClockUTC(r.starts_at)}</span>
+                  {r.op_call === myOpCall && (
+                    <button
+                      type="button"
+                      disabled={busy}
+                      onClick={() => patchSlot(r.id, 'release')}
+                      title="Cancel this booking"
+                      className="text-[10px] text-zinc-600 hover:text-red-400 disabled:opacity-50"
+                    >
+                      &times;
+                    </button>
+                  )}
                 </span>
               </div>
             ))}

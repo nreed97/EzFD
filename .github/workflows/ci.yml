@@ -1,0 +1,69 @@
+# The two checks AGENTS.md already requires before finishing a frontend
+# change, run automatically on every push and pull request.
+#
+# Deliberately does not run `npm run lint`: eslint currently reports 22
+# pre-existing errors on master, so gating on it would fail every PR. Worth
+# adding once that backlog is cleared.
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      # `npm ci` needs the lockfile to match package.json exactly, which is
+      # what we want in CI — it fails loudly on drift rather than silently
+      # resolving new versions.
+      - run: npm ci
+
+      - name: Typecheck
+        run: npx tsc --noEmit
+
+      - name: Build
+        run: npm run build
+
+  schema:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+    steps:
+      - uses: actions/checkout@v4
+
+      # deploy.sh and ezfd-admin.sh both re-apply schema.sql on every update,
+      # so applying it twice is the real-world case: it must be idempotent.
+      - name: Apply schema twice
+        env:
+          PGPASSWORD: postgres
+        run: |
+          psql -h localhost -U postgres -c "CREATE ROLE ezfd LOGIN;"
+          psql -h localhost -U postgres -c "CREATE DATABASE ezfd;"
+          psql -h localhost -U postgres -d ezfd -v ON_ERROR_STOP=1 -q -f db/schema.sql
+          psql -h localhost -U postgres -d ezfd -v ON_ERROR_STOP=1 -q -f db/schema.sql
+
+      # The SES call-checkout guarantee lives entirely in a database
+      # constraint, so it needs a test that exercises the database.
+      - name: Verify SES overlap constraint
+        env:
+          PGPASSWORD: postgres
+        run: psql -h localhost -U postgres -d ezfd -v ON_ERROR_STOP=1 -f db/test-ses-constraint.sql

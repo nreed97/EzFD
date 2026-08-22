@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     qrz_username, qrz_password, admin_key, event_type, power,
     use_call_history, use_master_callsign_file,
     starts_at, ends_at, ses_description, ses_qsl_info,
-    slot_enforcement, slot_minutes, dupe_rule,
+    slot_enforcement, slot_minutes, dupe_rule, require_operator_approval,
   } = body;
 
   const isSesEvent = event_type === 'SES';
@@ -80,16 +80,21 @@ export async function POST(request: Request) {
        (join_code, club_name, club_call, event_year, class, arrl_section, location,
         qrz_username, qrz_password, event_type, power, use_call_history,
         use_master_callsign_file, starts_at, ends_at, ses_description, ses_qsl_info,
-        slot_enforcement, slot_minutes, dupe_rule)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
+        slot_enforcement, slot_minutes, dupe_rule, require_operator_approval)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
      RETURNING id, join_code`,
     [
       join_code,
       club_name.trim(),
       club_call.toUpperCase().trim(),
       resolvedYear,
+      // A special event station has no contest class, ever. Its section is
+      // optional: plenty of special events run outside FD/WFD but are still
+      // worth recording a section for, and it feeds ADIF MY_ARRL_SECT.
       isSesEvent ? null : fdClass.toUpperCase().trim(),
-      isSesEvent ? null : arrl_section.toUpperCase().trim(),
+      isSesEvent
+        ? (arrl_section?.toUpperCase().trim() || null)
+        : arrl_section.toUpperCase().trim(),
       location?.trim() ?? null,
       qrz_username?.trim() ?? null,
       encryptedPassword,
@@ -104,6 +109,7 @@ export async function POST(request: Request) {
       slot_enforcement === 'HARD' ? 'HARD' : 'SOFT',
       Number(slot_minutes) > 0 ? Math.round(Number(slot_minutes)) : 120,
       ['EVENT','DAY','NONE'].includes(dupe_rule) ? dupe_rule : (isSesEvent ? 'DAY' : 'EVENT'),
+      isSesEvent && !!require_operator_approval,
     ]
   );
 
