@@ -12,6 +12,41 @@ export default function HomePage() {
   const [joinCode, setJoinCode] = useState('');
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState('');
+
+  // Restoring an EzFD backup — the counterpart to the dashboard's Backup
+  // button. Always creates a new event with a fresh join code, so this can't
+  // damage anything already on the instance, which is why it needs no
+  // confirmation step beyond picking the file.
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    e.target.value = '';           // let the same file be picked again after an error
+    if (!file) return;
+
+    setImportError('');
+    setImporting(true);
+    try {
+      const payload = JSON.parse(await file.text());
+      const res = await fetch('/api/import/event', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ payload }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setImportError(data.error ?? 'Import failed.');
+        return;
+      }
+      const first = data.imported?.[0];
+      if (first?.new_code) router.push(`/event/${first.new_code}`);
+      else setImportError('The export contained no events.');
+    } catch {
+      setImportError("That file isn't a readable EzFD backup.");
+    } finally {
+      setImporting(false);
+    }
+  }
 
   async function handleJoin(e: React.FormEvent) {
     e.preventDefault();
@@ -84,6 +119,23 @@ export default function HomePage() {
           >
             Create Event
           </Link>
+
+          {/* Moving an event between instances — off a field server, or off a
+              hosted instance you'd rather not depend on — shouldn't require a
+              shell on the server. */}
+          <label className="mt-3 block cursor-pointer text-center text-xs text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700">
+            <input
+              type="file"
+              accept="application/json,.json"
+              onChange={handleImport}
+              disabled={importing}
+              className="hidden"
+            />
+            {importing ? 'Restoring…' : 'or restore from a backup file'}
+          </label>
+          {importError && (
+            <p className="mt-2 text-center text-xs text-red-400 light:text-red-600">{importError}</p>
+          )}
         </div>
       </div>
 

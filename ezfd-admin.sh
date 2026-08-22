@@ -33,37 +33,10 @@ fi
 
 # ── JSON mode (non-interactive, pipeable) ─────────────────────────────────────
 if [[ "${1:-}" == "--json" ]]; then
-  PG -c "
-    SELECT json_agg(row_to_json(t)) FROM (
-      SELECT
-        e.id, e.join_code, e.club_name, e.club_call, e.event_year,
-        e.class, e.arrl_section, e.event_type, e.power, e.location,
-        e.bonuses, e.created_at,
-        e.starts_at, e.ends_at, e.ses_description, e.ses_qsl_info,
-        e.slot_enforcement, e.slot_minutes, e.dupe_rule, e.require_operator_approval,
-        (SELECT COUNT(*) FROM qsos q WHERE q.event_id = e.id AND NOT q.is_dupe) AS qso_count,
-        (SELECT COUNT(*) FROM qsos q WHERE q.event_id = e.id AND     q.is_dupe) AS dupe_count,
-        (SELECT json_agg(DISTINCT q.operator_call ORDER BY q.operator_call)
-           FROM qsos q WHERE q.event_id = e.id AND q.operator_call IS NOT NULL
-        ) AS operators,
-        (SELECT json_agg(row_to_json(q) ORDER BY q.datetime_utc)
-           FROM qsos q WHERE q.event_id = e.id
-        ) AS qsos,
-        -- The SES roster carries each operator's own grid/state, which is
-        -- what the ADIF MY_* fields are built from. Omitting it from a dump
-        -- would make the backup silently lossy for special event stations.
-        (SELECT json_agg(row_to_json(o) ORDER BY o.op_call)
-           FROM ses_operators o WHERE o.event_id = e.id
-        ) AS ses_operators,
-        (SELECT json_agg(json_build_object(
-                  'op_call', r.op_call, 'band', r.band, 'mode', r.mode,
-                  'starts_at', lower(r.during), 'ends_at', upper(r.during),
-                  'planned_freq', r.planned_freq, 'note', r.note,
-                  'status', r.status, 'created_at', r.created_at) ORDER BY lower(r.during))
-           FROM ses_reservations r WHERE r.event_id = e.id
-        ) AS ses_reservations
-      FROM events e ORDER BY e.created_at
-    ) t;"
+  # One canonical export shape, defined in db/schema.sql and shared with the
+  # HTTP API and the tests. It excludes the QRZ credentials by construction
+  # and always carries the SES roster and checkout history.
+  PG -c "SELECT ezfd_export_events();"
   exit 0
 fi
 
@@ -697,13 +670,11 @@ backup_all() {
   file="/tmp/ezfd_backup_$(date -u +%Y%m%d_%H%M%S).json"
   echo -e "  Writing full backup to ${BOLD}${file}${NC}…"
   echo
-  PG -c "
-    SELECT json_agg(row_to_json(t)) FROM (
-      SELECT e.*,
-        (SELECT json_agg(row_to_json(q) ORDER BY q.datetime_utc)
-         FROM qsos q WHERE q.event_id = e.id) AS qsos
-      FROM events e ORDER BY e.created_at
-    ) t;" > "$file"
+  # Was a second, drifted copy of the export query: SELECT e.* dumped the
+  # encrypted QRZ credentials into the file, and it carried neither the SES
+  # roster nor the checkout history, so a restored special event lost the
+  # per-operator grid/state the ADIF MY_* fields are built from.
+  PG -c "SELECT ezfd_export_events();" > "$file"
   log "Backup complete: $file"
   local size; size=$(du -sh "$file" | awk '{print $1}')
   echo -e "  ${DIM}File size: ${size}${NC}"
@@ -789,127 +760,16 @@ restore_from_json() {
   echo -e "  ${DIM}Restoring…${NC}"
 
   local result
-  result=$(PG -c "
-    CREATE TEMP TABLE _restore_summary (orig_code text, new_code text, qso_count int);
-
-    DO \$\$
-    DECLARE
-      raw jsonb;
-      ev  jsonb;
-      qso jsonb;
-      op  jsonb;
-      res jsonb;
-      new_id uuid;
-      new_code text;
-      n int;
-    BEGIN
-      raw := pg_read_file('$json_file')::jsonb;
-      IF jsonb_typeof(raw) = 'object' THEN
-        raw := jsonb_build_array(raw);
-      END IF;
-
-      -- json_agg over zero rows yields JSON null — a scalar, not SQL NULL —
-      -- so COALESCE(...,'[]') does not catch it and jsonb_array_elements
-      -- then fails with "cannot extract elements from a scalar". Every list
-      -- below is therefore type-checked rather than COALESCEd.
-      FOR ev IN SELECT * FROM jsonb_array_elements(raw) LOOP
-        new_id := gen_random_uuid();
-        new_code := upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
-
-        INSERT INTO events (id, join_code, club_name, club_call, event_year, class, arrl_section,
-                             location, qrz_username, qrz_password, qrz_session_key, qrz_session_expires,
-                             bonuses, event_type, power, created_at,
-                             starts_at, ends_at, ses_description, ses_qsl_info,
-                             slot_enforcement, slot_minutes, dupe_rule, require_operator_approval)
-        VALUES (
-          new_id, new_code,
-          COALESCE(ev->>'club_name',''), COALESCE(ev->>'club_call',''),
-          COALESCE((ev->>'event_year')::int, EXTRACT(YEAR FROM NOW())::int),
-          -- NULLIF, not COALESCE to '': a special event station stores NULL
-          -- here, and restoring it as an empty string would put a blank
-          -- MY_ARRL_SECT into every exported ADIF record.
-          NULLIF(ev->>'class',''), NULLIF(ev->>'arrl_section',''),
-          ev->>'location', ev->>'qrz_username', ev->>'qrz_password', ev->>'qrz_session_key',
-          NULLIF(ev->>'qrz_session_expires','')::timestamptz,
-          COALESCE(ev->'bonuses','{}'::jsonb),
-          COALESCE(ev->>'event_type','FD'),
-          COALESCE(ev->>'power','HIGH'),
-          COALESCE(NULLIF(ev->>'created_at','')::timestamptz, NOW()),
-          NULLIF(ev->>'starts_at','')::timestamptz,
-          NULLIF(ev->>'ends_at','')::timestamptz,
-          ev->>'ses_description', ev->>'ses_qsl_info',
-          COALESCE(ev->>'slot_enforcement','SOFT'),
-          COALESCE((ev->>'slot_minutes')::int, 120),
-          COALESCE(ev->>'dupe_rule','EVENT'),
-          COALESCE((ev->>'require_operator_approval')::boolean, false)
-        );
-
-        n := 0;
-        FOR qso IN SELECT * FROM jsonb_array_elements(CASE WHEN jsonb_typeof(ev->'qsos') = 'array'
-                                        THEN ev->'qsos' ELSE '[]'::jsonb END) LOOP
-          INSERT INTO qsos (id, event_id, callsign, band, mode, datetime_utc, sent_class, sent_section,
-                             rcvd_class, rcvd_section, operator_call, station_number, is_dupe, created_at,
-                             rst_sent, rst_rcvd, rcvd_name, rcvd_qth, rcvd_grid, comment,
-                             adif_mode, freq_khz)
-          VALUES (
-            gen_random_uuid(), new_id,
-            qso->>'callsign', qso->>'band', qso->>'mode',
-            COALESCE(NULLIF(qso->>'datetime_utc','')::timestamptz, NOW()),
-            qso->>'sent_class', qso->>'sent_section',
-            qso->>'rcvd_class', qso->>'rcvd_section',
-            qso->>'operator_call', COALESCE((qso->>'station_number')::int, 1),
-            COALESCE((qso->>'is_dupe')::boolean, false),
-            COALESCE(NULLIF(qso->>'created_at','')::timestamptz, NOW()),
-            qso->>'rst_sent', qso->>'rst_rcvd', qso->>'rcvd_name',
-            qso->>'rcvd_qth', qso->>'rcvd_grid', qso->>'comment',
-            qso->>'adif_mode', NULLIF(qso->>'freq_khz','')::int
-          );
-          n := n + 1;
-        END LOOP;
-
-        -- The SES operator roster. Losing this would strip the per-operator
-        -- grid/state that the ADIF MY_* fields are built from, leaving a
-        -- restored special event log that no longer uploads correctly.
-        FOR op IN SELECT * FROM jsonb_array_elements(CASE WHEN jsonb_typeof(ev->'ses_operators') = 'array'
-                                        THEN ev->'ses_operators' ELSE '[]'::jsonb END) LOOP
-          INSERT INTO ses_operators (event_id, op_call, op_name, grid, state, county, dxcc, approved, created_at)
-          VALUES (
-            new_id, op->>'op_call', op->>'op_name', op->>'grid', op->>'state',
-            op->>'county', NULLIF(op->>'dxcc','')::int,
-            COALESCE((op->>'approved')::boolean, true),
-            COALESCE(NULLIF(op->>'created_at','')::timestamptz, NOW())
-          )
-          ON CONFLICT (event_id, op_call) DO NOTHING;
-        END LOOP;
-
-        -- Checkout history, rebuilt from the decomposed bounds the backup
-        -- stores (a tstzrange doesn't survive a JSON round-trip intact).
-        -- Skipped where a bound is missing rather than guessed at.
-        FOR res IN SELECT * FROM jsonb_array_elements(CASE WHEN jsonb_typeof(ev->'ses_reservations') = 'array'
-                                        THEN ev->'ses_reservations' ELSE '[]'::jsonb END) LOOP
-          CONTINUE WHEN NULLIF(res->>'starts_at','') IS NULL;
-          INSERT INTO ses_reservations (event_id, op_call, band, mode, during,
-                                        planned_freq, note, status, created_at)
-          VALUES (
-            new_id, res->>'op_call', res->>'band', res->>'mode',
-            tstzrange(
-              (res->>'starts_at')::timestamptz,
-              COALESCE(NULLIF(res->>'ends_at','')::timestamptz,
-                       (res->>'starts_at')::timestamptz + interval '2 hours'),
-              '[)'
-            ),
-            res->>'planned_freq', res->>'note',
-            COALESCE(res->>'status','RELEASED'),
-            COALESCE(NULLIF(res->>'created_at','')::timestamptz, NOW())
-          );
-        END LOOP;
-
-        INSERT INTO _restore_summary VALUES (ev->>'join_code', new_code, n);
-      END LOOP;
-    END \$\$;
-
-    SELECT orig_code, new_code, qso_count FROM _restore_summary;
-  " 2>&1)
+  # The backup is read here and passed in as a parameter, rather than with
+  # pg_read_file() which reads the *database server's* filesystem. That used
+  # to require the database to be on this host -- docs/deployment.md documents
+  # pointing DATABASE_URL elsewhere, which would have broken restore silently.
+  # The restore itself lives in db/schema.sql, so the API and the tests run
+  # the same code.
+  # Fed on stdin, not with -c: psql only interpolates :'variables' when it
+  # lexes the input, which it does for stdin and -f but not for -c.
+  result=$(PG -v payload="$(cat "$json_file")" \
+              <<< "SELECT orig_code, new_code, qso_count FROM ezfd_restore_events(:'payload'::jsonb);" 2>&1)
   local status=$?
 
   if [[ $status -ne 0 ]]; then

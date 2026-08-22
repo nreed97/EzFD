@@ -54,6 +54,25 @@ export async function GET(request: Request, { params }: { params: Promise<{ code
   ].filter(Boolean).join('_');
   const stem = `${event.club_call.replace(/[^A-Za-z0-9]/g, '')}_${suffix}`;
 
+  // Full-event JSON: everything the admin console's backup carries — event
+  // settings, every QSO, the SES roster and the checkout history — so an
+  // event can be moved between instances by the person who owns it, without
+  // shell access. Built by ezfd_export_events() in db/schema.sql, which is
+  // also what ezfd-admin.sh calls, so the two shapes cannot drift.
+  //
+  // Deliberately not filtered by op/from/to: this is a portability export,
+  // and a partial one would restore as a partial event. Those filters stay
+  // on the ADIF path, where pulling one operator's contacts is the point.
+  if (format === 'json') {
+    const { rows } = await pool.query('SELECT ezfd_export_events($1) AS payload', [event.id]);
+    return new NextResponse(JSON.stringify(rows[0].payload, null, 2), {
+      headers: {
+        'Content-Type': 'application/json; charset=utf-8',
+        'Content-Disposition': `attachment; filename="${stem}.json"`,
+      },
+    });
+  }
+
   if (format === 'cabrillo') {
     // Cabrillo is a contest submission format. A special event station has no
     // contest, no exchange and no score, so there is nothing to submit.

@@ -17,7 +17,6 @@
 # matching the convention in ezfd-admin.sh (see AGENTS.md).
 set -uo pipefail
 
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PSQL="${PSQL:-psql -h 127.0.0.1 -p 5432 -U postgres}"
 DB="${DB:-ezfd}"
 WORK="$(mktemp -d)"
@@ -32,46 +31,28 @@ no() { echo "FAIL  $1  ${2:-}"; FAILURES=$((FAILURES + 1)); }
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
 
-# The backup query from ezfd-admin.sh's "Export full backup" action.
+# Export and restore are functions in db/schema.sql, so this exercises the
+# shipped definitions directly rather than a copy. That matters here more than
+# most places: this test used to carry its own third variant of the backup
+# query, so it round-tripped a shape the admin console's menu action never
+# actually produced -- and stayed green while that action silently dropped the
+# SES roster.
 backup() {
   local uuid="$1" out="$2"
-  $PSQL -d "$DB" -tAX -c "
-    SELECT row_to_json(t) FROM (
-      SELECT e.*,
-        (SELECT json_agg(row_to_json(q) ORDER BY q.datetime_utc) FROM qsos q WHERE q.event_id=e.id) AS qsos,
-        (SELECT json_agg(row_to_json(o) ORDER BY o.op_call)
-           FROM ses_operators o WHERE o.event_id=e.id) AS ses_operators,
-        (SELECT json_agg(json_build_object(
-                  'op_call', r.op_call, 'band', r.band, 'mode', r.mode,
-                  'starts_at', lower(r.during), 'ends_at', upper(r.during),
-                  'planned_freq', r.planned_freq, 'note', r.note,
-                  'status', r.status, 'created_at', r.created_at) ORDER BY lower(r.during))
-           FROM ses_reservations r WHERE r.event_id=e.id) AS ses_reservations
-      FROM events e WHERE e.id='$uuid'
-    ) t;" > "$out"
-}
-
-# Pull the restore DO block out of ezfd-admin.sh so the real code is what runs
-# rather than a copy that could drift away from it.
-#
-# One substitution: ezfd-admin.sh reads the backup with pg_read_file(), which
-# reads the *server's* filesystem. That is correct in production, where the
-# admin script and PostgreSQL are on the same host, but in CI the database is
-# a container that cannot see the runner's /tmp. So the file read is replaced
-# with the JSON inlined as a dollar-quoted literal. Everything after that
-# assignment -- the parsing, the loops, the NULLIF and jsonb_typeof guards,
-# all the logic that has ever actually been wrong -- is byte-for-byte the
-# shipped code. Only the way the JSON arrives differs.
-extract_restore() {
-  local json_file="$1" out="$2"
-  python3 "$SCRIPT_DIR/scripts/_extract_restore.py" \
-    "$SCRIPT_DIR/ezfd-admin.sh" "$json_file" "$out"
+  $PSQL -d "$DB" -tAX -c "SELECT ezfd_export_events('$uuid');" > "$out"
 }
 
 restore() {
-  local json_file="$1" sql="$WORK/restore.sql"
-  extract_restore "$json_file" "$sql"
-  $PSQL -d "$DB" -tAX -v ON_ERROR_STOP=1 -f "$sql" 2>&1 | grep -E '^[A-Z0-9]{6}$' | head -1
+  local json_file="$1"
+  # The payload goes in as a psql variable rather than pg_read_file(), which
+  # reads the *database server's* filesystem -- invisible to the runner when
+  # the database is a container, as it is in CI. Fed on stdin, not with -c:
+  # psql only interpolates :'variables' when it lexes the input, which it does
+  # for stdin and -f but not for -c.
+  $PSQL -d "$DB" -tAX -v ON_ERROR_STOP=1 \
+    -v payload="$(cat "$json_file")" \
+    <<< "SELECT new_code FROM ezfd_restore_events(:'payload'::jsonb);" 2>&1 \
+    | grep -E '^[A-Z0-9]{6}$' | head -1
 }
 
 echo "── seeding ──"
@@ -116,6 +97,25 @@ echo "── round trips ──"
 # ── SES ──────────────────────────────────────────────────────────────────────
 SES_UUID=$(q "SELECT id FROM events WHERE join_code='RTSES';")
 backup "$SES_UUID" "$WORK/ses.json"
+
+# Both of these were live bugs. ezfd-admin.sh's interactive "Full JSON backup"
+# used SELECT e.*, so it dumped the encrypted QRZ credentials into a file the
+# script then offers to scp off-server, and it carried neither the SES roster
+# nor the checkout history -- silently lossy for exactly the event type that
+# needs the roster most, since it is the only source for the ADIF MY_* fields.
+if grep -qi 'qrz' "$WORK/ses.json"; then
+  no "  the export carries no QRZ credentials" "$(grep -oi 'qrz[a-z_]*' "$WORK/ses.json" | sort -u | tr '\n' ' ')"
+else
+  ok "  the export carries no QRZ credentials"
+fi
+for table in ses_operators ses_reservations qsos; do
+  if grep -q "\"$table\"" "$WORK/ses.json"; then
+    ok "  the export carries $table"
+  else
+    no "  the export carries $table"
+  fi
+done
+
 SES_NEW=$(restore "$WORK/ses.json")
 if [[ -z "$SES_NEW" ]]; then
   no "SES event restores"

@@ -165,6 +165,12 @@ timestamps — treat it as a signal to refetch, not as data.
 
 ### `GET /api/export/{code}`
 
+`?format=json` returns the whole event — settings, bonuses, every QSO, the SES
+roster and the checkout history — as a restorable backup. QRZ credentials are
+excluded by construction. The `op`/`from`/`to` filters apply to ADIF only; a
+filtered portability export would restore as a partial event.
+
+
 ADIF by default; `?format=cabrillo` for Cabrillo.
 
 | Parameter | Effect |
@@ -178,6 +184,20 @@ filters, so per-operator exports don't collide.
 
 `400` for `format=cabrillo` on a special event — there is no contest to
 submit to.
+
+### `POST /api/import/event`
+
+Recreate an event from a full-event JSON export.
+
+```json
+{ "payload": [ /* the export */ ], "admin_key": "optional" }
+```
+
+Always creates a **new** event with a fresh join code — never overwrites or
+merges — so importing is safe to try, and safe to try twice. Returns
+`{ "imported": [{ "orig_code", "new_code", "qso_count" }] }`.
+
+Gated by `EZFD_ADMIN_KEY` when it is set, matching event creation.
 
 ### `POST /api/import/adif`
 

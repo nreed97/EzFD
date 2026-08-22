@@ -297,6 +297,84 @@ else
   no "  DX survives into the Cabrillo log"
 fi
 
+# ── Self-service event portability ───────────────────────────────────────────
+#
+# Moving an event between instances used to require shell access on the server.
+# These cover the round trip over HTTP: a full-event backup out, and an import
+# that recreates it as a new event with a fresh join code.
+echo "── event export / import ──"
+
+# No QRZ credentials here: storing them needs EZFD_ENCRYPTION_KEY, which CI
+# doesn't set. The leak case with a real encrypted secret is covered in
+# scripts/test-restore.sh, which inserts one directly and greps the export
+# for it. What this asserts is the structural guarantee — the export names
+# its columns explicitly and no qrz_ field appears at all.
+PORT_EV=$(req POST /api/events '{"club_name":"Portable","club_call":"W0PRT","event_type":"SES","slot_enforcement":"SOFT","arrl_section":"MN"}' | jq_get join_code)
+PORT_ID=$(req GET "/api/events/$PORT_EV" | jq_get id)
+req POST /api/ses/operators "{\"event_id\":\"$PORT_ID\",\"op_call\":\"W0AAA\",\"grid\":\"EN34\",\"state\":\"MN\"}" > /dev/null
+req POST /api/qso "{\"event_id\":\"$PORT_ID\",\"callsign\":\"K1POR\",\"band\":\"20m\",\"mode\":\"PH\",\"rcvd_section\":\"EPA\",\"operator_call\":\"W0AAA\"}" > /dev/null
+
+EXPORT_JSON=$(req GET "/api/export/$PORT_EV?format=json")
+if [[ "$(status GET "/api/export/$PORT_EV?format=json")" == "200" ]]; then
+  ok "  a full-event JSON export downloads"
+else
+  no "  a full-event JSON export downloads"
+fi
+if [[ "$EXPORT_JSON" == *"ses_operators"* && "$EXPORT_JSON" == *"W0AAA"* ]]; then
+  ok "  it carries the SES roster"
+else
+  no "  it carries the SES roster"
+fi
+# The password is encrypted with a key the backup doesn't contain, and this
+# endpoint is reachable over HTTP with only a join code.
+if [[ "$EXPORT_JSON" == *"qrz"* ]]; then
+  no "  it carries no QRZ fields at all" "$(echo "$EXPORT_JSON" | grep -oi 'qrz[a-z_]*' | sort -u | tr '\n' ' ')"
+else
+  ok "  it carries no QRZ fields at all"
+fi
+
+IMPORTED=$(req POST /api/import/event "{\"payload\":$EXPORT_JSON}")
+NEW_CODE=$(echo "$IMPORTED" | python3 -c "import sys,json;d=json.load(sys.stdin);print((d.get('imported') or [{}])[0].get('new_code',''))" 2>/dev/null)
+if [[ -n "$NEW_CODE" && "$NEW_CODE" != "$PORT_EV" ]]; then
+  ok "  importing it creates a new event with a fresh join code"
+else
+  no "  importing it creates a new event with a fresh join code" "got '$NEW_CODE'"
+fi
+IMPORTED_EV=$(req GET "/api/events/$NEW_CODE")
+if [[ "$(echo "$IMPORTED_EV" | jq_get club_call)" == "W0PRT" ]]; then
+  ok "  the restored event keeps its settings"
+else
+  no "  the restored event keeps its settings"
+fi
+if [[ "$(req GET "/api/export/$NEW_CODE")" == *"K1POR"* ]]; then
+  ok "  and its QSOs"
+else
+  no "  and its QSOs"
+fi
+if [[ "$(req GET "/api/export/$NEW_CODE")" == *"EN34"* ]]; then
+  ok "  and the roster that feeds the ADIF MY_* fields"
+else
+  no "  and the roster that feeds the ADIF MY_* fields"
+fi
+
+# Importing must never damage what is already there.
+if [[ "$(status GET "/api/events/$PORT_EV")" == "200" ]]; then
+  ok "  the original event is untouched by the import"
+else
+  no "  the original event is untouched by the import"
+fi
+
+if [[ "$(status POST /api/import/event '{"payload":"not-an-event"}')" == "400" ]]; then
+  ok "  a payload that is not an event is refused"
+else
+  no "  a payload that is not an event is refused"
+fi
+if [[ "$(status POST /api/import/event '{}')" == "400" ]]; then
+  ok "  a missing payload is refused"
+else
+  no "  a missing payload is refused"
+fi
+
 # ── Server clock endpoint ────────────────────────────────────────────────────
 #
 # The clock-skew banner is only as good as this endpoint. A field server with
