@@ -21,9 +21,6 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PSQL="${PSQL:-psql -h 127.0.0.1 -p 5432 -U postgres}"
 DB="${DB:-ezfd}"
 WORK="$(mktemp -d)"
-# pg_read_file runs as the PostgreSQL server process, which is a different
-# user, so it must be able to traverse this directory. mktemp -d gives 0700.
-chmod 755 "$WORK"
 FAILURES=0
 
 q()  { $PSQL -d "$DB" -tAX -c "$1" 2>&1; }
@@ -50,12 +47,26 @@ backup() {
            FROM ses_reservations r WHERE r.event_id=e.id) AS ses_reservations
       FROM events e WHERE e.id='$uuid'
     ) t;" > "$out"
-  # pg_read_file runs as the server process, which is not this user.
-  chmod 644 "$out"
 }
 
-# Pull the restore DO block out of ezfd-admin.sh so the real code is what runs.
+# Pull the restore DO block out of ezfd-admin.sh so the real code is what runs
+# rather than a copy that could drift away from it.
+#
+# One substitution: ezfd-admin.sh reads the backup with pg_read_file(), which
+# reads the *server's* filesystem. That is correct in production, where the
+# admin script and PostgreSQL are on the same host, but in CI the database is
+# a container that cannot see the runner's /tmp. So the file read is replaced
+# with the JSON inlined as a dollar-quoted literal. Everything after that
+# assignment -- the parsing, the loops, the NULLIF and jsonb_typeof guards,
+# all the logic that has ever actually been wrong -- is byte-for-byte the
+# shipped code. Only the way the JSON arrives differs.
 extract_restore() {
+  local json_file="$1" out="$2"
+  python3 "$SCRIPT_DIR/scripts/_extract_restore.py" \
+    "$SCRIPT_DIR/ezfd-admin.sh" "$json_file" "$out"
+}
+
+restore() {
   local json_file="$1" out="$2"
   python3 - "$SCRIPT_DIR/ezfd-admin.sh" "$json_file" "$out" <<'PY'
 import sys
