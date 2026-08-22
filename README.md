@@ -340,6 +340,8 @@ instead would stamp every operator's QSOs with the same wrong location and
 produce a log that doesn't upload cleanly.
 
 **Two operators must not sign the call on the same band and mode at once.**
+Special event rules generally permit one signal per band per mode, which is
+exactly the granularity the checkout enforces.
 Operators check the call out for a band/mode window from the **Call Checkout**
 panel. Overlap isn't checked in application code — it's prevented by a
 PostgreSQL `EXCLUDE USING gist` constraint on `ses_reservations`, so two
@@ -520,6 +522,34 @@ npm run dev
 ```
 
 Open `http://localhost:3000`.
+
+### Tests
+
+CI runs these on every push and pull request; all four also run locally
+against any database with `db/schema.sql` applied.
+
+```bash
+# The AGENTS.md gate — both must be clean before finishing a change
+npx tsc --noEmit
+npm run build
+
+# The SES one-signal-per-band-per-mode guarantee lives in a database
+# constraint, so it's asserted against a real database
+psql -d ezfd -v ON_ERROR_STOP=1 -f db/test-ses-constraint.sql
+
+# Route SQL is built as strings, which the typechecker can't see into
+DATABASE_URL=postgres://localhost/ezfd node scripts/test-queries.cjs
+
+# ezfd-admin.sh's backup/restore, round-tripped for SES, FD and empty events
+PSQL="psql -h localhost -U postgres" bash scripts/test-restore.sh
+
+# End-to-end against a running server
+BASE_URL=http://localhost:3000 bash scripts/test-e2e.sh
+```
+
+`scripts/test-restore.sh` extracts the restore SQL from `ezfd-admin.sh`
+rather than copying it, so the test exercises the real code and cannot
+drift away from it.
 
 ### Project Structure
 

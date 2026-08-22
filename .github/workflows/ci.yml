@@ -1,9 +1,14 @@
-# The two checks AGENTS.md already requires before finishing a frontend
-# change, run automatically on every push and pull request.
+# The checks AGENTS.md already requires before finishing a change, plus the
+# ones that would have caught bugs this project has actually hit:
 #
-# Deliberately does not run `npm run lint`: eslint currently reports 22
-# pre-existing errors on master, so gating on it would fail every PR. Worth
-# adding once that backlog is cleared.
+#   build   — typecheck and production build (the AGENTS.md gate), then the
+#             end-to-end API flow against the real server
+#   schema  — schema idempotency, the SES exclusion constraint, the route-level
+#             SQL, and the admin console's backup/restore round trip
+#   shell   — syntax-checks the shell scripts, which nothing else validates
+#
+# Deliberately not gating on `npm run lint`: eslint reports 22 pre-existing
+# errors on master, so it would fail every PR. Worth adding once cleared.
 name: CI
 
 on:
@@ -11,9 +16,24 @@ on:
     branches: [master]
   pull_request:
 
+env:
+  PGPASSWORD: postgres
+
 jobs:
   build:
     runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_PASSWORD: postgres
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
     steps:
       - uses: actions/checkout@v4
 
@@ -22,9 +42,8 @@ jobs:
           node-version: 22
           cache: npm
 
-      # `npm ci` needs the lockfile to match package.json exactly, which is
-      # what we want in CI — it fails loudly on drift rather than silently
-      # resolving new versions.
+      # `npm ci` fails loudly if the lockfile has drifted from package.json,
+      # which is what we want in CI rather than silently resolving new versions.
       - run: npm ci
 
       - name: Typecheck
@@ -32,6 +51,28 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Prepare database
+        run: |
+          psql -h localhost -U postgres -c "CREATE ROLE ezfd LOGIN;"
+          psql -h localhost -U postgres -c "CREATE DATABASE ezfd;"
+          psql -h localhost -U postgres -d ezfd -v ON_ERROR_STOP=1 -q -f db/schema.sql
+
+      # The standalone bundle doesn't include the static assets; the deploy
+      # copies them alongside, so do the same here.
+      - name: Start server
+        run: |
+          cp -r .next/static .next/standalone/.next/
+          cd .next/standalone
+          DATABASE_URL=postgres://postgres:postgres@localhost:5432/ezfd \
+          PORT=3000 HOSTNAME=127.0.0.1 node server.js > /tmp/server.log 2>&1 &
+
+      - name: End-to-end API tests
+        run: BASE_URL=http://127.0.0.1:3000 bash scripts/test-e2e.sh
+
+      - name: Server log
+        if: failure()
+        run: cat /tmp/server.log || true
 
   schema:
     runs-on: ubuntu-latest
@@ -50,20 +91,53 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
       # deploy.sh and ezfd-admin.sh both re-apply schema.sql on every update,
       # so applying it twice is the real-world case: it must be idempotent.
       - name: Apply schema twice
-        env:
-          PGPASSWORD: postgres
         run: |
           psql -h localhost -U postgres -c "CREATE ROLE ezfd LOGIN;"
           psql -h localhost -U postgres -c "CREATE DATABASE ezfd;"
           psql -h localhost -U postgres -d ezfd -v ON_ERROR_STOP=1 -q -f db/schema.sql
           psql -h localhost -U postgres -d ezfd -v ON_ERROR_STOP=1 -q -f db/schema.sql
 
-      # The SES call-checkout guarantee lives entirely in a database
-      # constraint, so it needs a test that exercises the database.
-      - name: Verify SES overlap constraint
-        env:
-          PGPASSWORD: postgres
+      # The SES one-signal-per-band-per-mode guarantee lives entirely in a
+      # database constraint, so it needs a test that exercises the database.
+      - name: SES constraint assertions
         run: psql -h localhost -U postgres -d ezfd -v ON_ERROR_STOP=1 -f db/test-ses-constraint.sql
+
+      # Route SQL is built as strings, so the typechecker can't see a bad cast.
+      - name: Route query tests
+        run: DATABASE_URL=postgres://postgres:postgres@localhost:5432/ezfd node scripts/test-queries.cjs
+
+      # This path has been wrong twice, both times silently.
+      - name: Backup/restore round trip
+        run: PSQL="psql -h localhost -U postgres" bash scripts/test-restore.sh
+
+  shell:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # deploy.sh and ezfd-admin.sh are long, interactive, and otherwise
+      # unvalidated — a syntax error would only surface on a live server.
+      - name: Syntax-check shell scripts
+        run: |
+          for f in $(git ls-files '*.sh'); do
+            echo "checking $f"
+            bash -n "$f"
+          done
+
+      # Advisory: the existing scripts predate this and would fail a gate,
+      # but new problems are still worth surfacing in the log.
+      - name: shellcheck (advisory)
+        continue-on-error: true
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
+          shellcheck --severity=error $(git ls-files '*.sh') || true

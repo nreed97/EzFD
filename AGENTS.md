@@ -11,6 +11,20 @@ EzFD is a real-time, multi-operator ARRL Field Day / Winter Field Day logger. Ne
 ## Before finishing a frontend change
 Run `npx tsc --noEmit` and `npm run build` — both must be clean.
 
+Changes touching the schema, the SES routes, or `ezfd-admin.sh` should also run
+the relevant suite (CI runs all of them — see the Tests section in `README.md`):
+
+| Script | Covers |
+|---|---|
+| `db/test-ses-constraint.sql` | The SES overlap constraint, asserted against a real database |
+| `scripts/test-queries.cjs` | Route SQL through the `pg` driver — casts the typechecker can't see |
+| `scripts/test-restore.sh` | `ezfd-admin.sh` backup/restore for SES, FD and empty events |
+| `scripts/test-e2e.sh` | The API end to end, including Field Day regressions |
+
+When adding a test, check it can actually fail — break the thing it guards and
+watch it go red. Doing that is what surfaced the missing self-heal on the
+exclusion constraint.
+
 ## Critical gotchas
 
 - **`pg` returns `TIMESTAMPTZ` as JS `Date` objects**, not strings. `lib/adif.ts` and `lib/cabrillo.ts` must handle both shapes.
@@ -21,6 +35,7 @@ Run `npx tsc --noEmit` and `npm run build` — both must be clean.
 - **`EZFD_REPO_DIR`** (in `/opt/ezfd/.env`, written by `deploy.sh`) tells `ezfd-admin.sh`'s "Update application" action where to `git pull` from.
 - **N1MM call history files are contest-year-specific**, unlike `MASTER.SCP` (evergreen). `lib/callHistory.ts` builds the download URL from `event_type`+`event_year` against N1MM's `{fd|wfd}_{year}-LAST.txt` slug and falls back to the prior year if that year's file isn't published yet — override with `EZFD_FD_CALL_HISTORY_URL`/`EZFD_WFD_CALL_HISTORY_URL` (supports a `{year}` placeholder) if N1MM changes their URL scheme. The FD/WFD file's `Exch1` column is the station's **sent class** (e.g. `3A`), not a generic exchange field — mapped to `sent_class` and used to prefill Rcvd Class, alongside `Sect` → Rcvd Section. `MASTER.SCP` header/comment lines start with `!` or `#` (not `;`). Both downloads are best-effort at event creation — a failed fetch must never block event creation, only degrade the prefill/lookup feature (each fetch carries an `AbortSignal.timeout`, since the create request awaits them).
 - **`events.class` and `events.arrl_section` are nullable** — they are NULL for every `event_type='SES'` row (a special event station has no contest exchange). Anything reading them needs a null guard; `lib/cabrillo.ts`, `lib/adif.ts`, `components/SummarySheet.tsx` and the QSO insert paths already have one. Cabrillo export is refused outright for SES.
+- **SES checkout granularity is (band, mode) and must not be narrowed to frequency.** Special event rules generally allow one signal per band per mode, so frequency-level slots would let the database permit something the rules forbid. `ses_reservations.planned_freq` is free text for humans and deliberately carries no exclusivity.
 - **SES call checkout is enforced by a database constraint, not application code.** `ses_reservations` carries `EXCLUDE USING gist (event_id WITH =, band WITH =, mode WITH =, during WITH &&) WHERE (status <> 'RELEASED')`, which needs the `btree_gist` extension for the `=` comparisons. Never replace it with a SELECT-then-INSERT check: two operators claiming the same slot in the same instant is exactly the case it exists to prevent. A collision arrives as SQLSTATE **`23P01`** and the routes translate it to a 409 naming the holder. Releasing a slot clamps the range with `GREATEST(lower(during), NOW())` — clamping to `NOW()` alone inverts the range when a not-yet-started slot is cancelled.
 - **Offline-queue replays must never be rejected.** `POST /api/qso` takes a `replay: true` flag that bypasses the SES band/mode gate unconditionally, and `LoggingClient`'s `flushQueue` sets it. By reconnect time the slot has always expired; a contact that already happened on the air must not be dropped because the network blipped. For the same reason `flushQueue` only dequeues once `result.qso` is present — checking the wrapper object instead silently discarded QSOs whenever a submit failed.
 - **`json_agg` over zero rows serialises as JSON `null`, a scalar — not SQL NULL.** `COALESCE(ev->'qsos','[]'::jsonb)` therefore does *not* catch it, and `jsonb_array_elements` then fails with "cannot extract elements from a scalar". `ezfd-admin.sh`'s restore guards every list with `jsonb_typeof(...) = 'array'` instead. This bit the QSO loop too: restoring an event with no QSOs used to error out.

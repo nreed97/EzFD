@@ -205,6 +205,12 @@ CREATE TABLE IF NOT EXISTS ses_operators (
 --
 -- btree_gist is what allows the plain `=` comparisons on uuid/text to sit
 -- alongside the `&&` range overlap test inside a single GiST index.
+--
+-- Granularity is deliberately (band, mode) and must stay that way: special
+-- event rules generally permit one signal per band per mode, so a finer
+-- frequency-level slot would let the database bless something the rules
+-- forbid. Operators who want to note a planned frequency use planned_freq,
+-- which is free text and intentionally carries no exclusivity.
 -- ---------------------------------------------------------------------------
 CREATE EXTENSION IF NOT EXISTS btree_gist;
 
