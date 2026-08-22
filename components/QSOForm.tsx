@@ -313,9 +313,16 @@ function QSOForm({
       <div>
         <div className="mb-1 flex items-center justify-between">
           <label className="block text-xs text-zinc-400 light:text-zinc-600">Callsign</label>
-          <label className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700" title="Enter logs immediately with default exchange values, skipping the other fields">
+          <label className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700">
             <input type="checkbox" checked={quickLog} onChange={toggleQuickLog} tabIndex={-1} className="h-3 w-3" />
             Quick Log
+            <span
+              tabIndex={0}
+              title="Enter logs immediately with default exchange values, skipping the other fields"
+              className="ml-0.5 flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border border-zinc-600 text-[9px] leading-none text-zinc-500 hover:border-zinc-400 hover:text-zinc-300"
+            >
+              ?
+            </span>
           </label>
         </div>
         <input

@@ -34,11 +34,15 @@ export default function DateTimeField({
   }
 
   const dateClass = compact
-    ? 'flex-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700'
-    : 'input flex-1';
+    ? 'w-full rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700'
+    : 'input w-full';
 
   return (
-    <div className="flex gap-2">
+    // Stacked rather than side-by-side: a fixed-width date input next to the
+    // clock field's own HH/MM/icon cluster doesn't fit two-up in a narrow
+    // column (the SES sidebar panel, or the two-column Starts/Ends row on
+    // event/new) — it overflowed the card. Full-width stacked rows never do.
+    <div className="flex flex-col gap-1.5">
       <input
         type="date"
         value={datePart}
@@ -53,7 +57,7 @@ export default function DateTimeField({
         onChange={setTime}
         label={label}
         compact={compact}
-        className={compact ? 'w-20' : 'w-[6.5rem]'}
+        className="w-full"
       />
     </div>
   );
