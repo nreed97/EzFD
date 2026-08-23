@@ -229,7 +229,7 @@ function parseLoggedQso(buf) {
   if (schema >= 3) {
     r.utf8();              // My call
     r.utf8();              // My grid
-    exchangeSent = r.utf8(); // Exchange sent (e.g. "3A EPA")
+    exchangeSent = r.utf8(); // Exchange sent (e.g. "3A MN")
     exchangeRcvd = r.utf8(); // Exchange received (e.g. "2A CT")
     // ADIF Propagation mode follows but we don't need it
   }
@@ -238,7 +238,7 @@ function parseLoggedQso(buf) {
 }
 
 // ──────────────────────────────────────────
-// Parse Field Day exchange "2A EPA" → { class, section }
+// Parse Field Day exchange "2A MN" → { class, section }
 // ──────────────────────────────────────────
 
 function parseExchange(s) {
