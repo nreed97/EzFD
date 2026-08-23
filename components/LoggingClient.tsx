@@ -111,6 +111,13 @@ async function submitQSOToServer(
   }
 }
 
+// Retry schedule for draining the offline queue, in milliseconds. Backs off
+// because a queued contact that can *never* be accepted — the event was
+// deleted, or the entry predates a schema change — would otherwise retry at a
+// fixed interval for as long as the tab stays open. Progress resets it, so a
+// real outage still drains at full speed.
+const QUEUE_RETRY_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
+
 export default function LoggingClient({ event, initialQSOs, operatorCall, stationNumber, approvalPending = false }: Props) {
   const router = useRouter();
   const [confirmedQSOs, setConfirmedQSOs] = useState<QSO[]>(initialQSOs);
@@ -164,6 +171,14 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   /* eslint-enable react-hooks/set-state-in-effect */
 
 
+  // The queue drain, reachable from long-lived callbacks (the SSE reconnect
+  // handler and the retry timer) without making either depend on its identity
+  // — a dependency that would tear down and restart the timer on every
+  // unrelated re-render, which is how the auto-CQ timer once failed to
+  // complete an interval. Populated by an effect below, since flushQueue is
+  // declared after this point.
+  const flushRef = useRef<(() => Promise<boolean>) | null>(null);
+
   // SSE subscription for real-time QSO updates
   useEffect(() => {
     const es = new EventSource(`/api/realtime/${event.id}`);
@@ -178,8 +193,20 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     // decomposed timestamps the UI wants, so this just signals "refetch".
     es.addEventListener('reservation', () => setReservationVersion(v => v + 1));
 
+    // A dropped stream is the earliest signal available that the server went
+    // away, and the reconnect is the earliest that it came back — sooner than
+    // any retry timer worth running. navigator.onLine says nothing about
+    // either: it tracks this machine's link, which stays up across a server
+    // restart, an nginx reload or a 502.
+    let dropped = false;
     es.onerror = () => {
       // Browser will auto-reconnect for SSE; errors here are transient
+      dropped = true;
+    };
+    es.onopen = () => {
+      if (!dropped) return;   // the initial connect is not a recovery
+      dropped = false;
+      flushRef.current?.();
     };
 
     return () => es.close();
@@ -212,9 +239,15 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     return () => { cancelled = true; };
   }, [isSes, event.id, operatorCall]);
 
+  /** Drain the offline queue. Resolves true if at least one contact was
+   *  accepted, which is what tells the retry timer it is making progress. */
   const flushQueue = useCallback(async () => {
-    if (syncingRef.current) return;
+    // A flush already running will report its own progress; returning false
+    // here can only cost the timer one backoff step, and the next dequeue
+    // restarts it at full speed anyway.
+    if (syncingRef.current) return false;
     syncingRef.current = true;
+    let progressed = false;
     for (const pending of loadQueue(event.id)) {
       // replay=true — the server accepts these unconditionally.
       const result = await submitQSOToServer(event.id, pending, true);
@@ -223,11 +256,15 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       // submit still dequeued, silently losing the contact.
       if (!result.qso) break;
       dequeue(event.id, pending.local_id);
+      progressed = true;
       setPendingQSOs(prev => prev.filter(p => p._local_id !== pending.local_id));
       setPendingCount(prev => Math.max(0, prev - 1));
     }
     syncingRef.current = false;
+    return progressed;
   }, [event.id]);
+
+  useEffect(() => { flushRef.current = flushQueue; }, [flushQueue]);
 
   // The connectivity *value* comes from useOnline; this effect exists only
   // for the side effect of draining the offline queue on the transition back
@@ -240,6 +277,36 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     // eslint-disable-next-line react-hooks/set-state-in-effect
     if (isOnline) flushQueue();
   }, [isOnline, flushQueue]);
+
+  // Keep retrying while contacts are still queued.
+  //
+  // The effect above fires only when the *browser's* link changes, which is
+  // the wrong signal for the common case: a server restart, an nginx reload
+  // or a brief 502 leaves navigator.onLine true throughout, so there is no
+  // transition and the queue would sit untouched until an operator noticed
+  // the pending badge and pressed Sync. Mid-contest nobody is watching that
+  // badge.
+  //
+  // The timer reschedules itself rather than relying on the effect re-running,
+  // because a failed attempt changes no state the effect depends on. A
+  // successful one does — pendingCount drops, this effect restarts, and the
+  // backoff is back at its shortest step.
+  useEffect(() => {
+    if (!isOnline || pendingCount === 0) return;
+    let cancelled = false;
+    let attempt = 0;
+    let timer: ReturnType<typeof setTimeout>;
+    const schedule = () => {
+      timer = setTimeout(async () => {
+        const progressed = await flushRef.current?.();
+        if (cancelled) return;
+        attempt = progressed ? 0 : Math.min(attempt + 1, QUEUE_RETRY_MS.length - 1);
+        schedule();
+      }, QUEUE_RETRY_MS[attempt]);
+    };
+    schedule();
+    return () => { cancelled = true; clearTimeout(timer); };
+  }, [isOnline, pendingCount]);
 
   const logQSO = useCallback(async (data: QSOSubmission) => {
     setSubmitting(true);
