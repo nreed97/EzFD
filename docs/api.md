@@ -155,11 +155,19 @@ Operators active in the last 90 seconds.
 
 ### `POST /api/presence`
 
-Publish or refresh your band and mode. Upserts on `(event_id, op_call)`.
+Publish or refresh your band and mode. Upserts on `(event_id, op_call, station)`
+— keyed per radio, so one operator running two rigs from two windows holds two
+rows rather than overwriting themselves.
+
+| Field | Notes |
+|---|---|
+| `event_id`, `op_call`, `band`, `mode` | Required |
+| `station` | Which radio. Defaults to `1` |
 
 ### `DELETE /api/presence`
 
-Go QRT.
+Go QRT. Takes `event_id`, `op_call` and `station` — shutting one radio down
+leaves the operator's other radio on the air.
 
 ## Real-time
 
@@ -181,17 +189,18 @@ timestamps — treat it as a signal to refetch, not as data.
 
 ### `GET /api/export/{code}`
 
+ADIF by default; `?format=cabrillo` for Cabrillo; `?format=json` for a full
+backup.
+
 `?format=json` returns the whole event — settings, bonuses, every QSO, the SES
-roster and the checkout history — as a restorable backup. QRZ credentials are
-excluded by construction. The `op`/`from`/`to` filters apply to ADIF only; a
-filtered portability export would restore as a partial event.
-
-
-ADIF by default; `?format=cabrillo` for Cabrillo.
+roster and the checkout history — as a restorable backup, and is what
+`POST /api/import/event` consumes. QRZ credentials are excluded by
+construction. The `op`/`from`/`to` filters apply to ADIF only; a filtered
+portability export would restore as a partial event.
 
 | Parameter | Effect |
 |---|---|
-| `format` | `adif` (default) or `cabrillo` |
+| `format` | `adif` (default), `cabrillo` or `json` |
 | `op` | Only that operator's QSOs |
 | `from`, `to` | Restrict to a UTC window |
 

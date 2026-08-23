@@ -18,3 +18,40 @@
 [data-night="true"] .night-scope {
   background-color: #000000;
 }
+
+/* Rendered documentation (app/docs). Tailwind's typography plugin isn't a
+   dependency here, and the guides use a small, known set of elements, so the
+   styles they need are written out rather than pulling in a package. */
+.doc-body { line-height: 1.7; }
+.doc-body > :first-child { margin-top: 0; }
+.doc-body h1 { @apply mt-8 mb-4 text-2xl font-bold text-zinc-100 light:text-zinc-900; }
+.doc-body h2 { @apply mt-8 mb-3 border-b border-zinc-800 pb-1 text-xl font-bold text-zinc-100 light:border-zinc-200 light:text-zinc-900; }
+.doc-body h3 { @apply mt-6 mb-2 text-base font-bold text-zinc-200 light:text-zinc-800; }
+.doc-body h4 { @apply mt-5 mb-2 text-sm font-bold uppercase tracking-wide text-zinc-400 light:text-zinc-600; }
+.doc-body p  { @apply my-3; }
+.doc-body a  { @apply text-amber-400 underline underline-offset-2 hover:text-amber-300 light:text-amber-700 light:hover:text-amber-600; }
+.doc-body ul { @apply my-3 list-disc pl-6; }
+.doc-body ol { @apply my-3 list-decimal pl-6; }
+.doc-body li { @apply my-1; }
+.doc-body strong { @apply font-semibold text-zinc-100 light:text-zinc-900; }
+.doc-body code {
+  @apply rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[0.85em] text-amber-300;
+  @apply light:bg-zinc-100 light:text-amber-800;
+}
+.doc-body pre {
+  @apply my-4 overflow-x-auto rounded-lg border border-zinc-800 bg-zinc-900 p-3;
+  @apply light:border-zinc-200 light:bg-zinc-50;
+}
+.doc-body pre code { @apply bg-transparent p-0 text-[0.85em] text-zinc-300 light:text-zinc-700; }
+.doc-body blockquote {
+  @apply my-4 border-l-2 border-amber-700 pl-4 text-zinc-400 light:text-zinc-600;
+}
+/* Tables can be wide; the wrapper scrolls rather than the page. */
+.doc-body table { @apply my-4 w-full border-collapse text-sm; }
+.doc-body thead th {
+  @apply border-b border-zinc-700 px-2 py-1.5 text-left font-semibold text-zinc-200;
+  @apply light:border-zinc-300 light:text-zinc-800;
+}
+.doc-body tbody td { @apply border-b border-zinc-800 px-2 py-1.5 align-top light:border-zinc-200; }
+.doc-body img { @apply my-4 max-w-full rounded-lg border border-zinc-800 light:border-zinc-200; }
+.doc-body hr { @apply my-8 border-zinc-800 light:border-zinc-200; }

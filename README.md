@@ -7,7 +7,8 @@ Every operator logs into one shared log. Every QSO appears on every other
 device within milliseconds. When the network drops — and at a Field Day site
 it will — logging carries on locally and syncs when it comes back.
 
-📖 **[Full documentation](docs/)**
+📖 **[Full documentation](docs/)** — and the same guides ship inside the app,
+so they work on a field server with no internet.
 
 <p align="center">
   <img src="docs/images/logging-screen.png" alt="The logging screen: entry form, band/mode, operators and live score" width="100%">
@@ -29,7 +30,12 @@ ever overwriting something you typed. Night mode dims to 35% for the overnight
 shift.
 
 **Offline by design, not as an afterthought.** QSOs are written to local
-storage first and sent second. A flaky link costs you nothing.
+storage first and sent second, in every window that logs — the main tab, the
+CW popout, and the WSJT-X relay, which spools to disk. The queue drains itself
+when the link returns, when the real-time stream reconnects, or on a backing-off
+retry. That last part matters: a server restart leaves your own network up, so
+"back online" is not a signal you can wait for. A flaky link, or a server that
+goes away mid-run, costs you nothing.
 
 **Radios if you want them.** A local Python bridge connects any
 Hamlib-supported rig, so band and mode follow the VFO. If the rig supports CAT
@@ -45,11 +51,16 @@ Field Day bonus categories tracked live. Sections do not multiply the score —
 a detail that's easy to get wrong and expensive when you do.
 
 **Special event stations.** A third event type for a callsign activated across
-many operators and locations. Operators check the callsign out for a band and
+many operators and locations. Each operator's own grid and state follow their
+contacts into the exported ADIF, which is what LoTW needs from a station
+operated from several places. One operator can run two radios at once, as two
+logging windows.
+
+**Band and mode coordination, enforced.** A slot is checked out for a band and
 mode, and a database constraint makes overlapping checkouts impossible — one
-signal per band per mode, enforced rather than merely intended. Each operator's
-own grid and state follow their contacts into the exported ADIF, which is what
-LoTW needs from a station operated from several places.
+signal per band per mode, enforced rather than merely intended. On a special
+event the holder is an operator; on Field Day it's a station, because station 2
+holds 20m phone whoever is sitting at it.
 
 **Exports that go where you need them.** ADIF for LoTW and QRZ, Cabrillo for
 ARRL submission, a printable summary worksheet, and per-operator or
@@ -143,15 +154,11 @@ Tailwind v4 · Leaflet · Hamlib
 ## Contributing
 
 `AGENTS.md` documents the conventions and the accumulated gotchas — worth
-reading before changing anything non-obvious. `npx tsc --noEmit` and
-`npm run build` must both be clean; CI additionally runs the section-list,
-scoring, ADIF, Cabrillo, schema, query, restore and end-to-end suites.
+reading before changing anything non-obvious. `npx tsc --noEmit`,
+`npm run lint` and `npm run build` must all be clean; CI gates on those plus
+`shellcheck`, and runs the section-list, scoring, ADIF, Cabrillo, schema,
+query, restore and end-to-end suites.
 
 When adding a test, break the thing it guards and watch it fail before
 trusting it. That practice has already caught a bug the test was written to
 prevent.
-
-## Known issues
-
-- [#13](https://github.com/nreed97/EzFD/issues/13) — eslint and shellcheck
-  backlogs, keeping those CI gates advisory for now.

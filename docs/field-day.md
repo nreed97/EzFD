@@ -121,7 +121,13 @@ Both exports include only non-duplicate QSOs, in chronological order.
 ## Sections
 
 The app ships a list of ARRL and RAC sections used for validation, the map,
-the section grid, and the Worked All Sections bonus. It currently contains 81
-entries and does not include Puerto Rico, the Virgin Islands, or the current
-Ontario splits. If you work a section the app doesn't recognise you will get a
-warning and the QSO will log normally — the exchange is stored as typed.
+the section grid, and the Worked All Sections bonus. It contains **85** entries
+— the 71 US sections plus the 14 current RAC sections, including Puerto Rico,
+the Virgin Islands and the Ontario splits (`ONE`, `ONN`, `ONS`, `GH`). If you
+work a section the app doesn't recognise you will get a warning and the QSO
+will log normally — the exchange is stored as typed, and the dashboard lists
+the unrecognised values so a typo can be spotted and corrected.
+
+`DX` is accepted as an exchange without a warning — Field Day stations outside
+the US and Canada send it — but it is not a section, so it doesn't count toward
+Worked All Sections.

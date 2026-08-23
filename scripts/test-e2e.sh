@@ -450,6 +450,54 @@ else
   no "  station claims survive into the full-event backup"
 fi
 
+# ── The in-app documentation ─────────────────────────────────────────────────
+#
+# The guides are read from docs/ at request time, which only works because
+# next.config.ts names them in outputFileTracingIncludes — file tracing can
+# follow a static path but not a filename built from a URL slug. This suite
+# runs against the standalone bundle, so it is the thing that would notice the
+# guides silently not shipping.
+echo "── documentation ──"
+
+if [[ "$(status GET /docs)" == "200" ]]; then
+  ok "  the documentation index renders"
+else
+  no "  the documentation index renders"
+fi
+
+DOC=$(req GET /docs/operating)
+if [[ "$DOC" == *"Working offline"* ]]; then
+  ok "  a guide renders from the shipped markdown"
+else
+  no "  a guide renders from the shipped markdown"
+fi
+
+# Cross-links are written for GitHub as `field-day.md#scoring`; both halves are
+# rewritten, and headings carry GitHub's slug so the anchor still lands.
+if [[ "$DOC" == *'href="/docs/'* && "$DOC" != *'.md"'* ]]; then
+  ok "  cross-links are rewritten for the app"
+else
+  no "  cross-links are rewritten for the app"
+fi
+if [[ "$(req GET /docs/deployment)" == *'id="offline-field-servers"'* ]]; then
+  ok "  headings carry anchors, so a #link lands on its section"
+else
+  no "  headings carry anchors, so a #link lands on its section"
+fi
+
+if [[ "$(curl -s -o /dev/null -w '%{content_type}' "$BASE/docs/images/dashboard.png")" == "image/png" ]]; then
+  ok "  screenshots referenced by the guides are served"
+else
+  no "  screenshots referenced by the guides are served"
+fi
+
+# The slug reaches the filesystem, so it must not be able to leave docs/.
+if [[ "$(status GET "/docs/images/..%2f..%2fpackage.json")" == "404" ]]; then
+  ok "  a traversal attempt on the docs images is refused"
+else
+  no "  a traversal attempt on the docs images is refused"
+fi
+
 # ── One operator, two radios ─────────────────────────────────────────────────
 #
 # A single operator running two rigs is one callsign in two logging windows,

@@ -360,6 +360,17 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             >
               Dashboard
             </button>
+            {/* Opened in its own tab so a mid-event lookup never costs the
+                operator their logging window. */}
+            <a
+              href="/docs"
+              target="_blank"
+              rel="noopener noreferrer"
+              title="Open the EzFD guides"
+              className="rounded border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600"
+            >
+              Docs
+            </a>
             <button
               onClick={() => {
                 sessionStorage.removeItem(`ezfd_op_${event.join_code}`);

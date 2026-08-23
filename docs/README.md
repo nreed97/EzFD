@@ -35,6 +35,16 @@ Start with whichever describes you.
 | [Database](database.md) | Schema reference and the constraints that matter |
 | [HTTP API](api.md) | Every endpoint |
 
+## Reading these in the app
+
+Every guide here is also served by a running EzFD instance at **`/docs`** —
+linked from the footer of the home page and from **Docs** in the logging
+header. That matters for a field server with no internet, where the operator
+who needs the troubleshooting page is exactly the one who can't reach GitHub.
+
+The app renders the same files from this directory, so there is one copy of
+each guide and no second version to drift.
+
 ## Conventions used here
 
 Commands prefixed `$` run on your own machine; commands prefixed `#` run as
