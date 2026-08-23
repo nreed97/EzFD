@@ -84,6 +84,7 @@ not the server. Each has a matching command-line flag that takes precedence.
 | `EZFD_OPERATOR` | `--operator` | *(empty)* |
 | `EZFD_STATION` | `--station` | `1` |
 | `EZFD_UDP_PORT` | `--port` | `2237` |
+| `EZFD_SPOOL` | `--spool` | `~/.ezfd/wsjtx-queue-<event-id>.jsonl` |
 
 See [Digital modes](digital-modes.md).
 

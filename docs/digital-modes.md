@@ -30,6 +30,29 @@ $ node wsjtx-bridge.cjs --event-id <uuid> --api-url https://your-server --operat
 | `--operator` | `EZFD_OPERATOR` | *(empty)* |
 | `--station` | `EZFD_STATION` | `1` |
 | `--port` | `EZFD_UDP_PORT` | `2237` |
+| `--spool` | `EZFD_SPOOL` | `~/.ezfd/wsjtx-queue-<event-id>.jsonl` |
+
+### If the server goes away
+
+WSJT-X keeps logging whether or not EzFD is reachable, so the relay keeps a
+queue. A contact the server can't take is written to the spool file above and
+retried — after 5s, then 10s, 30s, 60s and 2 minutes — until it lands. The
+relay prints `queued (N waiting)` when that happens and `Synced N queued
+contact(s)` when they go through.
+
+The spool is a file, not memory: closing the relay or rebooting the machine
+doesn't lose it, and the next start drains whatever is still there. So an EzFD
+restart, an nginx reload or a flaky field network **delays** digital contacts
+rather than dropping them.
+
+The one thing it won't retry is a contact the server refuses on purpose — a
+`4xx`, such as an event ID that doesn't exist. Retrying can't fix that, so the
+relay says `rejected` and moves on; the contact is still in WSJT-X's own
+`wsjtx_log.adi` and can be brought in with an ADIF import.
+
+Queued contacts are stamped by the server when they finally arrive, not when
+they were made, so a long outage shifts their times. If exact times matter for
+a submission, import `wsjtx_log.adi` instead — ADIF carries the original.
 
 ### Configuring WSJT-X
 
