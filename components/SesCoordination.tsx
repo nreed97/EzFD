@@ -9,6 +9,12 @@ import DateTimeField from './DateTimeField';
 interface Props {
   eventId: string;
   myOpCall: string;
+  /** This operator's station on a contest event, or null on a special event.
+   *  Decides both what a claim is recorded against and whether an existing
+   *  slot counts as mine: on Field Day the slot belongs to the station, so an
+   *  operator who moves from station 1 to station 2 inherits station 2's
+   *  claim rather than having to re-take it. */
+  stationNumber?: number | null;
   currentBand: Band;
   currentMode: Mode;
   /** Default checkout length for this event, in minutes. */
@@ -68,7 +74,7 @@ function minutesUntil(iso: string | null): number | null {
 }
 
 export default function SesCoordination({
-  eventId, myOpCall, currentBand, currentMode, slotMinutes,
+  eventId, myOpCall, stationNumber = null, currentBand, currentMode, slotMinutes,
   eventStartsAt, eventEndsAt, refreshToken, lastQsoAt, onHoldingChange,
 }: Props) {
   const [reservations, setReservations] = useState<SesReservation[]>([]);
@@ -128,9 +134,20 @@ export default function SesCoordination({
   });
   const upcoming = reservations.filter(r => new Date(r.starts_at).getTime() > now);
 
-  const mySlot = active.find(r => r.op_call === myOpCall) ?? null;
+  // On a contest the slot belongs to the station, so an operator who moves
+  // between stations inherits the claim rather than re-taking it.
+  const isMine = (r: SesReservation) =>
+    stationNumber != null ? r.station_number === stationNumber : r.op_call === myOpCall;
+
+  const mySlot = active.find(isMine) ?? null;
+
+  /** A contest slot is held by a station, a special event slot by a person.
+   *  Naming the operator on a contest would be misleading — the person at
+   *  station 2 changes through the weekend, the claim doesn't. */
+  const holderLabel = (r: SesReservation) =>
+    r.station_number != null ? `Station ${r.station_number}` : r.op_call;
   const hereHolder = active.find(r => r.band === currentBand && r.mode === currentMode) ?? null;
-  const iHoldHere = hereHolder?.op_call === myOpCall;
+  const iHoldHere = !!hereHolder && isMine(hereHolder);
 
   useEffect(() => {
     onHoldingChange?.(iHoldHere);
@@ -187,7 +204,10 @@ export default function SesCoordination({
     prevBandModeRef.current = { band: currentBand, mode: currentMode };
     if (prev.band === currentBand && prev.mode === currentMode) return;
     const left = activeRef.current.find(
-      r => r.op_call === myOpCall && r.band === prev.band && r.mode === prev.mode
+      r => (stationNumber != null
+              ? r.station_number === stationNumber
+              : r.op_call === myOpCall)
+           && r.band === prev.band && r.mode === prev.mode
     );
     if (!left) return;
     fetch(`/api/ses/reservations/${left.id}`, {
@@ -195,7 +215,7 @@ export default function SesCoordination({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'release', op_call: myOpCall }),
     }).then(() => fetchReservations()).catch(() => {});
-  }, [currentBand, currentMode, myOpCall, fetchReservations]);
+  }, [currentBand, currentMode, myOpCall, stationNumber, fetchReservations]);
 
   async function checkOut() {
     setBusy(true);
@@ -207,6 +227,7 @@ export default function SesCoordination({
         body: JSON.stringify({
           event_id: eventId,
           op_call: myOpCall,
+          station_number: stationNumber,
           band: currentBand,
           mode: currentMode,
           minutes,
@@ -240,6 +261,7 @@ export default function SesCoordination({
         body: JSON.stringify({
           event_id: eventId,
           op_call: myOpCall,
+          station_number: stationNumber,
           band: planBand,
           mode: planMode,
           // datetime-local has no timezone; operators plan in UTC during an
@@ -302,7 +324,7 @@ export default function SesCoordination({
         {iHoldHere ? (
           <>You have <strong>{currentBand} {currentMode}</strong> until {clockUTC(hereHolder!.ends_at)}</>
         ) : hereHolder ? (
-          <><strong>{hereHolder.op_call}</strong> holds {currentBand} {currentMode} until {clockUTC(hereHolder.ends_at)}</>
+          <><strong>{holderLabel(hereHolder)}</strong> holds {currentBand} {currentMode} until {clockUTC(hereHolder.ends_at)}</>
         ) : (
           <>Nobody holds <strong>{currentBand} {currentMode}</strong> right now</>
         )}
@@ -378,7 +400,7 @@ export default function SesCoordination({
             type="button"
             disabled={busy || !!hereHolder}
             onClick={checkOut}
-            title={hereHolder ? `${hereHolder.op_call} already holds this band/mode` : undefined}
+            title={hereHolder ? `${holderLabel(hereHolder)} already holds this band/mode` : undefined}
             className="flex-1 rounded bg-amber-400 py-1.5 text-[11px] font-bold text-zinc-900 hover:bg-amber-300 disabled:opacity-40 disabled:hover:bg-amber-400"
           >
             Check out {currentBand} {currentMode}
@@ -469,7 +491,7 @@ export default function SesCoordination({
                 <span className={`font-mono font-semibold ${
                   r.op_call === myOpCall ? 'text-amber-400 light:text-amber-700' : 'text-zinc-200 light:text-zinc-800'
                 }`}>
-                  {r.op_call}
+                  {holderLabel(r)}
                 </span>
                 <span className="flex items-center gap-2">
                   <span className="font-mono text-zinc-300 light:text-zinc-700">{r.band}</span>
@@ -495,7 +517,7 @@ export default function SesCoordination({
           <div className="flex flex-col gap-1">
             {upcoming.slice(0, 8).map(r => (
               <div key={r.id} className="flex items-center justify-between rounded px-2 py-0.5 text-[11px] text-zinc-500">
-                <span className="font-mono">{r.op_call}</span>
+                <span className="font-mono">{holderLabel(r)}</span>
                 <span className="flex items-center gap-2">
                   <span className="font-mono">{r.band} {r.mode}</span>
                   <span className="font-mono text-[10px]">{dayClockUTC(r.starts_at)}</span>

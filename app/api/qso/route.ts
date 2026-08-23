@@ -58,9 +58,20 @@ export async function POST(request: Request) {
   // certainly expired, and a contact that already happened on the air must
   // never be dropped because of a network blip. The gate is about
   // coordinating who transmits next, not about vetoing history.
+  //
+  // Contests get the same coordination, because Field Day has the same
+  // one-signal-per-band-per-mode rule — but the holder is the station rather
+  // than the operator, and enforcement defaults to SOFT. For a special event
+  // two stations signing one callsign is a rules problem, so blocking is
+  // defensible; on Field Day it is a coordination problem, and refusing to
+  // log a contact that already happened on the air is worse than warning.
   let slotWarning: string | null = null;
-  if (isSes && opCall && !replay) {
-    const slot = await checkSlot(pool, resolvedEventId, opCall, band, mode);
+  if (opCall && !replay) {
+    const slot = await checkSlot(
+      pool, resolvedEventId, opCall, band, mode,
+      isSes ? null : Math.max(1, Number(station_number) || 1),
+      isSes,   // an unclaimed band is only a finding on a special event
+    );
     if (!slot.ok) {
       if (event.slot_enforcement === 'HARD') {
         return NextResponse.json(
