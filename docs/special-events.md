@@ -79,6 +79,34 @@ operator who has logged a QSO in the last 15 minutes. Without that condition a
 forgotten browser tab would hold the callsign indefinitely and nobody else
 could check it out.
 
+## Running two radios at once
+
+One operator on two rigs — 20m phone on one, 40m CW on the other — is a normal
+special event pattern, and the checkout has always allowed it: slots are
+exclusive per band and mode, not per person, so holding two at once is legal.
+
+Each radio is its own logging window. Click **+ Radio 2** in the header to open
+one; it is a full logger at `?station=2`, and its own header offers **+ Radio 3**
+if you need it. Everything is per window from there: each shows what *that*
+radio holds, going QRT shuts down only that radio, and changing band in one
+releases only that radio's slot.
+
+If you use rig control, each radio needs its own bridge process on its own
+port. Station 1 uses the default, so a single-radio setup needs no arguments;
+station 2 listens on 4576, station 3 on 4577, and so on:
+
+```bash
+# radio 1 — the default
+$ python3 ezfd-rig-bridge.py --rigctld-port 4532
+
+# radio 2
+$ python3 ezfd-rig-bridge.py --port 4576 --rigctld-port 4533
+```
+
+Both radios log under the same operator callsign, which is what the ADIF
+`OPERATOR` field and the roster record. The station number distinguishes the
+windows, not the person.
+
 ## Enforcement
 
 Set per event:

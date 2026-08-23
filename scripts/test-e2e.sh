@@ -450,6 +450,57 @@ else
   no "  station claims survive into the full-event backup"
 fi
 
+# ── One operator, two radios ─────────────────────────────────────────────────
+#
+# A single operator running two rigs is one callsign in two logging windows,
+# each on its own band. Presence is keyed per radio so both stay visible, and
+# going QRT on one leaves the other on the air. Keyed on the operator alone,
+# the second window overwrote the first and QRT cleared both.
+echo "── two radios, one operator ──"
+
+RAD=$(req POST /api/events '{"club_name":"Two Radio","club_call":"W0RAD","event_type":"SES","slot_enforcement":"SOFT","arrl_section":"MN"}' | jq_get join_code)
+RAD_ID=$(req GET "/api/events/$RAD" | jq_get id)
+
+req POST /api/presence "{\"event_id\":\"$RAD_ID\",\"op_call\":\"W0AAA\",\"station\":1,\"band\":\"20m\",\"mode\":\"PH\"}" > /dev/null
+req POST /api/presence "{\"event_id\":\"$RAD_ID\",\"op_call\":\"W0AAA\",\"station\":2,\"band\":\"40m\",\"mode\":\"CW\"}" > /dev/null
+PRES=$(req GET "/api/presence?event_id=$RAD_ID")
+if [[ "$(echo "$PRES" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))')" == "2" ]]; then
+  ok "  both of an operator's radios appear in presence"
+else
+  no "  both of an operator's radios appear in presence" "$PRES"
+fi
+
+# QRT is per radio. Shutting down station 2 must leave station 1 transmitting.
+req DELETE /api/presence "{\"event_id\":\"$RAD_ID\",\"op_call\":\"W0AAA\",\"station\":2}" > /dev/null
+PRES=$(req GET "/api/presence?event_id=$RAD_ID")
+LEFT_N=$(echo "$PRES" | python3 -c 'import sys,json;print(len(json.load(sys.stdin)))')
+LEFT_STN=$(echo "$PRES" | python3 -c 'import sys,json;d=json.load(sys.stdin);print(d[0]["station"] if d else "")')
+if [[ "$LEFT_N" == "1" && "$LEFT_STN" == "1" ]]; then
+  ok "  going QRT on one radio leaves the other on the air"
+else
+  no "  going QRT on one radio leaves the other on the air" "$PRES"
+fi
+
+# A special event claim records which radio took it, so two windows for one
+# operator can be told apart — without it, leaving a band in one window
+# released the slot the other was transmitting on.
+R1=$(req POST /api/ses/reservations "{\"event_id\":\"$RAD_ID\",\"op_call\":\"W0AAA\",\"band\":\"20m\",\"mode\":\"PH\",\"station_number\":1}")
+R2=$(req POST /api/ses/reservations "{\"event_id\":\"$RAD_ID\",\"op_call\":\"W0AAA\",\"band\":\"40m\",\"mode\":\"CW\",\"station_number\":2}")
+if [[ "$(echo "$R1" | jq_get station_number)" == "1" && "$(echo "$R2" | jq_get station_number)" == "2" ]]; then
+  ok "  a special event claim records which radio holds it"
+else
+  no "  a special event claim records which radio holds it" "$R1 / $R2"
+fi
+
+# ...but the holder still reads as the operator on a special event: the person
+# holds the club call, whichever of their radios took the slot.
+CONFLICT=$(req POST /api/ses/reservations "{\"event_id\":\"$RAD_ID\",\"op_call\":\"W0BBB\",\"band\":\"20m\",\"mode\":\"PH\",\"station_number\":1}")
+if [[ "$CONFLICT" == *"W0AAA"* && "$CONFLICT" != *"Station 1"* ]]; then
+  ok "  a special event holder is still named by callsign, not station"
+else
+  no "  a special event holder is still named by callsign, not station" "$CONFLICT"
+fi
+
 # ── QSO audit trail and soft delete ──────────────────────────────────────────
 #
 # There is no authentication here — anyone with the join code can edit or
