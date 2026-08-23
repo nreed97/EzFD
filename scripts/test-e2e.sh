@@ -491,19 +491,21 @@ else
   no "  screenshots referenced by the guides are served"
 fi
 
-# The quick starts are the front door for anyone who isn't running the server,
-# so they get their own assertion rather than relying on the index listing them.
-QS=$(req GET /docs/quick-start-operating)
-if [[ "$QS" == *"Quick start"* && "$QS" == *"join code"* ]]; then
-  ok "  the operating quick start renders"
+# The quick start is the front door for anyone who isn't running the server,
+# so it gets its own assertion rather than relying on the index listing it.
+QS=$(req GET /docs/quick-start)
+if [[ "$QS" == *"For operators"* && "$QS" == *"join code"* ]]; then
+  ok "  the operator quick start renders"
 else
-  no "  the operating quick start renders"
+  no "  the operator quick start renders"
 fi
+# Matched on the index's own wording rather than an href: the sidebar links
+# every guide that exists, so an href match would pass even with the row gone.
 INDEX=$(req GET /docs)
-if [[ "$INDEX" == *"handed a join code"* && "$INDEX" == *"Setting up the log for your club"* ]]; then
-  ok "  both quick starts are listed on the docs index"
+if [[ "$INDEX" == *"Nothing to install, nothing to administer"* ]]; then
+  ok "  the quick start is listed on the docs index"
 else
-  no "  both quick starts are listed on the docs index"
+  no "  the quick start is listed on the docs index"
 fi
 
 # The checkout board screenshot is referenced from the special event guide.

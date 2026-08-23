@@ -1,7 +1,12 @@
-# Quick start: operating
+# Quick start
 
-Someone gave you a join code and sat you at a radio. This is everything you
-need for the next five minutes. No setup, no server, no jargon.
+**For operators.** You have a join code and a radio, and somebody else is
+running the server. This covers the five things you'll actually do: get in,
+log a contact, change band, cope with a dropped network, and sign off.
+
+If you're the one setting the event up, [Getting started](getting-started.md)
+covers that end — installing the server, creating the event, and closing it
+out afterwards.
 
 ## 1. Get in
 
@@ -69,8 +74,9 @@ server accepts it, not when you logged it. A long outage shifts those times.
 band is still busy. On a special event, **Release** your band and mode so
 someone else can take it.
 
-That's it. If you want to know why any of the above works the way it does,
-[Operating](operating.md) is the same ground in depth.
+That's the whole job. [Operating](operating.md) covers the same screen in
+detail — duplicate handling, the band conflict panel, night mode, and why the
+offline queue behaves the way it does.
 
 ## When something looks wrong
 

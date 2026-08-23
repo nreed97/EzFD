@@ -6,14 +6,11 @@ shared log, and every QSO appears on every other device within milliseconds.
 
 Start with whichever describes you.
 
-## Just tell me what to do
-
-Short, task-shaped, no server administration.
+## I'm just here to operate
 
 | Guide | What it covers |
 |---|---|
-| [Quick start: operating](quick-start-operating.md) | You were handed a join code and sat at a radio |
-| [Quick start: running an event](quick-start-event.md) | Setting up the log for your club, and closing it out |
+| [Quick start](quick-start.md) | You have a join code and a radio. Nothing to install, nothing to administer |
 
 ## I want to run an event
 

@@ -1,7 +1,10 @@
 # Getting started
 
-This walks from an empty server to a logged QSO. If someone else runs the
-server and you just want to operate, skip to [Joining an event](#joining-an-event).
+This walks from an empty server to a logged QSO and out the other side — the
+whole path for whoever is standing the event up.
+
+If someone else runs the server and you just want to operate, you don't need
+any of the install half: read the [Quick start](quick-start.md) instead.
 
 ![EzFD home page: join an event with a code, or start a new one](images/home.png)
 
@@ -96,6 +99,20 @@ nothing is lost, and you can keep logging.
 [Operating](operating.md) covers the rest of the screen: band and mode
 switching, duplicate handling, band conflicts and the score display.
 
+## While it runs
+
+Open the **Dashboard** on a spare screen. It is read-only and updates live —
+score, rate, sections worked, and who is on which band.
+
+![The dashboard during a Field Day event](images/dashboard.png)
+
+**Visitor mode** is the same view with no callsign and no ability to log, for
+a screen visitors can see.
+
+On a special event the dashboard gets a **Checkouts** tab instead of the
+section views: a timeline of who holds which band and mode, over a grid to
+claim from. See [Special event stations](special-events.md#the-whole-schedule-on-the-dashboard).
+
 ## Finish the event
 
 From the dashboard:
@@ -105,7 +122,20 @@ From the dashboard:
   only; a special event has no contest to submit to).
 - **Summary** — a printable worksheet mirroring the ARRL entry form.
 
-Back the event up before you tear anything down:
+Read the summary sheet before you submit anything — it is the worksheet you
+transcribe onto the ARRL entry, and it shows the score calculation rather than
+just the total.
+
+![The Field Day summary sheet](images/summary-sheet.png)
+
+Then back the event up before you tear anything down. **Backup** on the
+dashboard downloads the whole event as one JSON file — every contact, the
+roster, the checkouts, and the deleted contacts too — and it restores into any
+EzFD instance from the home page. That is also how you move an event off a
+field server.
+
+The same backup is available from the server shell, which is the better option
+if the event is large or the browser is far away:
 
 ```bash
 # bash ezfd-admin.sh      # → List / manage events → Export full backup
