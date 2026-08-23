@@ -44,10 +44,16 @@ export async function POST(request: Request) {
     // or two operators importing an overlapping export — must not double the
     // log. This is distinct from the dupe *rule* below: that flags a contact
     // worked twice on the air, this detects the same contact arriving twice.
+    //
+    // A soft-deleted contact counts as absent here, so re-importing a file
+    // brings it back. Deleting removes a mistake from the log; deliberately
+    // importing a file that contains it is a second, explicit act, and a
+    // silent no-op the operator couldn't explain would be worse.
     const { rows: seen } = await pool.query(
       `SELECT id FROM qsos
        WHERE event_id=$1 AND callsign=$2 AND band=$3 AND mode=$4
          AND ABS(EXTRACT(EPOCH FROM (datetime_utc - $5::timestamptz))) <= $6
+         AND deleted_at IS NULL
        LIMIT 1`,
       [event_id, callsign, rec.band, rec.mode, dt, MERGE_WINDOW_SECONDS]
     );

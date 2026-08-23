@@ -42,9 +42,26 @@ CREATE TABLE IF NOT EXISTS qsos (
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
+-- Audit trail. There is no authentication here — operator identity is a
+-- callsign typed at join time, and anyone with the join code can edit or
+-- delete any QSO. That is a deliberate trade for a club event, but it left
+-- the log unable to answer "what happened to that contact?": a QSO in one
+-- operator's paper backup and not in the log could have been deleted or never
+-- logged, and there was no way to tell.
+--
+-- updated_by/deleted_by record who *claimed* to be editing, not a verified
+-- identity. Useful; not evidence.
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS updated_by TEXT;
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS deleted_by TEXT;
+
 CREATE INDEX IF NOT EXISTS qsos_event_idx      ON qsos(event_id);
 CREATE INDEX IF NOT EXISTS qsos_dupe_idx       ON qsos(event_id, callsign, band, mode);
 CREATE INDEX IF NOT EXISTS qsos_datetime_idx   ON qsos(event_id, datetime_utc DESC);
+-- Every read path filters deleted_at IS NULL, so the common case gets its own
+-- partial index rather than filtering the full table each time.
+CREATE INDEX IF NOT EXISTS qsos_live_idx       ON qsos(event_id, datetime_utc DESC) WHERE deleted_at IS NULL;
 
 -- ---------------------------------------------------------------------------
 -- Presence  (band/mode per operator — TTL-based, cleaned up on read)
@@ -348,11 +365,15 @@ AS $$
       e.bonuses, e.created_at,
       e.starts_at, e.ends_at, e.ses_description, e.ses_qsl_info,
       e.slot_enforcement, e.slot_minutes, e.dupe_rule, e.require_operator_approval,
-      (SELECT COUNT(*) FROM qsos q WHERE q.event_id = e.id AND NOT q.is_dupe) AS qso_count,
-      (SELECT COUNT(*) FROM qsos q WHERE q.event_id = e.id AND     q.is_dupe) AS dupe_count,
+      (SELECT COUNT(*) FROM qsos q WHERE q.event_id = e.id AND NOT q.is_dupe AND q.deleted_at IS NULL) AS qso_count,
+      (SELECT COUNT(*) FROM qsos q WHERE q.event_id = e.id AND     q.is_dupe AND q.deleted_at IS NULL) AS dupe_count,
       (SELECT jsonb_agg(DISTINCT q.operator_call)
-         FROM qsos q WHERE q.event_id = e.id AND q.operator_call IS NOT NULL
+         FROM qsos q WHERE q.event_id = e.id AND q.operator_call IS NOT NULL AND q.deleted_at IS NULL
       ) AS operators,
+      -- Deliberately NOT filtered on deleted_at: this is a backup, and an
+      -- audit trail that a backup silently drops is not an audit trail. The
+      -- ADIF and Cabrillo exports do exclude them, because those are
+      -- submissions rather than archives.
       (SELECT jsonb_agg(to_jsonb(q) ORDER BY q.datetime_utc)
          FROM qsos q WHERE q.event_id = e.id
       ) AS qsos,
@@ -446,7 +467,8 @@ BEGIN
       INSERT INTO qsos (id, event_id, callsign, band, mode, datetime_utc, sent_class, sent_section,
                         rcvd_class, rcvd_section, operator_call, station_number, is_dupe, created_at,
                         rst_sent, rst_rcvd, rcvd_name, rcvd_qth, rcvd_grid, comment,
-                        adif_mode, freq_khz)
+                        adif_mode, freq_khz,
+                        updated_at, updated_by, deleted_at, deleted_by)
       VALUES (
         gen_random_uuid(), v_new_id,
         qso->>'callsign', qso->>'band', qso->>'mode',
@@ -458,7 +480,9 @@ BEGIN
         COALESCE(NULLIF(qso->>'created_at','')::timestamptz, NOW()),
         qso->>'rst_sent', qso->>'rst_rcvd', qso->>'rcvd_name',
         qso->>'rcvd_qth', qso->>'rcvd_grid', qso->>'comment',
-        qso->>'adif_mode', NULLIF(qso->>'freq_khz','')::int
+        qso->>'adif_mode', NULLIF(qso->>'freq_khz','')::int,
+        NULLIF(qso->>'updated_at','')::timestamptz, qso->>'updated_by',
+        NULLIF(qso->>'deleted_at','')::timestamptz, qso->>'deleted_by'
       );
       n := n + 1;
     END LOOP;

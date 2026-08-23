@@ -82,7 +82,23 @@ Every QSO for an event, newest first.
 
 Edit callsign, band, mode or exchange. Duplicate status is re-evaluated.
 
-### `DELETE /api/qso/{id}`
+### `DELETE /api/qso/{id}?operator_call=`
+
+Soft delete — the row is marked, not removed. It leaves the live log, the
+ADIF and Cabrillo exports, scoring and dupe checking immediately; the
+full-event JSON backup keeps it. `operator_call` records who claimed to
+delete it. Deleting an already-deleted contact returns 200.
+
+### `POST /api/qso/{id}`
+
+Restore a soft-deleted contact. Body `{ "operator_call": "W0AAA" }`.
+
+### `GET /api/qso?event_id=&deleted=1`
+
+The soft-deleted contacts for an event, most recently deleted first. Without
+`deleted=1` only live contacts are returned.
+
+
 
 ## Special events
 

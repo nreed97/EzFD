@@ -78,6 +78,22 @@ that device.
 Either way, **QSOs already logged keep the timestamps they were given.** Fixing
 the clock only corrects contacts from that point on.
 
+## A QSO was deleted by mistake
+
+Deleting a contact no longer removes it. Open the QSO table on the logging
+page and expand **Deleted contacts** at the bottom: each entry shows who
+deleted it and when, with a **Restore** button that puts it back in the log.
+
+Deleted contacts leave the live log, the ADIF and Cabrillo exports and the
+score immediately, so a deletion still does what it looks like — it just isn't
+final any more. The full-event JSON backup keeps them, so a backup taken after
+a deletion can still account for it.
+
+One thing this cannot tell you: operator identity here is a callsign typed at
+join time, not a verified login. `deleted by W0AAA` records who *claimed* to
+be operating, which is useful when two operators are reconciling a log after
+the event, but it is not evidence.
+
 ## A section is rejected as invalid
 
 The entry form warns when a received section isn't one of the 85 current

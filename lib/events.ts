@@ -51,6 +51,7 @@ export async function isDupeQSO(
   const { rows } = await pool.query(
     `SELECT id FROM qsos
      WHERE event_id=$1 AND callsign=$2 AND band=$3 AND mode=$4 AND is_dupe=false
+       AND deleted_at IS NULL
      ${dayClause}
      LIMIT 1`,
     params

@@ -153,6 +153,12 @@ export interface QSO {
   operator_call: string | null;
   station_number: number;
   is_dupe: boolean;
+  /** Audit trail. updated_by/deleted_by are self-asserted callsigns — who
+   *  claimed to act, not a verified identity. */
+  updated_at?: string | Date | null;
+  updated_by?: string | null;
+  deleted_at?: string | Date | null;
+  deleted_by?: string | null;
   created_at: string;
   // SES exchange — null on contest QSOs.
   rst_sent: string | null;

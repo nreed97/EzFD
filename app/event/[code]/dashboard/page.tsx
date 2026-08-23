@@ -21,7 +21,7 @@ export default async function DashboardPage({
   if (!evRows[0]) redirect('/');
 
   const { rows: qsos } = await pool.query(
-    'SELECT * FROM qsos WHERE event_id=$1 ORDER BY datetime_utc ASC',
+    'SELECT * FROM qsos WHERE event_id=$1 AND deleted_at IS NULL ORDER BY datetime_utc ASC',
     [evRows[0].id]
   );
 

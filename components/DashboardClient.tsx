@@ -5,6 +5,7 @@ import { useNow } from '@/lib/useNow';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { calculateScore } from '@/lib/scoring';
+import { applyQsoEvent } from '@/lib/qsoStream';
 import type { Event, QSO, Bonuses, SesReservation } from '@/lib/types';
 import Scoreboard from './Scoreboard';
 import SectionGrid from './SectionGrid';
@@ -100,9 +101,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
     const es = new EventSource(`/api/realtime/${event.id}`);
     es.addEventListener('qso', (e: MessageEvent) => {
       const { op, record } = JSON.parse(e.data) as { op: string; record: QSO };
-      if (op === 'INSERT') setQSOs(prev => prev.some(q => q.id === record.id) ? prev : [...prev, record]);
-      else if (op === 'UPDATE') setQSOs(prev => prev.map(q => q.id === record.id ? record : q));
-      else if (op === 'DELETE') setQSOs(prev => prev.filter(q => q.id !== record.id));
+      setQSOs(prev => applyQsoEvent(prev, op, record, false));
     });
     // Call checkouts ride the same stream; the payload carries the raw range
     // column, so this just signals "refetch".

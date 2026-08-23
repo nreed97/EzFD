@@ -97,7 +97,7 @@ fetch_events() {
       COUNT(q.id) FILTER (WHERE     q.is_dupe)  AS dupes,
       COUNT(DISTINCT q.operator_call) FILTER (WHERE q.operator_call IS NOT NULL) AS ops
     FROM events e
-    LEFT JOIN qsos q ON q.event_id = e.id
+    LEFT JOIN qsos q ON q.event_id = e.id AND q.deleted_at IS NULL
     GROUP BY e.id
     ORDER BY e.created_at DESC;" 2>/dev/null
 }
@@ -201,7 +201,7 @@ view_event() {
       COUNT(*) FILTER (WHERE     is_dupe) AS dupes,
       COUNT(DISTINCT operator_call) FILTER (WHERE operator_call IS NOT NULL) AS ops,
       COUNT(DISTINCT rcvd_section)  FILTER (WHERE rcvd_section IS NOT NULL AND rcvd_section != '' AND NOT is_dupe) AS sections
-    FROM qsos WHERE event_id='$uuid';" 2>/dev/null)
+    FROM qsos WHERE event_id='$uuid' AND deleted_at IS NULL;" 2>/dev/null)
   IFS='|' read -r qsos dupes ops sections <<< "$stats"
 
   label "QSOs (non-dupe):"; echo -e "${GREEN}${qsos}${NC}"
@@ -213,7 +213,7 @@ view_event() {
   # Band/mode breakdown
   local band_rows; band_rows=$(PG -c "
     SELECT band, mode, COUNT(*) AS n FROM qsos
-    WHERE event_id='$uuid' AND NOT is_dupe
+    WHERE event_id='$uuid' AND NOT is_dupe AND deleted_at IS NULL
     GROUP BY band, mode ORDER BY n DESC;" 2>/dev/null || true)
   if [[ -n "$band_rows" ]]; then
     echo -e "  ${BOLD}Band breakdown:${NC}"
@@ -226,7 +226,7 @@ view_event() {
   # Operators
   local op_rows; op_rows=$(PG -c "
     SELECT operator_call, COUNT(*) AS n FROM qsos
-    WHERE event_id='$uuid' AND operator_call IS NOT NULL AND NOT is_dupe
+    WHERE event_id='$uuid' AND operator_call IS NOT NULL AND NOT is_dupe AND deleted_at IS NULL
     GROUP BY operator_call ORDER BY n DESC;" 2>/dev/null || true)
   if [[ -n "$op_rows" ]]; then
     echo -e "  ${BOLD}Operators:${NC}"
@@ -240,6 +240,7 @@ view_event() {
   local sec_list; sec_list=$(PG -c "
     SELECT DISTINCT rcvd_section FROM qsos
     WHERE event_id='$uuid' AND rcvd_section IS NOT NULL AND rcvd_section != '' AND NOT is_dupe
+          AND deleted_at IS NULL
     ORDER BY rcvd_section;" 2>/dev/null | tr '\n' ' ' || true)
   if [[ -n "$sec_list" ]]; then
     echo -e "  ${BOLD}Sections worked:${NC}"
@@ -272,7 +273,7 @@ view_event() {
     1) # CSV export
        local file="/tmp/qsos_${code}.csv"
        sudo -u postgres psql -d "$DB" -c \
-         "\COPY (SELECT * FROM qsos WHERE event_id='$uuid' ORDER BY datetime_utc) TO '${file}' CSV HEADER" \
+         "\COPY (SELECT * FROM qsos WHERE event_id='$uuid' AND deleted_at IS NULL ORDER BY datetime_utc) TO '${file}' CSV HEADER" \
          >/dev/null
        log "Exported to ${file}"
        pause ;;
@@ -500,7 +501,7 @@ view_event() {
        pause ;;
 
     6) # Clear dupes
-       local n; n=$(PG -c "SELECT COUNT(*) FROM qsos WHERE event_id='$uuid' AND is_dupe;" 2>/dev/null)
+       local n; n=$(PG -c "SELECT COUNT(*) FROM qsos WHERE event_id='$uuid' AND is_dupe AND deleted_at IS NULL;" 2>/dev/null)
        if [[ "$n" == "0" ]]; then
          warn "No dupes to clear."; pause; return
        fi
@@ -513,9 +514,9 @@ view_event() {
        pause ;;
 
     7) # Delete all QSOs
-       local n; n=$(PG -c "SELECT COUNT(*) FROM qsos WHERE event_id='$uuid';" 2>/dev/null)
+       local n; n=$(PG -c "SELECT COUNT(*) FROM qsos WHERE event_id='$uuid' AND deleted_at IS NULL;" 2>/dev/null)
        if confirm_danger "This will permanently delete ALL ${n} QSOs for event ${code}."; then
-         PG -c "DELETE FROM qsos WHERE event_id='$uuid';" >/dev/null
+         PG -c "DELETE FROM qsos WHERE event_id='$uuid' AND deleted_at IS NULL;" >/dev/null
          log "All QSOs deleted."
        else
          warn "Cancelled."
@@ -609,7 +610,7 @@ server_stats() {
       COUNT(DISTINCT q.rcvd_section)  FILTER (WHERE q.rcvd_section IS NOT NULL AND NOT q.is_dupe),
       MIN(e.created_at)::date,
       MAX(e.created_at)::date
-    FROM events e LEFT JOIN qsos q ON q.event_id = e.id;" 2>/dev/null)
+    FROM events e LEFT JOIN qsos q ON q.event_id = e.id AND q.deleted_at IS NULL;" 2>/dev/null)
   IFS='|' read -r tot_events tot_qsos tot_dupes tot_ops tot_sections first_event last_event <<< "$totals"
 
   label "Total events:";       echo "$tot_events"
@@ -625,7 +626,7 @@ server_stats() {
   echo -e "  ${BOLD}Top 10 operators (all events):${NC}"
   PG -c "
     SELECT operator_call, COUNT(*) AS n FROM qsos
-    WHERE operator_call IS NOT NULL AND NOT is_dupe
+    WHERE operator_call IS NOT NULL AND NOT is_dupe AND deleted_at IS NULL
     GROUP BY operator_call ORDER BY n DESC LIMIT 10;" 2>/dev/null | \
   while IFS='|' read -r op count; do
     printf "    %-12s  %s QSOs\n" "$op" "$count"
@@ -636,7 +637,7 @@ server_stats() {
   echo -e "  ${BOLD}QSOs by event type:${NC}"
   PG -c "
     SELECT e.event_type, COUNT(q.id) FILTER (WHERE NOT q.is_dupe) AS n
-    FROM events e LEFT JOIN qsos q ON q.event_id = e.id
+    FROM events e LEFT JOIN qsos q ON q.event_id = e.id AND q.deleted_at IS NULL
     GROUP BY e.event_type ORDER BY n DESC;" 2>/dev/null | \
   while IFS='|' read -r etype count; do
     printf "    %-8s  %s QSOs\n" "$etype" "$count"
@@ -1013,7 +1014,7 @@ main_menu() {
     local totals; totals=$(PG -c "
       SELECT COUNT(DISTINCT e.id),
              COUNT(q.id) FILTER (WHERE NOT q.is_dupe)
-      FROM events e LEFT JOIN qsos q ON q.event_id = e.id;" 2>/dev/null)
+      FROM events e LEFT JOIN qsos q ON q.event_id = e.id AND q.deleted_at IS NULL;" 2>/dev/null)
     IFS='|' read -r tot_events tot_qsos <<< "$totals"
     echo -e "  ${DIM}${tot_events} event(s)  ·  ${tot_qsos} QSO(s) on this server${NC}"
     echo
