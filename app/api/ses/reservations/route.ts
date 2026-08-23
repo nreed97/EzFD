@@ -90,8 +90,13 @@ export async function POST(request: Request) {
   const isSes = event.event_type === 'SES';
 
   const opCall = op_call.toUpperCase().trim();
-  // NULL for a special event, where the operator is the holder.
-  const stationNumber = isSes ? null : Math.max(1, parseInt(String(station_number ?? 1), 10) || 1);
+  // Which position holds the slot. On a contest that is the transmitter, and
+  // it is what "mine" is tested against. On a special event the *operator*
+  // still holds the callsign — but one operator can run two radios from two
+  // windows, and without a station recorded both claims look identical, so
+  // leaving one band released the other's slot. Recording it disambiguates
+  // the windows; describeHolder() still shows an SES holder as their call.
+  const stationNumber = Math.max(1, parseInt(String(station_number ?? 1), 10) || 1);
   const start = starts_at ? new Date(starts_at) : new Date();
   if (isNaN(start.getTime())) {
     return NextResponse.json({ error: 'Invalid starts_at' }, { status: 400 });
@@ -114,7 +119,7 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: holder
-            ? `${describeHolder(holder)} already holds ${band} ${mode} until ${formatSlotEnd(holder.ends_at)}`
+            ? `${describeHolder(holder, isSes)} already holds ${band} ${mode} until ${formatSlotEnd(holder.ends_at)}`
             : `${band} ${mode} is already claimed for that window`,
           holder,
         },

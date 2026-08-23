@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useStoredFlag } from '@/lib/useStoredFlag';
 import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
-import { useRigBridge } from '@/lib/useRigBridge';
+import { useRigBridge, rigPortForStation } from '@/lib/useRigBridge';
 import { useQsoQueue } from '@/lib/useQsoQueue';
 import { applyQsoEvent } from '@/lib/qsoStream';
 import { ARRL_SECTIONS } from '@/lib/types';
@@ -75,7 +75,13 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
   const isSes = event.event_type === 'SES';
 
-  const rig = useRigBridge({ onBand: setCurrentBand, onMode: setCurrentMode });
+  // One bridge process per radio, each on its own port, so a second window
+  // drives a second rig instead of both fighting over one connection.
+  const rig = useRigBridge({
+    onBand: setCurrentBand,
+    onMode: setCurrentMode,
+    port: rigPortForStation(stationNumber),
+  });
   const rigConnected = rig.connected;
   const rigFreq = rig.freq;
 
@@ -227,6 +233,19 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
               )}
             </button>
           )}
+          {/* Running two radios at once is one operator in two windows, each on
+              its own station number — the shape settled in #30. The second
+              window is a full logger, so it needs no new UI of its own. */}
+          <button
+            onClick={() => window.open(
+              `/event/${event.join_code}/log?op=${encodeURIComponent(operatorCall)}&station=${stationNumber + 1}`,
+              `ezfd_radio_${event.join_code}_${stationNumber + 1}`,
+              'width=1100,height=900,noopener'
+            )}
+            title={`Open a second logging window as station ${stationNumber + 1}, for a second radio. Its rig bridge listens on port ${rigPortForStation(stationNumber + 1)}.`}
+            className="hidden sm:inline-flex items-center gap-1 rounded border border-zinc-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400 hover:bg-zinc-800 transition-colors light:border-zinc-300 light:text-zinc-600">
+            + Radio {stationNumber + 1}
+          </button>
           {rigConnected && rig.canCw && (
             <button
               onClick={() => window.open(
@@ -440,6 +459,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             eventId={event.id}
             myOpCall={operatorCall}
             stationNumber={isSes ? null : stationNumber}
+            myStation={stationNumber}
             currentBand={currentBand}
             currentMode={currentMode}
             slotMinutes={event.slot_minutes ?? 120}

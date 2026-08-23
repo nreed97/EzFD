@@ -9,6 +9,9 @@ import DateTimeField from './DateTimeField';
 interface Props {
   eventId: string;
   myOpCall: string;
+  /** Which radio/window this is. On a special event one operator can run two
+   *  radios from two windows; this is what tells their claims apart. */
+  myStation: number;
   /** This operator's station on a contest event, or null on a special event.
    *  Decides both what a claim is recorded against and whether an existing
    *  slot counts as mine: on Field Day the slot belongs to the station, so an
@@ -74,7 +77,7 @@ function minutesUntil(iso: string | null): number | null {
 }
 
 export default function SesCoordination({
-  eventId, myOpCall, stationNumber = null, currentBand, currentMode, slotMinutes,
+  eventId, myOpCall, stationNumber = null, myStation, currentBand, currentMode, slotMinutes,
   eventStartsAt, eventEndsAt, refreshToken, lastQsoAt, onHoldingChange,
 }: Props) {
   const [reservations, setReservations] = useState<SesReservation[]>([]);
@@ -135,9 +138,14 @@ export default function SesCoordination({
   const upcoming = reservations.filter(r => new Date(r.starts_at).getTime() > now);
 
   // On a contest the slot belongs to the station, so an operator who moves
-  // between stations inherits the claim rather than re-taking it.
+  // between stations inherits the claim rather than re-taking it. On a special
+  // event the operator holds it — but one operator can run two radios from two
+  // windows, so the station still has to disambiguate *which window's* claim
+  // this is, or leaving a band in one window releases the other's slot.
   const isMine = (r: SesReservation) =>
-    stationNumber != null ? r.station_number === stationNumber : r.op_call === myOpCall;
+    stationNumber != null
+      ? r.station_number === stationNumber
+      : r.op_call === myOpCall && r.station_number === myStation;
 
   const mySlot = active.find(isMine) ?? null;
 
@@ -145,7 +153,9 @@ export default function SesCoordination({
    *  Naming the operator on a contest would be misleading — the person at
    *  station 2 changes through the weekend, the claim doesn't. */
   const holderLabel = (r: SesReservation) =>
-    r.station_number != null ? `Station ${r.station_number}` : r.op_call;
+    stationNumber != null && r.station_number != null
+      ? `Station ${r.station_number}`
+      : r.op_call;
   const hereHolder = active.find(r => r.band === currentBand && r.mode === currentMode) ?? null;
   const iHoldHere = !!hereHolder && isMine(hereHolder);
 
@@ -206,7 +216,7 @@ export default function SesCoordination({
     const left = activeRef.current.find(
       r => (stationNumber != null
               ? r.station_number === stationNumber
-              : r.op_call === myOpCall)
+              : r.op_call === myOpCall && r.station_number === myStation)
            && r.band === prev.band && r.mode === prev.mode
     );
     if (!left) return;
@@ -215,7 +225,7 @@ export default function SesCoordination({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ action: 'release', op_call: myOpCall }),
     }).then(() => fetchReservations()).catch(() => {});
-  }, [currentBand, currentMode, myOpCall, stationNumber, fetchReservations]);
+  }, [currentBand, currentMode, myOpCall, stationNumber, myStation, fetchReservations]);
 
   async function checkOut() {
     setBusy(true);
@@ -227,7 +237,7 @@ export default function SesCoordination({
         body: JSON.stringify({
           event_id: eventId,
           op_call: myOpCall,
-          station_number: stationNumber,
+          station_number: stationNumber ?? myStation,
           band: currentBand,
           mode: currentMode,
           minutes,
@@ -261,7 +271,7 @@ export default function SesCoordination({
         body: JSON.stringify({
           event_id: eventId,
           op_call: myOpCall,
-          station_number: stationNumber,
+          station_number: stationNumber ?? myStation,
           band: planBand,
           mode: planMode,
           // datetime-local has no timezone; operators plan in UTC during an

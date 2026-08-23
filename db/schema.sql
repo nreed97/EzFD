@@ -73,8 +73,26 @@ CREATE TABLE IF NOT EXISTS presence (
   band        TEXT        NOT NULL,
   mode        TEXT        NOT NULL,
   updated_at  TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-  PRIMARY KEY (event_id, op_call)
+  PRIMARY KEY (event_id, op_call, station)
 );
+
+-- One operator running two radios is one callsign in two windows, each on its
+-- own band. With the station out of the key they overwrite each other's row,
+-- so the band activity panel could only ever show one of the two — and going
+-- QRT on either radio cleared both. Widening the key is safe on existing data:
+-- rows unique on (event_id, op_call) stay unique with a column added.
+DO $$
+BEGIN
+  IF EXISTS (
+    SELECT 1 FROM pg_index i
+     WHERE i.indrelid = 'presence'::regclass AND i.indisprimary
+       AND i.indnatts = 2
+  ) THEN
+    ALTER TABLE presence DROP CONSTRAINT presence_pkey;
+    ALTER TABLE presence ADD PRIMARY KEY (event_id, op_call, station);
+  END IF;
+END
+$$;
 
 -- ---------------------------------------------------------------------------
 -- pg_notify trigger — fires on every QSO INSERT or DELETE

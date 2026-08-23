@@ -200,6 +200,48 @@ function check(name, ok, detail = '') {
     check('roster upsert keeps grid/state when only a name is sent',
       op.grid === 'EN34' && op.state === 'MN' && op.op_name === 'Dave');
 
+    // ── presence is keyed per radio, not per person ──────────────────────
+    //
+    // One operator running two rigs is one callsign in two windows, each on
+    // its own band. With the station out of the primary key the second window
+    // overwrote the first's row, so the band activity panel could only ever
+    // show one of the two — and going QRT on either cleared both.
+    const upsertPresence = (station, band, mode) => pool.query(
+      `INSERT INTO presence (event_id, op_call, station, band, mode, updated_at)
+       VALUES ($1,$2,$3,$4,$5,NOW())
+       ON CONFLICT (event_id, op_call, station)
+       DO UPDATE SET band=$4, mode=$5, updated_at=NOW()`,
+      [ev.id, 'W0AAA', station, band, mode]);
+
+    await upsertPresence(1, '20m', 'PH');
+    await upsertPresence(2, '40m', 'CW');
+    const { rows: both } = await pool.query(
+      `SELECT station, band, mode FROM presence
+        WHERE event_id=$1 AND op_call='W0AAA' ORDER BY station`, [ev.id]);
+    check('two radios for one operator keep separate presence rows',
+      both.length === 2 && both[0].band === '20m' && both[1].band === '40m',
+      both.map(r => `${r.station}:${r.band}`).join(' '));
+
+    // Re-posting a radio's own band must update in place, not add a third row.
+    await upsertPresence(2, '15m', 'CW');
+    const { rows: still } = await pool.query(
+      `SELECT station, band FROM presence
+        WHERE event_id=$1 AND op_call='W0AAA' ORDER BY station`, [ev.id]);
+    check('a radio moving band updates its own row rather than adding one',
+      still.length === 2 && still[1].band === '15m',
+      still.map(r => `${r.station}:${r.band}`).join(' '));
+
+    // QRT is per radio: shutting one down leaves the other on the air.
+    await pool.query(
+      `DELETE FROM presence WHERE event_id=$1 AND op_call=$2 AND station=$3`,
+      [ev.id, 'W0AAA', 2]);
+    const { rows: left } = await pool.query(
+      `SELECT station, band FROM presence WHERE event_id=$1 AND op_call='W0AAA'`,
+      [ev.id]);
+    check('QRT on one radio leaves the operator\'s other radio on the air',
+      left.length === 1 && left[0].station === 1,
+      left.map(r => `${r.station}:${r.band}`).join(' ') || 'none left');
+
     // ── grants: the app role is DML-only and must still reach these ──────
     const { rows: [priv] } = await pool.query(
       `SELECT has_table_privilege('ezfd','ses_reservations','INSERT') AS r,

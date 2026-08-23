@@ -62,9 +62,11 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
     await fetch('/api/presence', {
       method: 'DELETE',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ event_id: eventId, op_call: myOpCall }),
+      // Station included: going QRT shuts down *this* radio, not every window
+      // this operator has open.
+      body: JSON.stringify({ event_id: eventId, op_call: myOpCall, station: myStation }),
     }).catch(() => {});
-  }, [eventId, myOpCall]);
+  }, [eventId, myOpCall, myStation]);
 
   const fetchPresence = useCallback(async () => {
     const res = await fetch(`/api/presence?event_id=${eventId}`).catch(() => null);
@@ -99,7 +101,7 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
     setIsQRT(true);
     removePresence();
     // Remove self from local station list immediately
-    setStations(prev => prev.filter(s => s.op_call !== myOpCall));
+    setStations(prev => prev.filter(s => !(s.op_call === myOpCall && s.station === myStation)));
   }
 
   function goOnAir() {

@@ -6,11 +6,21 @@ import type { Band, Mode } from '@/lib/types';
 interface Options {
   onBand?: (b: Band) => void;
   onMode?: (m: Mode) => void;
+  /** WebSocket port of this radio's bridge. See rigPortForStation(). */
+  port?: number;
 }
 
-const RIG_WS = 'ws://localhost:4575';
+const RIG_WS_DEFAULT_PORT = 4575;
 
-export function useRigBridge({ onBand, onMode }: Options = {}) {
+/** Each radio needs its own bridge process, and each bridge binds its own
+ *  port (`ezfd-rig-bridge.py --port`). Station 1 uses the default so the
+ *  single-radio setup needs no arguments; station 2 talks to 4576, and so on.
+ *  Without this the second window would fight the first for one connection. */
+export function rigPortForStation(station: number): number {
+  return RIG_WS_DEFAULT_PORT + Math.max(0, (station || 1) - 1);
+}
+
+export function useRigBridge({ onBand, onMode, port = RIG_WS_DEFAULT_PORT }: Options = {}) {
   const [connected, setConnected] = useState(false);
   const [freq, setFreq] = useState<number | null>(null);
   const [canCw, setCanCw] = useState(false);
@@ -37,7 +47,7 @@ export function useRigBridge({ onBand, onMode }: Options = {}) {
     let retryTimer: ReturnType<typeof setTimeout> | null = null;
 
     function connect() {
-      ws = new WebSocket(RIG_WS);
+      ws = new WebSocket(`ws://localhost:${port}`);
       wsRef.current = ws;
 
       ws.onopen = () => setConnected(true);
@@ -70,7 +80,7 @@ export function useRigBridge({ onBand, onMode }: Options = {}) {
       if (retryTimer) clearTimeout(retryTimer);
       ws?.close();
     };
-  }, []);
+  }, [port]);
 
   const sendCw = useCallback((text: string, wpm: number) => {
     setCwError(null);

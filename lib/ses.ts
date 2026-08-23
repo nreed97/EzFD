@@ -129,13 +129,17 @@ export interface SlotCheck {
 /** How a slot's holder reads to an operator.
  *
  *  A special event slot is held by a person — one operator has the club call
- *  on that band and mode. A contest slot is held by a *station*: on Field Day
- *  station 2 holds 20m phone regardless of who is sitting at it, and
- *  operators rotate through stations across the weekend. Naming the operator
- *  there would be actively misleading, since the person changes and the
- *  claim doesn't. */
-export function describeHolder(holder: { op_call: string; station_number?: number | null }): string {
-  return holder.station_number != null
+ *  on that band and mode, and that is what other operators need to see, even
+ *  though the claim also records which of their radios took it. A contest slot
+ *  is held by a *station*: on Field Day station 2 holds 20m phone regardless
+ *  of who is sitting at it, and operators rotate through stations across the
+ *  weekend. Naming the operator there would be actively misleading, since the
+ *  person changes and the claim doesn't. */
+export function describeHolder(
+  holder: { op_call: string; station_number?: number | null },
+  isSes = false,
+): string {
+  return (!isSes && holder.station_number != null)
     ? `Station ${holder.station_number}`
     : holder.op_call;
 }
@@ -171,15 +175,18 @@ export async function checkSlot(
   }
 
   // A contest slot belongs to a station; a special event slot to an operator.
-  const mine = holder.station_number != null
+  // Special event claims record a station too, so two windows for one operator
+  // can be told apart, but the *person* is still who may transmit — an
+  // operator with two radios is not trespassing on their own checkout.
+  const mine = stationNumber != null
     ? holder.station_number === stationNumber
     : holder.op_call === opCall.toUpperCase().trim();
 
   if (!mine) {
     return {
       ok: false,
-      heldBy: describeHolder(holder),
-      reason: `${describeHolder(holder)} holds ${band} ${mode} until ${formatSlotEnd(holder.ends_at)}.`,
+      heldBy: describeHolder(holder, stationNumber == null),
+      reason: `${describeHolder(holder, stationNumber == null)} holds ${band} ${mode} until ${formatSlotEnd(holder.ends_at)}.`,
     };
   }
   return { ok: true };
