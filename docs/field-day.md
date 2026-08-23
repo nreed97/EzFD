@@ -109,13 +109,6 @@ own line, active bonuses itemised, sections worked, and the operator list.
 
 ![Field Day summary sheet: QSO totals by mode, score calculation and sections worked](images/summary-sheet.png)
 
-> **Known bug.** The Cabrillo `CLAIMED-SCORE` header is wrong — it multiplies
-> by sections worked, ignores the power multiplier, and omits bonus points,
-> because it reimplements the formula instead of using the shared scoring
-> code. The score shown in the app is correct; only the submitted header is
-> not. Fix the number by hand before submitting. Tracked as
-> [#12](https://github.com/nreed97/EzFD/issues/12).
-
 Both exports include only non-duplicate QSOs, in chronological order.
 
 ## Sections

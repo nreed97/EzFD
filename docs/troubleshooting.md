@@ -121,12 +121,18 @@ a very old log can show a lower worked-section count than it did at the time.
 
 ## Cabrillo claimed score looks wrong
 
-**Known bug.** The `CLAIMED-SCORE` header is computed separately from the rest
-of the app and is wrong three ways: it multiplies by sections worked, ignores
-the power multiplier, and omits bonus points.
+It shouldn't any more. `CLAIMED-SCORE` used to be computed separately from the
+rest of the app and was wrong three ways — it multiplied by sections worked,
+ignored the power multiplier and dropped bonus points ([#12], fixed). The
+export now calls the same `calculateScore()` the dashboard uses, so the header
+and the app cannot disagree, and `scripts/test-cabrillo.cjs` asserts that in
+CI.
 
-The score in the app is correct. Correct the header by hand before
-submitting. Tracked as [#12](https://github.com/nreed97/EzFD/issues/12).
+If the two ever *do* disagree, that's a bug worth reporting rather than
+correcting by hand — the discrepancy would mean one of them is wrong and it
+isn't obvious which.
+
+[#12]: https://github.com/nreed97/EzFD/issues/12
 
 ## Rig control
 
