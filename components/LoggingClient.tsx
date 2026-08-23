@@ -1,12 +1,11 @@
 'use client';
 
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useStoredFlag } from '@/lib/useStoredFlag';
-import { useOnline } from '@/lib/useOnline';
 import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
 import { useRigBridge } from '@/lib/useRigBridge';
-import { enqueue, dequeue, loadQueue, type PendingQSO } from '@/lib/offline-queue';
+import { useQsoQueue } from '@/lib/useQsoQueue';
 import { applyQsoEvent } from '@/lib/qsoStream';
 import { ARRL_SECTIONS } from '@/lib/types';
 import type { Event, QSO, Band, Mode, DisplayQSO, SesReservation } from '@/lib/types';
@@ -34,96 +33,25 @@ interface Props {
   approvalPending?: boolean;
 }
 
-function pendingToDisplay(p: PendingQSO, sentClass: string | null, sentSection: string | null): DisplayQSO {
-  return {
-    id: p.local_id,
-    event_id: p.event_id,
-    callsign: p.callsign,
-    band: p.band,
-    mode: p.mode,
-    datetime_utc: p.submitted_at,
-    sent_class: sentClass,
-    sent_section: sentSection,
-    rcvd_class: p.rcvd_class || null,
-    rcvd_section: p.rcvd_section || null,
-    operator_call: p.operator_call,
-    station_number: p.station_number,
-    is_dupe: false,
-    created_at: p.submitted_at,
-    rst_sent: p.rst_sent ?? null,
-    rst_rcvd: p.rst_rcvd ?? null,
-    rcvd_name: p.rcvd_name ?? null,
-    rcvd_qth: p.rcvd_qth ?? null,
-    rcvd_grid: p.rcvd_grid ?? null,
-    comment: p.comment ?? null,
-    adif_mode: null,
-    freq_khz: null,
-    _pending: true,
-    _local_id: p.local_id,
-  };
-}
-
-/** `replay` marks a QSO coming back off the offline queue. The server always
- *  accepts those, bypassing the SES band/mode gate: by reconnect time the slot
- *  has expired, and a contact that already happened on the air must never be
- *  dropped because the network blipped. */
-async function submitQSOToServer(
-  eventId: string,
-  pending: PendingQSO,
-  replay = false,
-): Promise<{ qso: QSO | null; error?: string; warning?: string }> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), 10_000);
-  try {
-    const res = await fetch('/api/qso', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal: controller.signal,
-      body: JSON.stringify({
-        event_id: eventId,
-        callsign: pending.callsign,
-        band: pending.band,
-        mode: pending.mode,
-        rcvd_class: pending.rcvd_class,
-        rcvd_section: pending.rcvd_section,
-        operator_call: pending.operator_call,
-        station_number: pending.station_number,
-        rst_sent: pending.rst_sent,
-        rst_rcvd: pending.rst_rcvd,
-        rcvd_name: pending.rcvd_name,
-        rcvd_qth: pending.rcvd_qth,
-        rcvd_grid: pending.rcvd_grid,
-        comment: pending.comment,
-        replay,
-      }),
-    });
-    if (!res.ok) {
-      const body = await res.json().catch(() => ({})) as { error?: string };
-      return { qso: null, error: body.error ?? `Server error ${res.status}` };
-    }
-    const qso = await res.json() as QSO & { slot_warning?: string };
-    return { qso, warning: qso.slot_warning };
-  } catch (err) {
-    const msg = err instanceof Error ? err.message : 'Network error';
-    return { qso: null, error: msg.includes('abort') ? 'Request timed out' : msg };
-  } finally {
-    clearTimeout(timeout);
-  }
-}
-
-// Retry schedule for draining the offline queue, in milliseconds. Backs off
-// because a queued contact that can *never* be accepted — the event was
-// deleted, or the entry predates a schema change — would otherwise retry at a
-// fixed interval for as long as the tab stays open. Progress resets it, so a
-// real outage still drains at full speed.
-const QUEUE_RETRY_MS = [5_000, 10_000, 20_000, 40_000, 60_000];
-
 export default function LoggingClient({ event, initialQSOs, operatorCall, stationNumber, approvalPending = false }: Props) {
   const router = useRouter();
   const [confirmedQSOs, setConfirmedQSOs] = useState<QSO[]>(initialQSOs);
-  const [pendingQSOs, setPendingQSOs] = useState<DisplayQSO[]>([]);
-  const isOnline = useOnline();
-  const [pendingCount, setPendingCount] = useState(0);
+  // One implementation of the offline queue, shared with the CW popout.
+  const queue = useQsoQueue({
+    eventId: event.id,
+    sentClass: event.class,
+    sentSection: event.arrl_section,
+    operatorCall,
+    stationNumber,
+  });
+  // Destructured rather than used as `queue.x`: the callbacks are
+  // useCallback-stable, so effects and memoized props can depend on them
+  // individually. Depending on the returned object would change identity every
+  // render — which would tear down and reopen the EventSource below each time.
+  const {
+    submit: submitQSO, flush: flushQueue, drop: dropQueued,
+    noteReconnect, pending: pendingQSOs, pendingCount, isOnline,
+  } = queue;
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [lastLogged, setLastLogged] = useState<DisplayQSO | null>(null);
@@ -144,7 +72,6 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   // Bumped on each SSE reservation event so SesCoordination refetches without
   // opening a second EventSource for the same event.
   const [reservationVersion, setReservationVersion] = useState(0);
-  const syncingRef = useRef(false);
 
   const isSes = event.event_type === 'SES';
 
@@ -155,29 +82,6 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   function toggleNight() {
     setNightMode(prev => !prev);
   }
-
-  // Restore any pending QSOs from localStorage on mount
-  // Web storage does not exist during SSR, so this genuinely cannot be read
-  // while rendering and has to happen on mount. It runs once and settles; the
-  // extra render is the unavoidable cost of the value being client-only.
-  /* eslint-disable react-hooks/set-state-in-effect */
-  useEffect(() => {
-    const stored = loadQueue(event.id);
-    if (stored.length > 0) {
-      setPendingQSOs(stored.map(p => pendingToDisplay(p, event.class, event.arrl_section)));
-      setPendingCount(stored.length);
-    }
-  }, [event.id, event.class, event.arrl_section]);
-  /* eslint-enable react-hooks/set-state-in-effect */
-
-
-  // The queue drain, reachable from long-lived callbacks (the SSE reconnect
-  // handler and the retry timer) without making either depend on its identity
-  // — a dependency that would tear down and restart the timer on every
-  // unrelated re-render, which is how the auto-CQ timer once failed to
-  // complete an interval. Populated by an effect below, since flushQueue is
-  // declared after this point.
-  const flushRef = useRef<(() => Promise<boolean>) | null>(null);
 
   // SSE subscription for real-time QSO updates
   useEffect(() => {
@@ -206,11 +110,11 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     es.onopen = () => {
       if (!dropped) return;   // the initial connect is not a recovery
       dropped = false;
-      flushRef.current?.();
+      noteReconnect();
     };
 
     return () => es.close();
-  }, [event.id]);
+  }, [event.id, noteReconnect]);
 
   // If this operator already holds a live checkout when they sign in — e.g.
   // arriving right at the start of their scheduled slot — start the form on
@@ -241,108 +145,27 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
   /** Drain the offline queue. Resolves true if at least one contact was
    *  accepted, which is what tells the retry timer it is making progress. */
-  const flushQueue = useCallback(async () => {
-    // A flush already running will report its own progress; returning false
-    // here can only cost the timer one backoff step, and the next dequeue
-    // restarts it at full speed anyway.
-    if (syncingRef.current) return false;
-    syncingRef.current = true;
-    let progressed = false;
-    for (const pending of loadQueue(event.id)) {
-      // replay=true — the server accepts these unconditionally.
-      const result = await submitQSOToServer(event.id, pending, true);
-      // Only drop the queued copy once the server has actually taken it.
-      // Checking the wrapper object here instead of result.qso meant a failed
-      // submit still dequeued, silently losing the contact.
-      if (!result.qso) break;
-      dequeue(event.id, pending.local_id);
-      progressed = true;
-      setPendingQSOs(prev => prev.filter(p => p._local_id !== pending.local_id));
-      setPendingCount(prev => Math.max(0, prev - 1));
-    }
-    syncingRef.current = false;
-    return progressed;
-  }, [event.id]);
-
-  useEffect(() => { flushRef.current = flushQueue; }, [flushQueue]);
-
-  // The connectivity *value* comes from useOnline; this effect exists only
-  // for the side effect of draining the offline queue on the transition back
-  // to online. flushQueue is deliberately not in the deps — see its own note.
-  useEffect(() => {
-    // the loader is async: whatever state it sets happens in a promise
-    // continuation after an await, never synchronously during the effect, so
-    // it cannot cascade a render. The rule cannot see through the async
-    // boundary.
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (isOnline) flushQueue();
-  }, [isOnline, flushQueue]);
-
-  // Keep retrying while contacts are still queued.
-  //
-  // The effect above fires only when the *browser's* link changes, which is
-  // the wrong signal for the common case: a server restart, an nginx reload
-  // or a brief 502 leaves navigator.onLine true throughout, so there is no
-  // transition and the queue would sit untouched until an operator noticed
-  // the pending badge and pressed Sync. Mid-contest nobody is watching that
-  // badge.
-  //
-  // The timer reschedules itself rather than relying on the effect re-running,
-  // because a failed attempt changes no state the effect depends on. A
-  // successful one does — pendingCount drops, this effect restarts, and the
-  // backoff is back at its shortest step.
-  useEffect(() => {
-    if (!isOnline || pendingCount === 0) return;
-    let cancelled = false;
-    let attempt = 0;
-    let timer: ReturnType<typeof setTimeout>;
-    const schedule = () => {
-      timer = setTimeout(async () => {
-        const progressed = await flushRef.current?.();
-        if (cancelled) return;
-        attempt = progressed ? 0 : Math.min(attempt + 1, QUEUE_RETRY_MS.length - 1);
-        schedule();
-      }, QUEUE_RETRY_MS[attempt]);
-    };
-    schedule();
-    return () => { cancelled = true; clearTimeout(timer); };
-  }, [isOnline, pendingCount]);
-
   const logQSO = useCallback(async (data: QSOSubmission) => {
     setSubmitting(true);
     setSubmitError(null);
     setSlotWarning(null);
     try {
-      const pending = enqueue(event.id, {
-        ...data,
-        rcvd_class: data.rcvd_class,
-        rcvd_section: data.rcvd_section,
-        operator_call: operatorCall,
-        station_number: stationNumber,
-      });
-      const display = pendingToDisplay(pending, event.class, event.arrl_section);
-      setPendingQSOs(prev => [display, ...prev]);
-      setPendingCount(prev => prev + 1);
-      setLastLogged(display);
-
-      if (navigator.onLine) {
-        const { qso, error, warning } = await submitQSOToServer(event.id, pending);
-        if (warning) setSlotWarning(warning);
-        if (qso) {
-          dequeue(event.id, pending.local_id);
-          setPendingQSOs(prev => prev.filter(p => p._local_id !== pending.local_id));
-          setPendingCount(prev => Math.max(0, prev - 1));
-          setLastLogged(qso as DisplayQSO);
-          // On mobile, briefly flip to the QSO list so the operator sees it land
-          if (window.innerWidth < 768) setMobileTab('qsos');
-        } else if (error) {
-          setSubmitError(error);
-        }
+      // The queue takes the contact before the network is touched, so a failed
+      // submit leaves it safely on disk rather than losing it.
+      const { qso, queued, error, warning } = await submitQSO(data);
+      setLastLogged(queued);
+      if (warning) setSlotWarning(warning);
+      if (qso) {
+        setLastLogged(qso as DisplayQSO);
+        // On mobile, briefly flip to the QSO list so the operator sees it land
+        if (window.innerWidth < 768) setMobileTab('qsos');
+      } else if (error) {
+        setSubmitError(error);
       }
     } finally {
       setSubmitting(false);
     }
-  }, [event.id, event.class, event.arrl_section, operatorCall, stationNumber]);
+  }, [submitQSO]);
 
   const handleHoldingChange = useCallback((holding: boolean) => setHoldsSlot(holding), []);
 
@@ -352,15 +175,13 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
   const deleteQSO = useCallback(async (id: string, localId?: string) => {
     if (localId) {
-      dequeue(event.id, localId);
-      setPendingQSOs(prev => prev.filter(p => p._local_id !== localId));
-      setPendingCount(prev => Math.max(0, prev - 1));
+      dropQueued(localId);
       return;
     }
     // The actor rides along so the audit trail records who claimed to do it.
     await fetch(`/api/qso/${id}?operator_call=${encodeURIComponent(operatorCall)}`, { method: 'DELETE' });
     setConfirmedQSOs(prev => prev.filter(q => q.id !== id));
-  }, [event.id]);
+  }, [dropQueued, operatorCall]);
 
   const displayQSOs: DisplayQSO[] = [
     ...pendingQSOs,
