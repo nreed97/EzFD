@@ -65,6 +65,12 @@ event's callsign is what goes on the air.
 
 ![Join screen for an event: enter your callsign, or view visitor stats](images/join-event.png)
 
+On a multi-transmitter Field Day entry — `2A` and up — operators also pick
+**which station they're at**. That number rides on every QSO they log and
+becomes the transmitter number in the Cabrillo submission, so getting it right
+is the difference between a 3A entry that reads as three transmitters and one
+that claims every contact came from the same rig.
+
 On a special event, operators also enter their own grid and state, because a
 distributed activation has one location per operator rather than one per
 event. See [Special event stations](special-events.md).

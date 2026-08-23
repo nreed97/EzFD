@@ -8,7 +8,7 @@ contest logger was built on, and the SES event type addresses each.
 
 **There's no contest exchange and no score.** Class and section are stored as
 NULL. The entry form asks for RST sent and received, name, QTH, grid, and a
-comment instead. Scoring, bonuses, the section multiplier, the section views,
+comment instead. Scoring, bonuses, the section views,
 the summary sheet and Cabrillo export are all hidden — there's no contest to
 submit to. The dashboard shows QSO totals and rate.
 

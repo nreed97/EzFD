@@ -79,25 +79,43 @@ mode, and time since their last QSO.
 - **Go QRT** removes you from the list immediately rather than waiting for the
   timeout. Use it when you step away.
 
-On a special event this panel is supplemented by **Call Checkout**, which is
-authoritative about who may transmit — see
-[Special event stations](special-events.md).
+This panel is supplemented by **Call Checkout**, which is authoritative about
+who may transmit. On a special event a slot is held by an *operator* — see
+[Special event stations](special-events.md). On Field Day it is held by a
+*station*, because station 2 holds 20m phone whoever is sitting at it; claiming
+is optional there, so a club that never opens the panel is never warned. Either
+way the rule is the same one the rules impose: one signal per band and mode.
 
 ## Working offline
 
 QSOs are written to browser local storage *first*, then sent to the server.
 If the send fails the QSO stays queued, the header shows a pending count, and
-logging continues normally. When connectivity returns the queue flushes
-automatically; you can also click the pending badge to retry.
+logging continues normally. A queued QSO shows as `Queued — syncing…` until the
+server confirms it.
 
-A queued QSO shows as `Queued — syncing…` until the server confirms it.
+The queue drains by itself, on whichever of these comes first:
 
-Two consequences worth knowing:
+- the browser regaining connectivity;
+- the real-time stream reconnecting, which is the earliest sign the *server* is
+  back — usually a second or two after it returns;
+- a retry timer at 5s, 10s, 20s, 40s and then every minute.
 
-- **Nothing is lost to a flaky link.** This is the point of the design.
+You can also click the pending badge to retry immediately, but you shouldn't
+need to. That last point matters more than it looks: a server restart or an
+nginx reload leaves your own network up, so the browser never sees a
+connectivity change. The retry and the stream reconnect are what cover it.
+
+Three consequences worth knowing:
+
+- **Nothing is lost to a flaky link, or to the server going away.** This is the
+  point of the design. It holds in the CW window too, and in the WSJT-X relay,
+  which spools to a file on disk.
 - **Replayed QSOs bypass the special-event checkout gate.** By the time the
   browser reconnects the reservation has expired, and the contact already
   happened on the air. Dropping it would only lose the record.
+- **A queued QSO is timestamped when the server accepts it**, not when you
+  logged it, because the server stamps every contact from one clock. A long
+  outage therefore shifts those times.
 
 ## Editing and deleting
 
@@ -107,6 +125,13 @@ everywhere in real time.
 
 A queued QSO that hasn't synced yet can be deleted locally — it never reaches
 the server.
+
+Deleting doesn't destroy anything. There is no authentication here beyond the
+join code, so anyone can delete any contact, and a log that couldn't answer
+"what happened to that QSO?" would make an accident indistinguishable from a
+contact never logged. A deleted contact leaves the live log, the exports and
+the score, and moves to **Deleted contacts** below the table, with who deleted
+it. **Restore** puts it back.
 
 ## Night mode
 

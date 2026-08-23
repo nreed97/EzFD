@@ -139,8 +139,16 @@ export default function HomePage() {
         </div>
       </div>
 
-      <footer className="flex items-center justify-center gap-4 text-xs text-zinc-600 light:text-zinc-400">
+      <footer className="flex flex-wrap items-center justify-center gap-4 text-xs text-zinc-600 light:text-zinc-400">
         <span>73 de EzFD &bull; Open source Field Day, Winter Field Day &amp; special event logger</span>
+        {/* The guides ship with the app, so they work on a field server with
+            no internet — which is exactly when they're needed. */}
+        <Link
+          href="/docs"
+          className="hover:text-zinc-300 light:hover:text-zinc-700 transition-colors"
+        >
+          Documentation
+        </Link>
         <a
           href="https://github.com/nreed97/EzFD"
           target="_blank"
