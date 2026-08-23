@@ -37,7 +37,7 @@ export default function NewEventPage() {
     club_name: '',
     club_call: '',
     event_year: new Date().getFullYear(),
-    arrl_section: 'EPA',
+    arrl_section: 'MN',
     location: '',
     qrz_username: '',
     qrz_password: '',
@@ -149,7 +149,7 @@ export default function NewEventPage() {
                   setEventType(type);
                   if (type !== 'SES') setClassLetter(type === 'WFD' ? 'H' : 'A');
                   // FD/WFD require a section; an SES defaults to none.
-                  set('arrl_section', type === 'SES' ? '' : 'EPA');
+                  set('arrl_section', type === 'SES' ? '' : 'MN');
                   // Contest dupes are once per event; a special event may
                   // run for weeks, where working someone again on another
                   // day is normal.

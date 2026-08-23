@@ -13,7 +13,7 @@ CREATE TABLE IF NOT EXISTS events (
   club_call            TEXT        NOT NULL,
   event_year           INTEGER     NOT NULL DEFAULT EXTRACT(YEAR FROM NOW()),
   class                TEXT        NOT NULL,        -- e.g. "3A", "2A", "1D"
-  arrl_section         TEXT        NOT NULL,        -- e.g. "EPA"
+  arrl_section         TEXT        NOT NULL,        -- e.g. "MN"
   location             TEXT,
   qrz_username         TEXT,
   qrz_password         TEXT,                        -- stored plaintext for now; restrict DB access instead
