@@ -198,10 +198,14 @@ if [[ "$(echo "$FDQ" | jq_get sent_class)" == "3A" && "$(echo "$FDQ" | jq_get rc
 else
   no "  the contest exchange is still stamped"
 fi
+# Was "no SES checkout gate is applied to Field Day". Contests now share the
+# coordination, so the assertion has to change — but the important half is
+# preserved and sharpened: claiming is *opt-in* on a contest, so an event that
+# has never claimed a slot must not warn on any QSO.
 if [[ -z "$(echo "$FDQ" | jq_get slot_warning)" ]]; then
-  ok "  no SES checkout gate is applied to Field Day"
+  ok "  an unclaimed contest band produces no warning"
 else
-  no "  no SES checkout gate is applied to Field Day"
+  no "  an unclaimed contest band produces no warning" "$(echo "$FDQ" | jq_get slot_warning)"
 fi
 FDQ2=$(req POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":\"K1XYZ\",\"band\":\"20m\",\"mode\":\"PH\",\"rcvd_class\":\"2A\",\"rcvd_section\":\"EPA\",\"operator_call\":\"W0AAA\"}")
 if [[ "$(echo "$FDQ2" | jq_get is_dupe)" == "True" ]]; then
@@ -373,6 +377,77 @@ if [[ "$(status POST /api/import/event '{}')" == "400" ]]; then
   ok "  a missing payload is refused"
 else
   no "  a missing payload is refused"
+fi
+
+# ── Per-station coordination for contests ────────────────────────────────────
+#
+# Field Day has the same one-signal-per-band-per-mode rule as a special event,
+# and a multi-transmitter club has the same coordination problem — but the
+# holder is the station, not the operator, and enforcement stays soft because
+# refusing a contact that already happened is worse than a warning.
+echo "── contest station coordination ──"
+
+STN=$(req POST /api/events '{"club_name":"Stations","club_call":"W0STN","event_type":"FD","class":"3A","arrl_section":"MN","power":"LOW"}' | jq_get join_code)
+STN_ID=$(req GET "/api/events/$STN" | jq_get id)
+
+CLAIM=$(req POST /api/ses/reservations "{\"event_id\":\"$STN_ID\",\"op_call\":\"W0AAA\",\"band\":\"20m\",\"mode\":\"PH\",\"station_number\":1}")
+if [[ "$(echo "$CLAIM" | jq_get station_number)" == "1" ]]; then
+  ok "  a contest event can claim a band for a station"
+else
+  no "  a contest event can claim a band for a station" "$CLAIM"
+fi
+
+# The one-signal-per-band-per-mode rule holds across stations: station 2 must
+# not be able to take 20m PH while station 1 has it. Adding station to the
+# exclusion constraint would have allowed exactly that.
+if [[ "$(status POST /api/ses/reservations "{\"event_id\":\"$STN_ID\",\"op_call\":\"W0BBB\",\"band\":\"20m\",\"mode\":\"PH\",\"station_number\":2}")" == "409" ]]; then
+  ok "  a second station cannot take the same band and mode"
+else
+  no "  a second station cannot take the same band and mode"
+fi
+if [[ "$(status POST /api/ses/reservations "{\"event_id\":\"$STN_ID\",\"op_call\":\"W0BBB\",\"band\":\"40m\",\"mode\":\"CW\",\"station_number\":2}")" == "201" ]]; then
+  ok "  but it can take a different one"
+else
+  no "  but it can take a different one"
+fi
+
+# Logging from the station that holds the slot is clean...
+S1=$(req POST /api/qso "{\"event_id\":\"$STN_ID\",\"callsign\":\"K1STN\",\"band\":\"20m\",\"mode\":\"PH\",\"rcvd_class\":\"1A\",\"rcvd_section\":\"EPA\",\"operator_call\":\"W0AAA\",\"station_number\":1}")
+if [[ -z "$(echo "$S1" | jq_get slot_warning)" ]]; then
+  ok "  the holding station logs without a warning"
+else
+  no "  the holding station logs without a warning" "$(echo "$S1" | jq_get slot_warning)"
+fi
+
+# ...and from a different station it warns, naming the station rather than a
+# person, since operators rotate through stations and the claim doesn't.
+S2=$(req POST /api/qso "{\"event_id\":\"$STN_ID\",\"callsign\":\"K2STN\",\"band\":\"20m\",\"mode\":\"PH\",\"rcvd_class\":\"1A\",\"rcvd_section\":\"EPA\",\"operator_call\":\"W0BBB\",\"station_number\":2}")
+WARN2=$(echo "$S2" | jq_get slot_warning)
+if [[ "$WARN2" == *"Station 1"* ]]; then
+  ok "  another station is warned, and the holder is named as a station"
+else
+  no "  another station is warned, and the holder is named as a station" "$WARN2"
+fi
+if [[ -n "$(echo "$S2" | jq_get id)" ]]; then
+  ok "  and the QSO is still logged — enforcement is soft on a contest"
+else
+  no "  and the QSO is still logged — enforcement is soft on a contest"
+fi
+
+# A different operator at the holding station inherits the claim: the slot
+# belongs to the station, and people rotate through it.
+S3=$(req POST /api/qso "{\"event_id\":\"$STN_ID\",\"callsign\":\"K3STN\",\"band\":\"20m\",\"mode\":\"PH\",\"rcvd_class\":\"1A\",\"rcvd_section\":\"EPA\",\"operator_call\":\"W0CCC\",\"station_number\":1}")
+if [[ -z "$(echo "$S3" | jq_get slot_warning)" ]]; then
+  ok "  a new operator at the holding station inherits the claim"
+else
+  no "  a new operator at the holding station inherits the claim" "$(echo "$S3" | jq_get slot_warning)"
+fi
+
+# The claim survives a backup round trip.
+if [[ "$(req GET "/api/export/$STN?format=json")" == *"station_number"* ]]; then
+  ok "  station claims survive into the full-event backup"
+else
+  no "  station claims survive into the full-event backup"
 fi
 
 # ── QSO audit trail and soft delete ──────────────────────────────────────────

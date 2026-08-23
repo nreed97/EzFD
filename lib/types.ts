@@ -114,6 +114,10 @@ export interface SesReservation {
   id: string;
   event_id: string;
   op_call: string;
+  /** Who holds the slot on a contest event — station 2 holds 20m phone
+   *  regardless of who is sitting at it. NULL on a special event, where the
+   *  operator is the holder. */
+  station_number?: number | null;
   band: Band;
   mode: Mode;
   starts_at: string;

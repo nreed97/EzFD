@@ -274,6 +274,29 @@ BEGIN
 END
 $$;
 
+-- Band/mode coordination for contests as well as special events. Field Day
+-- has the same one-signal-per-band-per-mode rule, and a 3A club running three
+-- transmitters has exactly the problem this table already solves — so the
+-- table is reused rather than duplicated.
+--
+-- The unit that *holds* a slot differs by event type. On a special event one
+-- operator holds the callsign for a band and mode. On Field Day station 2
+-- holds 20m phone regardless of who is sitting at it, and operators rotate
+-- through stations across the weekend. station_number records that holder and
+-- is NULL for special events.
+--
+-- The table keeps its ses_ name: renaming a shipped table costs a migration
+-- for no functional gain.
+ALTER TABLE ses_reservations ADD COLUMN IF NOT EXISTS station_number INTEGER;
+
+-- station_number is deliberately NOT part of ses_no_overlap. Adding it would
+-- let the database accept station 1 and station 2 both holding 20m PH at the
+-- same moment, which both ARRL Field Day and special event rules forbid — one
+-- transmitted signal per band and mode. That is the same mistake as narrowing
+-- the slot to a frequency: it would let the database permit something the
+-- rules don't. The exclusivity stays (event_id, band, mode, during); the
+-- station is who holds it, not an extra dimension of it.
+
 CREATE INDEX IF NOT EXISTS ses_res_event_idx ON ses_reservations(event_id, during);
 CREATE INDEX IF NOT EXISTS ses_res_op_idx    ON ses_reservations(event_id, op_call);
 
@@ -389,7 +412,8 @@ AS $$
                 'op_call', r.op_call, 'band', r.band, 'mode', r.mode,
                 'starts_at', lower(r.during), 'ends_at', upper(r.during),
                 'planned_freq', r.planned_freq, 'note', r.note,
-                'status', r.status, 'created_at', r.created_at) ORDER BY lower(r.during))
+                'status', r.status, 'created_at', r.created_at,
+                'station_number', r.station_number) ORDER BY lower(r.during))
          FROM ses_reservations r WHERE r.event_id = e.id
       ) AS ses_reservations
     FROM events e
@@ -508,7 +532,8 @@ BEGIN
         CASE WHEN jsonb_typeof(ev->'ses_reservations') = 'array' THEN ev->'ses_reservations' ELSE '[]'::jsonb END) LOOP
       CONTINUE WHEN NULLIF(res->>'starts_at','') IS NULL;
       INSERT INTO ses_reservations (event_id, op_call, band, mode, during,
-                                    planned_freq, note, status, created_at)
+                                    planned_freq, note, status, created_at,
+                                    station_number)
       VALUES (
         v_new_id, res->>'op_call', res->>'band', res->>'mode',
         tstzrange(
@@ -519,7 +544,8 @@ BEGIN
         ),
         res->>'planned_freq', res->>'note',
         COALESCE(res->>'status','RELEASED'),
-        COALESCE(NULLIF(res->>'created_at','')::timestamptz, NOW())
+        COALESCE(NULLIF(res->>'created_at','')::timestamptz, NOW()),
+        NULLIF(res->>'station_number','')::int
       );
     END LOOP;
 

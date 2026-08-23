@@ -7,6 +7,7 @@ import {
   formatSlotEnd,
   loadEvent,
   overlappingHolder,
+  describeHolder,
 } from '@/lib/ses';
 import { BANDS, MODES } from '@/lib/types';
 
@@ -65,7 +66,8 @@ export async function GET(request: Request) {
  */
 export async function POST(request: Request) {
   const body = await request.json();
-  const { event_id, join_code, op_call, band, mode, minutes, starts_at, planned_freq, note } = body;
+  const { event_id, join_code, op_call, band, mode, minutes, starts_at, planned_freq, note,
+          station_number } = body;
 
   if ((!event_id && !join_code) || !op_call || !band || !mode) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
@@ -80,14 +82,16 @@ export async function POST(request: Request) {
   const pool = getPool();
   const event = await loadEvent(pool, { event_id, join_code });
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
-  if (event.event_type !== 'SES') {
-    return NextResponse.json(
-      { error: 'Call checkout only applies to special event stations' },
-      { status: 400 }
-    );
-  }
+  // Contests coordinate the same way. Field Day has the same
+  // one-signal-per-band-per-mode rule, and a 3A club running three
+  // transmitters has exactly the problem this already solves — the difference
+  // is only who holds a slot: an operator for a special event, a station for a
+  // contest.
+  const isSes = event.event_type === 'SES';
 
   const opCall = op_call.toUpperCase().trim();
+  // NULL for a special event, where the operator is the holder.
+  const stationNumber = isSes ? null : Math.max(1, parseInt(String(station_number ?? 1), 10) || 1);
   const start = starts_at ? new Date(starts_at) : new Date();
   if (isNaN(start.getTime())) {
     return NextResponse.json({ error: 'Invalid starts_at' }, { status: 400 });
@@ -97,10 +101,11 @@ export async function POST(request: Request) {
 
   try {
     const { rows } = await pool.query(
-      `INSERT INTO ses_reservations (event_id, op_call, band, mode, during, planned_freq, note)
-       VALUES ($1, $2, $3, $4, tstzrange($5, $6, '[)'), $7, $8)
+      `INSERT INTO ses_reservations (event_id, op_call, band, mode, during, planned_freq, note, station_number)
+       VALUES ($1, $2, $3, $4, tstzrange($5, $6, '[)'), $7, $8, $9)
        RETURNING ${RESERVATION_COLUMNS}`,
-      [event.id, opCall, band, mode, start, end, planned_freq?.trim() || null, note?.trim() || null]
+      [event.id, opCall, band, mode, start, end, planned_freq?.trim() || null, note?.trim() || null,
+       stationNumber]
     );
     return NextResponse.json(rows[0], { status: 201 });
   } catch (err) {
@@ -109,8 +114,8 @@ export async function POST(request: Request) {
       return NextResponse.json(
         {
           error: holder
-            ? `${holder.op_call} already holds ${band} ${mode} until ${formatSlotEnd(holder.ends_at)}`
-            : `${band} ${mode} is already checked out for that window`,
+            ? `${describeHolder(holder)} already holds ${band} ${mode} until ${formatSlotEnd(holder.ends_at)}`
+            : `${band} ${mode} is already claimed for that window`,
           holder,
         },
         { status: 409 }

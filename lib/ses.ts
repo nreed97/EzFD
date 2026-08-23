@@ -13,6 +13,7 @@ export const UPCOMING_WINDOW_HOURS = 48;
  *  can test overlap directly; clients want two plain timestamps instead. */
 export const RESERVATION_COLUMNS = `
   id, event_id, op_call, band, mode, planned_freq, note, status, created_at,
+  station_number,
   lower(during) AS starts_at,
   upper(during) AS ends_at
 `;
@@ -125,7 +126,26 @@ export interface SlotCheck {
   reason?: string;
 }
 
-/** Check whether an operator holds the call for a band/mode.
+/** How a slot's holder reads to an operator.
+ *
+ *  A special event slot is held by a person — one operator has the club call
+ *  on that band and mode. A contest slot is held by a *station*: on Field Day
+ *  station 2 holds 20m phone regardless of who is sitting at it, and
+ *  operators rotate through stations across the weekend. Naming the operator
+ *  there would be actively misleading, since the person changes and the
+ *  claim doesn't. */
+export function describeHolder(holder: { op_call: string; station_number?: number | null }): string {
+  return holder.station_number != null
+    ? `Station ${holder.station_number}`
+    : holder.op_call;
+}
+
+/** Check whether the caller holds the slot for a band/mode.
+ *
+ *  `stationNumber` is the caller's station on a contest event, and null on a
+ *  special event — matching how the holder is recorded. Passing it is what
+ *  lets an operator who moved from station 1 to station 2 log on station 2's
+ *  slot without re-claiming it.
  *
  *  Note this is only ever advisory input to the caller: under SOFT
  *  enforcement the QSO is logged anyway, and replayed QSOs from the offline
@@ -136,17 +156,30 @@ export async function checkSlot(
   eventId: string,
   opCall: string,
   band: Band | string,
-  mode: Mode | string
+  mode: Mode | string,
+  stationNumber: number | null = null,
+  requireClaim = true
 ): Promise<SlotCheck> {
   const holder = await currentHolder(pool, eventId, band, mode);
   if (!holder) {
+    // On a special event the checkout is the point: transmitting on a band
+    // nobody holds is the thing being coordinated, so an unheld slot is a
+    // finding. On a contest, claiming a station's band is opt-in — a club
+    // that never uses the schedule must not be warned on every single QSO.
+    if (!requireClaim) return { ok: true };
     return { ok: false, reason: `Nobody has checked out ${band} ${mode} right now.` };
   }
-  if (holder.op_call !== opCall.toUpperCase().trim()) {
+
+  // A contest slot belongs to a station; a special event slot to an operator.
+  const mine = holder.station_number != null
+    ? holder.station_number === stationNumber
+    : holder.op_call === opCall.toUpperCase().trim();
+
+  if (!mine) {
     return {
       ok: false,
-      heldBy: holder.op_call,
-      reason: `${holder.op_call} holds ${band} ${mode} until ${formatSlotEnd(holder.ends_at)}.`,
+      heldBy: describeHolder(holder),
+      reason: `${describeHolder(holder)} holds ${band} ${mode} until ${formatSlotEnd(holder.ends_at)}.`,
     };
   }
   return { ok: true };

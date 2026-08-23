@@ -543,20 +543,24 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
             existingQSOs={confirmedQSOs}
             bandOccupancy={bandOccupancy}
           />
-          {isSes && (
-            <SesCoordination
-              eventId={event.id}
-              myOpCall={operatorCall}
-              currentBand={currentBand}
-              currentMode={currentMode}
-              slotMinutes={event.slot_minutes ?? 120}
-              eventStartsAt={event.starts_at}
-              eventEndsAt={event.ends_at}
-              refreshToken={reservationVersion}
-              lastQsoAt={myLastQsoAt}
-              onHoldingChange={handleHoldingChange}
-            />
-          )}
+          {/* Contests get the same panel. Field Day has the same
+              one-signal-per-band-per-mode rule and a multi-transmitter club
+              has exactly this coordination problem — the difference is that
+              the holder is the station rather than the operator, so it reads
+              as a station schedule rather than a call checkout. */}
+          <SesCoordination
+            eventId={event.id}
+            myOpCall={operatorCall}
+            stationNumber={isSes ? null : stationNumber}
+            currentBand={currentBand}
+            currentMode={currentMode}
+            slotMinutes={event.slot_minutes ?? 120}
+            eventStartsAt={event.starts_at}
+            eventEndsAt={event.ends_at}
+            refreshToken={reservationVersion}
+            lastQsoAt={myLastQsoAt}
+            onHoldingChange={handleHoldingChange}
+          />
           <BandActivity
             eventId={event.id}
             myOpCall={operatorCall}
