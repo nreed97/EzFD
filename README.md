@@ -7,6 +7,11 @@ Every operator logs into one shared log. Every QSO appears on every other
 device within milliseconds. When the network drops — and at a Field Day site
 it will — logging carries on locally and syncs when it comes back.
 
+🚀 **Just operating?** [Quick start](docs/quick-start.md) — you have a join
+code and a radio, and five minutes. **Setting the event up?**
+[Getting started](docs/getting-started.md) covers install through to the
+final backup.
+
 📖 **[Full documentation](docs/)** — and the same guides ship inside the app,
 so they work on a field server with no internet.
 
@@ -87,6 +92,12 @@ date-filtered ADIF slices.
   <sub>One event type for Field Day, Winter Field Day, or a special event station</sub>
 </td>
 </tr>
+<tr>
+<td width="50%" colspan="2">
+  <img src="docs/images/checkout-board.png" alt="The checkout board: a timeline of who is on before and after, and the live band/mode grid"><br>
+  <sub>The checkout board — a timeline of who's on before and after, and a live band/mode grid to claim from</sub>
+</td>
+</tr>
 </table>
 
 ---
@@ -123,6 +134,9 @@ $ npm run dev
 ---
 
 ## Documentation
+
+**Operating**
+[Quick start](docs/quick-start.md)
 
 **Running an event**
 [Getting started](docs/getting-started.md) ·

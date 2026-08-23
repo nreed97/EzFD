@@ -6,11 +6,17 @@ shared log, and every QSO appears on every other device within milliseconds.
 
 Start with whichever describes you.
 
+## I'm just here to operate
+
+| Guide | What it covers |
+|---|---|
+| [Quick start](quick-start.md) | You have a join code and a radio. Nothing to install, nothing to administer |
+
 ## I want to run an event
 
 | Guide | What it covers |
 |---|---|
-| [Getting started](getting-started.md) | From nothing to a logged QSO |
+| [Getting started](getting-started.md) | From an empty server to a logged QSO — install included |
 | [Operating](operating.md) | The logging screen in depth — entry, QSY, dupes, offline |
 | [Field Day](field-day.md) | Classes, the exchange, scoring, bonuses, submitting your entry |
 | [Special event stations](special-events.md) | One callsign across many operators, and how the checkout works |
