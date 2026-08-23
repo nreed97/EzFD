@@ -491,6 +491,28 @@ else
   no "  screenshots referenced by the guides are served"
 fi
 
+# The quick starts are the front door for anyone who isn't running the server,
+# so they get their own assertion rather than relying on the index listing them.
+QS=$(req GET /docs/quick-start-operating)
+if [[ "$QS" == *"Quick start"* && "$QS" == *"join code"* ]]; then
+  ok "  the operating quick start renders"
+else
+  no "  the operating quick start renders"
+fi
+INDEX=$(req GET /docs)
+if [[ "$INDEX" == *"handed a join code"* && "$INDEX" == *"Setting up the log for your club"* ]]; then
+  ok "  both quick starts are listed on the docs index"
+else
+  no "  both quick starts are listed on the docs index"
+fi
+
+# The checkout board screenshot is referenced from the special event guide.
+if [[ "$(curl -s -o /dev/null -w '%{content_type}' "$BASE/docs/images/checkout-board.png")" == "image/png" ]]; then
+  ok "  the checkout board screenshot is served"
+else
+  no "  the checkout board screenshot is served"
+fi
+
 # The slug reaches the filesystem, so it must not be able to leave docs/.
 if [[ "$(status GET "/docs/images/..%2f..%2fpackage.json")" == "404" ]]; then
   ok "  a traversal attempt on the docs images is refused"

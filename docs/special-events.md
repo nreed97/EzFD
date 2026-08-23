@@ -72,6 +72,28 @@ slots would let the system bless two signals on one band and mode, which the
 rules generally forbid. The `planned_freq` field records an intended frequency
 for humans to read and carries no exclusivity.
 
+### The whole schedule, on the dashboard
+
+The panel above is one operator's view of their own slot. The dashboard has a
+**Checkouts** tab with the schedule for the entire event.
+
+![The checkout board: a timeline of who is on before and after, and the live band/mode grid](images/checkout-board.png)
+
+The top half is a timeline of who holds what, running from before now to after
+— switchable between 6, 12 and 24 hours, with a marker for the current moment,
+so a coordinator can see both what is on the air and what has been booked
+ahead. The bottom half is the live grid: every band against every mode, with
+the current holder and their expiry, and **+ Take** on anything free.
+
+Claiming and releasing work the same here as in the logging panel, against the
+same constraint — this is a second view of one set of reservations, not a
+second mechanism.
+
+The Checkouts tab appears on special events only. Contests can claim band and
+mode slots too since #21, but they do it from the logging panel; the board
+labels holders by callsign, which is right for a special event and wrong for a
+contest, where a slot belongs to a station rather than a person.
+
 ### Staying on past your slot
 
 A slot within 10 minutes of expiring extends automatically — but only for an

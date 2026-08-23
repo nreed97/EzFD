@@ -6,11 +6,20 @@ shared log, and every QSO appears on every other device within milliseconds.
 
 Start with whichever describes you.
 
+## Just tell me what to do
+
+Short, task-shaped, no server administration.
+
+| Guide | What it covers |
+|---|---|
+| [Quick start: operating](quick-start-operating.md) | You were handed a join code and sat at a radio |
+| [Quick start: running an event](quick-start-event.md) | Setting up the log for your club, and closing it out |
+
 ## I want to run an event
 
 | Guide | What it covers |
 |---|---|
-| [Getting started](getting-started.md) | From nothing to a logged QSO |
+| [Getting started](getting-started.md) | From an empty server to a logged QSO — install included |
 | [Operating](operating.md) | The logging screen in depth — entry, QSY, dupes, offline |
 | [Field Day](field-day.md) | Classes, the exchange, scoring, bonuses, submitting your entry |
 | [Special event stations](special-events.md) | One callsign across many operators, and how the checkout works |
