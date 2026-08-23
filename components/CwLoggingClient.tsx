@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStoredFlag } from '@/lib/useStoredFlag';
 import { applyQsoEvent } from '@/lib/qsoStream';
 import { useRigBridge } from '@/lib/useRigBridge';
+import { useQsoQueue } from '@/lib/useQsoQueue';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
 import QSOForm, { type QSOFormHandle } from './QSOForm';
 import CwMacroPanel, { type CwMacroPanelHandle } from './CwMacroPanel';
@@ -24,6 +25,22 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
   const [lastLogged, setLastLogged] = useState<DisplayQSO | null>(null);
   const formRef = useRef<QSOFormHandle>(null);
   const macroPanelRef = useRef<CwMacroPanelHandle>(null);
+  // The same offline queue the main tab uses. Before this, the CW window
+  // POSTed straight to /api/qso with no local copy, so a server outage during
+  // a run destroyed contacts: the fetch failed, QSOForm cleared the fields
+  // anyway, and nothing remembered them. CW running is the highest-rate
+  // operating this app supports, which made it the worst place for it.
+  const {
+    submit: submitQSO, flush: flushQueue, noteReconnect,
+    pendingCount, isOnline,
+  } = useQsoQueue({
+    eventId: event.id,
+    sentClass: event.class,
+    sentSection: event.arrl_section,
+    operatorCall,
+    stationNumber,
+  });
+
 
   const esmStorageKey = `ezfd_cw_esm_${event.id}_${operatorCall}`;
   // Defaults to on, as before, and now also stays in step with the main
@@ -51,9 +68,18 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
       const { op, record } = JSON.parse(e.data) as { op: string; record: QSO };
       setConfirmedQSOs(prev => applyQsoEvent(prev, op, record, true));
     });
-    es.onerror = () => { /* browser auto-reconnects SSE */ };
+    // A reconnect is the earliest evidence the server is back — navigator
+    // .onLine says nothing about it, since this machine's link stays up across
+    // a server restart, an nginx reload or a 502.
+    let dropped = false;
+    es.onerror = () => { dropped = true; /* browser auto-reconnects SSE */ };
+    es.onopen = () => {
+      if (!dropped) return;   // the initial connect is not a recovery
+      dropped = false;
+      noteReconnect();
+    };
     return () => es.close();
-  }, [event.id]);
+  }, [event.id, noteReconnect]);
 
   const logQSO = useCallback(async (data: {
     callsign: string; band: Band; mode: Mode;
@@ -62,34 +88,21 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
     setSubmitting(true);
     setSubmitError(null);
     try {
-      const res = await fetch('/api/qso', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          event_id: event.id,
-          callsign: data.callsign,
-          band: data.band,
-          mode: data.mode,
-          rcvd_class: data.rcvd_class,
-          rcvd_section: data.rcvd_section,
-          operator_call: operatorCall,
-          station_number: stationNumber,
-        }),
-      });
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({})) as { error?: string };
-        setSubmitError(body.error ?? `Server error ${res.status}`);
-        return;
+      // Queued to localStorage before the network is touched, so a failure
+      // here leaves the contact on disk instead of losing it. QSOForm clears
+      // the fields either way, which is only safe because of this.
+      const { qso, queued, error } = await submitQSO(data);
+      setLastLogged(queued);
+      if (qso) {
+        setConfirmedQSOs(prev => prev.some(q => q.id === qso.id) ? prev : [qso, ...prev]);
+        setLastLogged(qso as DisplayQSO);
+      } else if (error) {
+        setSubmitError(error);
       }
-      const qso = await res.json() as QSO;
-      setConfirmedQSOs(prev => prev.some(q => q.id === qso.id) ? prev : [qso, ...prev]);
-      setLastLogged(qso as DisplayQSO);
-    } catch (err) {
-      setSubmitError(err instanceof Error ? err.message : 'Network error');
     } finally {
       setSubmitting(false);
     }
-  }, [event.id, operatorCall, stationNumber]);
+  }, [submitQSO]);
 
   return (
     <div className="night-scope flex h-screen flex-col overflow-hidden bg-zinc-950 text-zinc-100">
@@ -98,6 +111,22 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
           <span className="font-bold text-amber-400 text-sm shrink-0">{event.club_call}</span>
           <span className="text-zinc-600">|</span>
           <span className="font-mono text-xs text-zinc-300">{operatorCall}</span>
+          {!isOnline && (
+            <span className="rounded bg-red-900/50 border border-red-700 px-1.5 py-0.5 text-[10px] font-semibold text-red-400 shrink-0">
+              OFFLINE
+            </span>
+          )}
+          {/* A queued contact has to be visible here. The whole failure this
+              fixes was contacts that existed nowhere the operator could see. */}
+          {pendingCount > 0 && (
+            <button
+              type="button"
+              onClick={flushQueue}
+              className="rounded bg-yellow-900/50 border border-yellow-700 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-400 hover:bg-yellow-900 shrink-0"
+            >
+              {pendingCount} pending{isOnline ? ' ↑' : ''}
+            </button>
+          )}
         </div>
         {rig.connected ? (
           <span className="inline-flex items-center gap-1.5 rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-400">
