@@ -375,6 +375,98 @@ else
   no "  a missing payload is refused"
 fi
 
+# ── QSO audit trail and soft delete ──────────────────────────────────────────
+#
+# There is no authentication here — anyone with the join code can edit or
+# delete any contact — so the log needs to be able to answer "what happened to
+# that QSO?". The risk in soft delete is a read path that forgets the filter,
+# which is how a deleted contact reappears in a submission.
+echo "── audit trail ──"
+
+AUD=$(req POST /api/events '{"club_name":"Audit","club_call":"W0AUD","event_type":"FD","class":"1A","arrl_section":"MN","power":"LOW"}' | jq_get join_code)
+AUD_ID=$(req GET "/api/events/$AUD" | jq_get id)
+AQ1=$(req POST /api/qso "{\"event_id\":\"$AUD_ID\",\"callsign\":\"K1KEEP\",\"band\":\"20m\",\"mode\":\"CW\",\"rcvd_class\":\"1A\",\"rcvd_section\":\"EPA\",\"operator_call\":\"W0AAA\"}" | jq_get id)
+AQ2=$(req POST /api/qso "{\"event_id\":\"$AUD_ID\",\"callsign\":\"K2GONE\",\"band\":\"40m\",\"mode\":\"CW\",\"rcvd_class\":\"1A\",\"rcvd_section\":\"MDC\",\"operator_call\":\"W0AAA\"}" | jq_get id)
+
+# An edit stamps who claimed to make it.
+req PATCH "/api/qso/$AQ1" '{"callsign":"K1KEPT","band":"20m","mode":"CW","rcvd_class":"1A","rcvd_section":"EPA","operator_call":"W0BBB"}' > /dev/null
+EDITED=$(req GET "/api/qso?event_id=$AUD_ID")
+if [[ "$EDITED" == *"W0BBB"* && "$EDITED" == *"K1KEPT"* ]]; then
+  ok "  an edit records updated_by"
+else
+  no "  an edit records updated_by"
+fi
+
+# Delete, then confirm it is gone from every live view.
+req DELETE "/api/qso/$AQ2?operator_call=W0CCC" > /dev/null
+LIVE=$(req GET "/api/qso?event_id=$AUD_ID")
+if [[ "$LIVE" != *"K2GONE"* ]]; then
+  ok "  a deleted contact leaves the live log"
+else
+  no "  a deleted contact leaves the live log"
+fi
+if [[ "$(req GET "/api/export/$AUD")" != *"K2GONE"* ]]; then
+  ok "  and the ADIF export"
+else
+  no "  and the ADIF export — a deleted contact would be submitted"
+fi
+if [[ "$(req GET "/api/export/$AUD?format=cabrillo")" != *"K2GONE"* ]]; then
+  ok "  and the Cabrillo submission"
+else
+  no "  and the Cabrillo submission — a deleted contact would be submitted"
+fi
+# 2 CW QSOs = 4 pts x2 (LOW) = 8; with one deleted it must be 4.
+CLAIMED=$(req GET "/api/export/$AUD?format=cabrillo" | sed -n 's/^CLAIMED-SCORE: //p')
+if [[ "$CLAIMED" == "4" ]]; then
+  ok "  and the score"
+else
+  no "  and the score" "CLAIMED-SCORE=$CLAIMED, expected 4"
+fi
+
+# But the full-event backup keeps it — an audit trail a backup drops is none.
+BACKUP=$(req GET "/api/export/$AUD?format=json")
+if [[ "$BACKUP" == *"K2GONE"* && "$BACKUP" == *"W0CCC"* ]]; then
+  ok "  the backup keeps it, with who deleted it"
+else
+  no "  the backup keeps it, with who deleted it"
+fi
+
+# The recovery path a hard delete never had.
+DELETED_LIST=$(req GET "/api/qso?event_id=$AUD_ID&deleted=1")
+if [[ "$DELETED_LIST" == *"K2GONE"* && "$DELETED_LIST" != *"K1KEPT"* ]]; then
+  ok "  the deleted list shows it and nothing else"
+else
+  no "  the deleted list shows it and nothing else"
+fi
+req POST "/api/qso/$AQ2" '{"operator_call":"W0DDD"}' > /dev/null
+if [[ "$(req GET "/api/qso?event_id=$AUD_ID")" == *"K2GONE"* ]]; then
+  ok "  restoring puts it back in the live log"
+else
+  no "  restoring puts it back in the live log"
+fi
+if [[ "$(req GET "/api/qso?event_id=$AUD_ID&deleted=1")" != *"K2GONE"* ]]; then
+  ok "  and out of the deleted list"
+else
+  no "  and out of the deleted list"
+fi
+
+# A deleted contact must not block re-logging the same station: it is not in
+# the log any more, so it cannot be what makes a new contact a dupe.
+req DELETE "/api/qso/$AQ2" > /dev/null
+REDUPE=$(req POST /api/qso "{\"event_id\":\"$AUD_ID\",\"callsign\":\"K2GONE\",\"band\":\"40m\",\"mode\":\"CW\",\"rcvd_class\":\"1A\",\"rcvd_section\":\"MDC\",\"operator_call\":\"W0AAA\"}")
+if [[ "$(echo "$REDUPE" | jq_get is_dupe)" == "False" ]]; then
+  ok "  a deleted contact does not make a re-log a dupe"
+else
+  no "  a deleted contact does not make a re-log a dupe"
+fi
+
+# Deleting twice is not an error — two operators can press it at once.
+if [[ "$(status DELETE "/api/qso/$AQ2")" == "200" ]]; then
+  ok "  deleting an already-deleted contact is not an error"
+else
+  no "  deleting an already-deleted contact is not an error"
+fi
+
 # ── Server clock endpoint ────────────────────────────────────────────────────
 #
 # The clock-skew banner is only as good as this endpoint. A field server with

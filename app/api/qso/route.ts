@@ -118,12 +118,19 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-  const eventId = new URL(request.url).searchParams.get('event_id');
+  const url = new URL(request.url);
+  const eventId = url.searchParams.get('event_id');
   if (!eventId) return NextResponse.json({ error: 'event_id required' }, { status: 400 });
+
+  // ?deleted=1 asks for the soft-deleted contacts instead of the live log —
+  // the recovery view. Everything else sees only live rows.
+  const wantDeleted = url.searchParams.get('deleted') === '1';
 
   const pool = getPool();
   const { rows } = await pool.query(
-    'SELECT * FROM qsos WHERE event_id=$1 ORDER BY datetime_utc DESC',
+    wantDeleted
+      ? 'SELECT * FROM qsos WHERE event_id=$1 AND deleted_at IS NOT NULL ORDER BY deleted_at DESC'
+      : 'SELECT * FROM qsos WHERE event_id=$1 AND deleted_at IS NULL ORDER BY datetime_utc DESC',
     [eventId]
   );
   return NextResponse.json(rows);

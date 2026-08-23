@@ -23,7 +23,7 @@ export default async function CwPage({
   if (!op) redirect(`/event/${code}`);
 
   const { rows: qsos } = await pool.query(
-    'SELECT * FROM qsos WHERE event_id=$1 ORDER BY datetime_utc DESC LIMIT 50',
+    'SELECT * FROM qsos WHERE event_id=$1 AND deleted_at IS NULL ORDER BY datetime_utc DESC LIMIT 50',
     [evRows[0].id]
   );
 

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStoredFlag } from '@/lib/useStoredFlag';
+import { applyQsoEvent } from '@/lib/qsoStream';
 import { useRigBridge } from '@/lib/useRigBridge';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
 import QSOForm, { type QSOFormHandle } from './QSOForm';
@@ -48,13 +49,7 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
     const es = new EventSource(`/api/realtime/${event.id}`);
     es.addEventListener('qso', (e: MessageEvent) => {
       const { op, record } = JSON.parse(e.data) as { op: string; record: QSO };
-      if (op === 'INSERT') {
-        setConfirmedQSOs(prev => prev.some(q => q.id === record.id) ? prev : [record, ...prev]);
-      } else if (op === 'UPDATE') {
-        setConfirmedQSOs(prev => prev.map(q => q.id === record.id ? record : q));
-      } else if (op === 'DELETE') {
-        setConfirmedQSOs(prev => prev.filter(q => q.id !== record.id));
-      }
+      setConfirmedQSOs(prev => applyQsoEvent(prev, op, record, true));
     });
     es.onerror = () => { /* browser auto-reconnects SSE */ };
     return () => es.close();

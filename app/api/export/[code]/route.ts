@@ -25,7 +25,10 @@ export async function GET(request: Request, { params }: { params: Promise<{ code
   const event = evRows[0];
   const isSes = event.event_type === 'SES';
 
-  const conditions = ['event_id = $1'];
+  // A deleted contact must never reach a submission. The full-event JSON
+  // export is different — it keeps them, because a backup that drops the
+  // audit trail isn't one.
+  const conditions = ['event_id = $1', 'deleted_at IS NULL'];
   const values: unknown[] = [event.id];
   if (opFilter) {
     values.push(opFilter);

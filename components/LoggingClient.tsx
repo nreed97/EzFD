@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
 import { useRigBridge } from '@/lib/useRigBridge';
 import { enqueue, dequeue, loadQueue, type PendingQSO } from '@/lib/offline-queue';
+import { applyQsoEvent } from '@/lib/qsoStream';
 import { ARRL_SECTIONS } from '@/lib/types';
 import type { Event, QSO, Band, Mode, DisplayQSO, SesReservation } from '@/lib/types';
 import type { QSOSubmission } from './QSOForm';
@@ -169,13 +170,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
     es.addEventListener('qso', (e: MessageEvent) => {
       const { op, record } = JSON.parse(e.data) as { op: string; record: QSO };
-      if (op === 'INSERT') {
-        setConfirmedQSOs(prev => prev.some(q => q.id === record.id) ? prev : [record, ...prev]);
-      } else if (op === 'UPDATE') {
-        setConfirmedQSOs(prev => prev.map(q => q.id === record.id ? record : q));
-      } else if (op === 'DELETE') {
-        setConfirmedQSOs(prev => prev.filter(q => q.id !== record.id));
-      }
+      setConfirmedQSOs(prev => applyQsoEvent(prev, op, record, true));
     });
 
     // Call checkouts arrive on the same stream (the realtime route LISTENs on
@@ -295,7 +290,8 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       setPendingCount(prev => Math.max(0, prev - 1));
       return;
     }
-    await fetch(`/api/qso/${id}`, { method: 'DELETE' });
+    // The actor rides along so the audit trail records who claimed to do it.
+    await fetch(`/api/qso/${id}?operator_call=${encodeURIComponent(operatorCall)}`, { method: 'DELETE' });
     setConfirmedQSOs(prev => prev.filter(q => q.id !== id));
   }, [event.id]);
 
@@ -589,7 +585,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
         </aside>
 
         <main className={`${mobileTab === 'qsos' ? 'flex flex-col' : 'hidden'} md:flex md:flex-col flex-1 overflow-hidden`}>
-          <QSOTable qsos={displayQSOs} onDelete={deleteQSO} onUpdate={updateQSO} currentOpCall={operatorCall} />
+          <QSOTable qsos={displayQSOs} onDelete={deleteQSO} onUpdate={updateQSO} currentOpCall={operatorCall} eventId={event.id} />
         </main>
       </div>
 

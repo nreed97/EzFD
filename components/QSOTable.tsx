@@ -16,6 +16,9 @@ interface Props {
   onDelete: (id: string, localId?: string) => void;
   onUpdate: (qso: QSO) => void;
   currentOpCall: string;
+  /** The event's soft-deleted contacts, fetched on demand. Undefined until
+   *  the operator asks to see them. */
+  eventId?: string;
 }
 
 function formatUTC(iso: string | Date) {
@@ -47,9 +50,11 @@ interface EditModalProps {
   qso: DisplayQSO;
   onSave: (updated: QSO) => void;
   onClose: () => void;
+  /** Recorded as updated_by — self-asserted, like every identity here. */
+  currentOpCall: string;
 }
 
-function EditModal({ qso, onSave, onClose }: EditModalProps) {
+function EditModal({ qso, onSave, onClose, currentOpCall }: EditModalProps) {
   const [callsign, setCallsign] = useState(qso.callsign);
   const [band, setBand] = useState<Band>(qso.band);
   const [mode, setMode] = useState<Mode>(qso.mode);
@@ -66,7 +71,8 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
       const res = await fetch(`/api/qso/${qso.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ callsign, band, mode, rcvd_class: rcvdClass, rcvd_section: rcvdSection }),
+        body: JSON.stringify({
+          operator_call: currentOpCall, callsign, band, mode, rcvd_class: rcvdClass, rcvd_section: rcvdSection }),
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({})) as { error?: string };
@@ -190,8 +196,41 @@ function EditModal({ qso, onSave, onClose }: EditModalProps) {
 // ---------------------------------------------------------------------------
 // Main table
 // ---------------------------------------------------------------------------
-export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall }: Props) {
+export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, eventId }: Props) {
   const [editingQSO, setEditingQSO] = useState<DisplayQSO | null>(null);
+  // Deleted contacts are fetched only when asked for: they're the exception,
+  // and loading them with every render would put a query on the hot path of
+  // the logger for a panel almost nobody opens.
+  const [showDeleted, setShowDeleted] = useState(false);
+  const [deleted, setDeleted] = useState<QSO[] | null>(null);
+  const [restoring, setRestoring] = useState<string | null>(null);
+
+  async function loadDeleted() {
+    if (!eventId) return;
+    const res = await fetch(`/api/qso?event_id=${eventId}&deleted=1`).catch(() => null);
+    if (res?.ok) setDeleted(await res.json());
+  }
+
+  async function toggleDeleted() {
+    const next = !showDeleted;
+    setShowDeleted(next);
+    if (next) await loadDeleted();
+  }
+
+  async function restore(id: string) {
+    setRestoring(id);
+    const res = await fetch(`/api/qso/${id}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ operator_call: currentOpCall }),
+    }).catch(() => null);
+    setRestoring(null);
+    if (res?.ok) {
+      // The restored row arrives in every open window over SSE; drop it from
+      // the deleted list here so this one agrees immediately.
+      setDeleted(prev => (prev ?? []).filter(q => q.id !== id));
+    }
+  }
 
   function handleUpdate(updated: QSO) {
     onUpdate(updated);
@@ -201,7 +240,7 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall }: Pr
   return (
     <>
       {editingQSO && (
-        <EditModal qso={editingQSO} onSave={handleUpdate} onClose={() => setEditingQSO(null)} />
+        <EditModal qso={editingQSO} onSave={handleUpdate} onClose={() => setEditingQSO(null)} currentOpCall={currentOpCall} />
       )}
 
       <div className="h-full overflow-auto">
@@ -292,6 +331,58 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall }: Pr
             )}
           </tbody>
         </table>
+
+        {/* Deleted contacts. A hard delete left no recovery path at all — an
+            operator who removed the wrong QSO at 3 AM had nothing to go back
+            to, and a contact missing from the log was indistinguishable from
+            one never logged. */}
+        {eventId && (
+          <div className="border-t border-zinc-800 px-3 py-2 light:border-zinc-200">
+            <button
+              onClick={toggleDeleted}
+              className="text-xs text-zinc-600 hover:text-zinc-300 light:text-zinc-400 light:hover:text-zinc-700 transition-colors"
+            >
+              {showDeleted ? '▾' : '▸'} Deleted contacts
+              {deleted !== null && ` (${deleted.length})`}
+            </button>
+
+            {showDeleted && (
+              deleted === null ? (
+                <p className="py-2 text-xs text-zinc-600">Loading…</p>
+              ) : deleted.length === 0 ? (
+                <p className="py-2 text-xs text-zinc-600 light:text-zinc-400">
+                  Nothing has been deleted from this log.
+                </p>
+              ) : (
+                <table className="mt-2 w-full text-xs">
+                  <tbody>
+                    {deleted.map(q => (
+                      <tr key={q.id} className="border-b border-zinc-900 last:border-0 light:border-zinc-100">
+                        <td className="py-1 pr-2 font-mono text-zinc-500">{formatUTC(q.datetime_utc)}</td>
+                        <td className="py-1 pr-2 font-mono text-zinc-400 light:text-zinc-600">{q.callsign}</td>
+                        <td className="py-1 pr-2 text-zinc-600">{q.band} {q.mode}</td>
+                        <td className="py-1 pr-2 text-zinc-600">
+                          {q.deleted_by ? `deleted by ${q.deleted_by}` : 'deleted'}
+                          {q.deleted_at ? ` · ${formatUTC(q.deleted_at)}` : ''}
+                        </td>
+                        <td className="py-1 text-right">
+                          <button
+                            onClick={() => restore(q.id)}
+                            disabled={restoring === q.id}
+                            className="text-amber-500 hover:text-amber-300 disabled:opacity-50 light:text-amber-700"
+                            title="Put this contact back in the log"
+                          >
+                            {restoring === q.id ? '…' : 'Restore'}
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )
+            )}
+          </div>
+        )}
       </div>
     </>
   );
