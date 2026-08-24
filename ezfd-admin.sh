@@ -14,6 +14,9 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 
 hr()    { echo -e "${DIM}────────────────────────────────────────────────────────────────${NC}"; }
+# hr() is a fixed 64 columns, which is narrower than the event table's header
+# and left the rule stopping short of the last three columns.
+rule()  { local n="${1:-64}" line=""; printf -v line '%*s' "$n" ''; echo -e "${DIM}${line// /─}${NC}"; }
 hr2()   { echo -e "${BOLD}════════════════════════════════════════════════════════════════${NC}"; }
 label() { printf "  ${BOLD}%-22s${NC}" "$1"; }
 log()   { echo -e "  ${GREEN}[✓]${NC} $*"; }
@@ -659,6 +662,9 @@ page_size() {
   printf '%s' "$size"
 }
 
+# Width of the event table's printf format above, so its rule matches it.
+TABLE_W=79
+
 list_events() {
   local page=1 filter=""
   while true; do
@@ -703,7 +709,7 @@ list_events() {
 
     printf "  ${BOLD}%3s  %-8s  %-24s %-4s %-4s  %-5s  %6s  %5s  %4s${NC}\n" \
       "#" "Code" "Club" "Type" "Pwr" "Class" "QSOs" "Dupes" "Ops"
-    hr
+    rule "$TABLE_W"
 
     # Only the rows on this page are parsed and printed; the page number is
     # what the operator types, so it restarts at 1 on every page.
@@ -722,7 +728,7 @@ list_events() {
       n=$(( n + 1 ))
     done
 
-    hr
+    rule "$TABLE_W"
     if [[ "$pages" -gt 1 ]]; then
       echo -e "  ${DIM}Showing $(( first + 1 ))–$(( last + 1 )) of ${total}  ·  page ${page}/${pages}${NC}"
     else

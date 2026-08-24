@@ -61,6 +61,9 @@ The event requires roster approval and this operator is pending. A coordinator
 approves them in the admin console: **List / manage events** → open the event
 → **Manage operator roster** → **Toggle approval**.
 
+At the event list, type the join code to open it straight away rather than
+finding its row — the operator asking you can read it to you.
+
 ## "This server's clock is N ahead of / behind this device"
 
 The server and the browser disagree about the time by more than a minute. QSOs
@@ -88,6 +91,11 @@ Deleted contacts leave the live log, the ADIF and Cabrillo exports and the
 score immediately, so a deletion still does what it looks like — it just isn't
 final any more. The full-event JSON backup keeps them, so a backup taken after
 a deletion can still account for it.
+
+The one action that *is* final is the admin console's **Delete ALL QSOs**,
+which really does remove every row for the event, deleted ones included — it
+says how many of each before asking you to confirm. Nothing restores those.
+See [Administration](administration.md#deleted-contacts-and-these-two-actions).
 
 One thing this cannot tell you: operator identity here is a callsign typed at
 join time, not a verified login. `deleted by W0AAA` records who *claimed* to
@@ -178,15 +186,42 @@ prefill degraded. Upstream was slow or unreachable.
 
 ## Restore fails or loses data
 
-Both known failure modes are fixed, but if you're running an older build:
+All three known failure modes are fixed, but if you're running an older build:
 
 - Restoring an event with **no QSOs** used to fail outright, because
   `json_agg` over zero rows serialises as JSON `null` and `COALESCE` doesn't
   catch a scalar.
 - A special event's roster used to be dropped entirely, taking the per-
   operator locations the ADIF `MY_*` fields depend on with it.
+- A **failed restore reported success**. `psql` fed a script on stdin exits
+  `0` even when a statement failed, so a restore that died on a constraint
+  violation printed *"Restore complete"* and then rendered the error text
+  through the results table.
 
-Update before relying on restore. `scripts/test-restore.sh` verifies both.
+Update before relying on restore. `scripts/test-restore.sh` verifies all
+three.
+
+### "It said Restore complete but the event isn't there"
+
+That is the third one above. The backup file is unharmed and a restore always
+creates new events, so simply update and run it again — retrying is safe. A
+current build stops and shows the error instead:
+
+```
+  [✗] Restore failed:
+ERROR:  new row for relation "qsos" violates check constraint "qsos_mode_check"
+```
+
+The same bug affected exports, which logged *"Backup complete"* over a file
+that was empty or truncated. If you hold a backup taken on an older build and
+have never restored from it, check it parses before you rely on it:
+
+```bash
+$ jq 'length' /backup/ezfd-2026-06-28.json
+```
+
+A current build deletes the partial file and reports the failure rather than
+leaving something that looks like a backup.
 
 ## Service won't start
 
