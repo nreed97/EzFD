@@ -259,6 +259,20 @@ wrapping it can tell a real failure from an empty server:
 #   || echo "EzFD backup FAILED" | mail -s "backup" admin@example.org
 ```
 
+### Database-level
+
+```bash
+# sudo -u postgres pg_dump ezfd | gzip > /backup/ezfd-$(date +%F).sql.gz
+```
+
+Restore with:
+
+```bash
+# sudo -u postgres psql -c "DROP DATABASE ezfd;"
+# sudo -u postgres psql -c "CREATE DATABASE ezfd;"
+# gunzip -c /backup/ezfd-2026-06-28.sql.gz | sudo -u postgres psql -d ezfd
+```
+
 ### When an export fails
 
 Every export path — CSV, per-event JSON, **Full JSON backup** and `--json` —
@@ -273,20 +287,6 @@ The partial file is deleted rather than left behind, because a truncated
 backup that looks like a backup is worse than no backup. These paths used to
 log success unconditionally, so a full disk still printed *"Backup complete"*
 next to a file size of zero.
-
-### Database-level
-
-```bash
-# sudo -u postgres pg_dump ezfd | gzip > /backup/ezfd-$(date +%F).sql.gz
-```
-
-Restore with:
-
-```bash
-# sudo -u postgres psql -c "DROP DATABASE ezfd;"
-# sudo -u postgres psql -c "CREATE DATABASE ezfd;"
-# gunzip -c /backup/ezfd-2026-06-28.sql.gz | sudo -u postgres psql -d ezfd
-```
 
 ## Restoring from JSON
 
