@@ -100,9 +100,16 @@ so explicitly for GOTA contacts, and it holds for all of them.
 ### Winter Field Day
 
 Winter Field Day is run by the Winter Field Day Association, not the ARRL, and
-has its own rules. The bonus values the app uses for a WFD event **have not
-been verified** against those rules — the panel says so, and you should check
-your claimed score against the current WFDA rules before submitting.
+scores by a different model — it has no bonus points and no power multiplier at
+all:
+
+```
+score = total QSO points × (Objective Multiplier + 1)
+```
+
+Objectives are ticked in the same dashboard panel, which switches to an
+**Objectives** list showing the OM each one contributes. See
+[the rules reference](rules-reference.md#winter-field-day) for the full table.
 
 ## Submitting
 

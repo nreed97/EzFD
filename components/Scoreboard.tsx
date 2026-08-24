@@ -5,9 +5,12 @@ import type { Score } from '@/lib/types';
 interface Props {
   score: Score;
   bonusPoints?: number;
+  /** Winter Field Day multiplies by objectives rather than power, and has no
+   *  bonus points at all. */
+  isWfd?: boolean;
 }
 
-export default function Scoreboard({ score, bonusPoints = 0 }: Props) {
+export default function Scoreboard({ score, bonusPoints = 0, isWfd = false }: Props) {
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-xs light:border-zinc-200 light:bg-zinc-100/50">
       <h3 className="mb-2 font-semibold text-zinc-400 uppercase tracking-wider text-[10px] light:text-zinc-500">Score</h3>
@@ -31,13 +34,17 @@ export default function Scoreboard({ score, bonusPoints = 0 }: Props) {
         <span className="text-zinc-400 light:text-zinc-600">QSO pts</span>
         <span className="font-mono text-zinc-200 light:text-zinc-800">{score.qso_points}</span>
       </div>
-      {/* Power is the only multiplier: score = QSO points × power multiplier.
-          Sections are shown because operators chase them for Worked All
-          Sections, but they must never read as part of the product — sections
-          multiplying the score was a real bug in this file's history. */}
+      {/* Exactly one multiplier is in play, and which one depends on the
+          contest: Field Day multiplies by power, Winter Field Day by its
+          Objective Multiplier + 1. Sections are shown below because operators
+          chase them, but they must never read as part of the product —
+          sections multiplying the score was a real bug in this file's
+          history, and they are not even a bonus. */}
       <div className="flex items-baseline justify-between mb-1">
-        <span className="text-zinc-400 light:text-zinc-600">× Power</span>
-        <span className="font-mono text-zinc-200 light:text-zinc-800">{score.power_multiplier}×</span>
+        <span className="text-zinc-400 light:text-zinc-600">{isWfd ? '× Objectives' : '× Power'}</span>
+        <span className="font-mono text-zinc-200 light:text-zinc-800">
+          {isWfd ? score.objective_multiplier : score.power_multiplier}×
+        </span>
       </div>
       <div className="flex items-baseline justify-between mb-1">
         <span className="text-zinc-400 light:text-zinc-600">Sections</span>

@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHandle } from 'react';
 import { useStoredFlag } from '@/lib/useStoredFlag';
 import type { Band, Mode, DisplayQSO, QSO, EventType, DupeRule } from '@/lib/types';
-import { VALID_EXCHANGES, isValidExchange } from '@/lib/types';
+import { validExchangesFor, isValidExchange } from '@/lib/types';
 
 export interface QSOFormHandle {
   getValues: () => {
@@ -53,7 +53,11 @@ const MODE_STYLE: Record<Mode, string> = {
 };
 
 const FD_CLASS_LETTERS  = new Set(['A','B','C','D','E','F']);
-const WFD_CLASS_LETTERS = new Set(['H','O','I']);
+// H home, I indoor, O outdoor, M mobile. M was missing, so every contact with
+// a mobile WFD station — "2M EPA" — drew a false "invalid class" warning. The
+// event-creation page has always offered M in its own copy of this list; two
+// copies of the same enumeration, and only one of them was right.
+const WFD_CLASS_LETTERS = new Set(['H','I','O','M']);
 
 interface Props {
   eventId: string;
@@ -311,7 +315,7 @@ function QSOForm({
   // Checked against VALID_EXCHANGES, not ARRL_SECTIONS: a station outside the
   // US and Canada correctly sends DX, and warning on it sends the operator
   // back to retype an exchange that was right the first time.
-  const sectionInvalid = rcvdSection.length > 0 && !isValidExchange(rcvdSection);
+  const sectionInvalid = rcvdSection.length > 0 && !isValidExchange(rcvdSection, eventType);
 
   return (
     <form ref={formRef} onSubmit={handleSubmit} className="flex flex-col gap-3">
@@ -489,7 +493,7 @@ function QSOForm({
             />
           </div>
           <datalist id="section-list">
-            {VALID_EXCHANGES.map(sec => <option key={sec} value={sec} />)}
+            {validExchangesFor(eventType).map(sec => <option key={sec} value={sec} />)}
           </datalist>
         </>
       ) : (
@@ -530,13 +534,13 @@ function QSOForm({
             maxLength={5}
           />
           <datalist id="section-list">
-            {VALID_EXCHANGES.map(s => <option key={s} value={s} />)}
+            {validExchangesFor(eventType).map(s => <option key={s} value={s} />)}
           </datalist>
         </div>
       </div>
       {classInvalid && (
         <p className="text-xs text-orange-400">
-          Invalid class — expected a number + {eventType === 'WFD' ? 'H, O, or I' : 'A–F'} (e.g. {eventType === 'WFD' ? '2O' : '3A'})
+          Invalid class — expected a number + {eventType === 'WFD' ? 'H, I, O, or M' : 'A–F'} (e.g. {eventType === 'WFD' ? '2O' : '3A'})
         </p>
       )}
       {sectionInvalid && (
