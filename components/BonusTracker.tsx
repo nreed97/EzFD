@@ -111,14 +111,22 @@ export default function BonusTracker({
                     className="accent-amber-400 shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
                   />
                 )}
-                <span className="truncate text-xs text-zinc-300 light:text-zinc-700">
+                {/* The panel column is narrow enough that a long label still
+                    truncates; the title keeps the full text reachable, and the
+                    summary sheet — the surface that gets transcribed onto an
+                    entry — always shows it in full. */}
+                <span
+                  title={def.rule ? `${def.label} (rule ${def.rule})` : def.label}
+                  className="truncate text-xs text-zinc-300 light:text-zinc-700"
+                >
                   {def.label}
-                  {def.rule && (
-                    <span className="ml-1 text-[10px] text-zinc-600 light:text-zinc-400">{def.rule}</span>
-                  )}
                 </span>
               </div>
+              {/* The rule number rides with the rate rather than the label:
+                  inside the label's truncating span it ate enough width to
+                  clip "Message to section manager" down to a stub. */}
               <span className="shrink-0 text-[10px] text-zinc-600 light:text-zinc-400">
+                {def.rule && <span className="mr-1.5 opacity-70">{def.rule}</span>}
                 {bonusRate(def, ctx)}
               </span>
             </div>
