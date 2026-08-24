@@ -68,10 +68,27 @@ works with a text parameter, or a range bound that returns a `Date` rather
 than a string, fails at runtime and nowhere earlier.
 
 **`scripts/test-restore.sh`** round-trips the admin console's backup and
-restore. It extracts the restore SQL from `ezfd-admin.sh` rather than copying
-it, so the test can't drift from the code it covers. It substitutes only the
-`pg_read_file()` call, which reads the *server's* filesystem — right in
-production, impossible against a containerised CI database.
+restore. Export and restore are `ezfd_export_events()` and
+`ezfd_restore_events()` in `db/schema.sql`, so the test exercises the shipped
+definitions rather than a copy — the same ones the HTTP API and the console
+call. It used to carry its own third variant of the backup query, and so
+round-tripped a shape the console's menu action never produced, staying green
+while that action silently dropped the SES roster.
+
+It also greps `ezfd-admin.sh` for three things a round trip cannot see,
+because each of them failed *silently*:
+
+| Guard | Catches |
+|---|---|
+| No `SELECT e.*` | A hand-rolled export that leaks the encrypted QRZ credentials, as two of the four earlier copies did |
+| No lax `PG -v payload=` | A payload call without `ON_ERROR_STOP`, which makes a failed restore exit `0` and report success |
+| No `IFS='\|' read` | A row reader splitting on a pipe, which a club name containing one silently shifts out of alignment |
+
+The middle one is worth a note on how to write this kind of guard. The first
+version checked that `PGS` appeared *somewhere* in the file — and passed even
+with the restore call reverted, because the count above it also uses `PGS` and
+satisfied the grep on its own. A guard over a file with two call sites has to
+assert the absence of the bad form, not the presence of the good one.
 
 **`scripts/test-e2e.sh`** drives the API against a running server: checkout
 conflicts, both enforcement modes, the offline replay bypass, roster approval,

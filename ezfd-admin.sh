@@ -14,6 +14,9 @@ RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'
 CYAN='\033[0;36m'; BOLD='\033[1m'; DIM='\033[2m'; NC='\033[0m'
 
 hr()    { echo -e "${DIM}────────────────────────────────────────────────────────────────${NC}"; }
+# hr() is a fixed 64 columns, which is narrower than the event table's header
+# and left the rule stopping short of the last three columns.
+rule()  { local n="${1:-64}" line=""; printf -v line '%*s' "$n" ''; echo -e "${DIM}${line// /─}${NC}"; }
 hr2()   { echo -e "${BOLD}════════════════════════════════════════════════════════════════${NC}"; }
 label() { printf "  ${BOLD}%-22s${NC}" "$1"; }
 log()   { echo -e "  ${GREEN}[✓]${NC} $*"; }
@@ -23,7 +26,40 @@ pause() { read -rp "$(echo -e "\n  ${DIM}Press Enter to continue…${NC}")" _; }
 
 # ── Database ──────────────────────────────────────────────────────────────────
 DB="ezfd"
-PG()  { sudo -u postgres psql -d "$DB" -tAX "$@"; }
+
+# Rows come back with an ASCII unit separator between fields, not psql's
+# default pipe. Club names, locations and SES descriptions are free text an
+# operator types, and psql -A does not escape the separator inside a value --
+# so a club called "Pipe|Name Club" shifted every column of the event table
+# one field to the right and printed the created date under "Class".
+FS=$'\x1f'
+PG()  { sudo -u postgres psql -d "$DB" -tAX -F "$FS" "$@"; }
+
+# Same, but a SQL error makes psql exit non-zero instead of being reported as
+# success. Use it for anything whose failure must not be announced as done.
+PGS() { sudo -u postgres psql -d "$DB" -tAX -F "$FS" -v ON_ERROR_STOP=1 "$@"; }
+
+# Quote a value for interpolation into a SQL string literal. Everything here
+# runs as the postgres superuser, so a stray apostrophe in a callsign or a
+# file path is not just a broken query.
+sql_lit() { printf '%s' "${1//\'/\'\'}"; }
+
+usage() {
+  cat <<'USAGE'
+EzFD — Interactive admin console
+
+Usage:
+  sudo bash ezfd-admin.sh            interactive menu
+  sudo bash ezfd-admin.sh --json     dump all events as JSON (stdout, pipeable)
+  sudo bash ezfd-admin.sh --help     this message
+USAGE
+}
+
+case "${1:-}" in
+  --help|-h) usage; exit 0 ;;
+  --json|"") ;;
+  *) err "Unknown option: $1"; echo >&2; usage >&2; exit 2 ;;
+esac
 
 if ! PG -c "SELECT 1" &>/dev/null; then
   err "Cannot connect to the ezfd database. Is PostgreSQL running?"
@@ -36,7 +72,9 @@ if [[ "${1:-}" == "--json" ]]; then
   # One canonical export shape, defined in db/schema.sql and shared with the
   # HTTP API and the tests. It excludes the QRZ credentials by construction
   # and always carries the SES roster and checkout history.
-  PG -c "SELECT ezfd_export_events();"
+  # ON_ERROR_STOP so a pipeline consuming this sees a failure as a failure
+  # rather than as an event list that happens to be empty.
+  PGS -c "SELECT ezfd_export_events();"
   exit 0
 fi
 
@@ -75,22 +113,36 @@ confirm_danger() {
   local msg="${1:-Are you sure?}"
   echo -e "\n  ${RED}${BOLD}⚠  ${msg}${NC}"
   echo -e "  ${DIM}Type YES (all caps) to confirm, anything else to cancel.${NC}"
-  local ans
+  local ans=""
   read -rp "  > " ans
   [[ "$ans" == "YES" ]]
 }
 
-# ── Fetch event list (returns pipe-delimited rows) ────────────────────────────
+# ── Fetch event list (one separator-delimited row per event) ──────────────────
+# An optional filter matches the join code, club name or club call. strpos()
+# rather than LIKE so an underscore or a percent sign in what the operator
+# typed is matched literally instead of as a wildcard.
 fetch_events() {
+  local filter="${1:-}"
+  local where="TRUE"
+  if [[ -n "$filter" ]]; then
+    local f=""; f=$(sql_lit "${filter^^}")
+    where="(strpos(UPPER(e.join_code),'$f') > 0
+         OR strpos(UPPER(e.club_name),'$f') > 0
+         OR strpos(UPPER(e.club_call),'$f') > 0)"
+  fi
+  # Placeholders are ASCII: the table is laid out with printf %-Ns, which pads
+  # by byte and not by display width, so a multi-byte em dash in a column
+  # knocked every following column of that row out of line.
   PG -c "
     SELECT
       e.join_code, e.club_name, e.club_call, e.event_year,
       -- An SES has no class or power category; show a dash rather than an
       -- empty column, and mark a gated roster so it's visible at a glance.
-      COALESCE(NULLIF(e.class,''), CASE WHEN e.event_type='SES' THEN '—' ELSE '?' END),
-      COALESCE(e.arrl_section,'—'),
+      COALESCE(NULLIF(e.class,''), CASE WHEN e.event_type='SES' THEN '-' ELSE '?' END),
+      COALESCE(e.arrl_section,'-'),
       e.event_type,
-      CASE WHEN e.event_type='SES' THEN '—' ELSE e.power END,
+      CASE WHEN e.event_type='SES' THEN '-' ELSE e.power END,
       COALESCE(e.location,''),
       e.created_at::date,
       COUNT(q.id) FILTER (WHERE NOT q.is_dupe)  AS qsos,
@@ -98,23 +150,28 @@ fetch_events() {
       COUNT(DISTINCT q.operator_call) FILTER (WHERE q.operator_call IS NOT NULL) AS ops
     FROM events e
     LEFT JOIN qsos q ON q.event_id = e.id AND q.deleted_at IS NULL
+    WHERE $where
     GROUP BY e.id
     ORDER BY e.created_at DESC;" 2>/dev/null
 }
 
 event_uuid() {
-  PG -c "SELECT id FROM events WHERE UPPER(join_code)=UPPER('$1');" 2>/dev/null
+  PG -c "SELECT id FROM events WHERE UPPER(join_code)=UPPER('$(sql_lit "$1")');" 2>/dev/null
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Event detail view
 # ─────────────────────────────────────────────────────────────────────────────
-view_event() {
+# Returns 0 to redraw this event's detail screen, 1 to go back to the list.
+# Every action used to end by calling view_event again, so a long session
+# building up a stack frame per action, and an informational "nothing to do"
+# threw the operator all the way back out to the list.
+view_event_once() {
   local code="$1"
   banner
   local uuid; uuid=$(event_uuid "$code")
   if [[ -z "$uuid" ]]; then
-    err "Event $code not found."; pause; return
+    err "Event $code not found."; pause; return 1
   fi
 
   # Header row
@@ -128,7 +185,7 @@ view_event() {
     FROM events WHERE id='$uuid';" 2>/dev/null)
   local club_name="" club_call="" year="" class="" section="" etype="" power="" location="" created=""
   local starts="" ends="" ses_desc="" ses_qsl="" enforce="" slotmin="" duperule="" reqappr=""
-  IFS='|' read -r club_name club_call year class section etype power location created \
+  IFS="$FS" read -r club_name club_call year class section etype power location created \
                   starts ends ses_desc ses_qsl enforce slotmin duperule reqappr <<< "$row"
 
   echo -e "  ${BOLD}${CYAN}${code}${NC}  ${BOLD}${club_name}${NC} ${DIM}(${club_call})${NC}"
@@ -167,7 +224,7 @@ view_event() {
     if [[ -n "$roster" ]]; then
       echo -e "  ${BOLD}Operator roster${NC}"
       local rc="" rg="" rs="" ra=""
-      while IFS='|' read -r rc rg rs ra; do
+      while IFS="$FS" read -r rc rg rs ra; do
         [[ -z "$rc" ]] && continue
         if [[ "$ra" == "t" ]]; then
           printf "    ${GREEN}%-10s${NC} %-8s %-4s ${DIM}approved${NC}\n" "$rc" "$rg" "$rs"
@@ -186,7 +243,7 @@ view_event() {
     if [[ -n "$live" ]]; then
       echo -e "  ${BOLD}On the air now${NC}"
       local lc="" lb="" lm="" lu=""
-      while IFS='|' read -r lc lb lm lu; do
+      while IFS="$FS" read -r lc lb lm lu; do
         [[ -z "$lc" ]] && continue
         printf "    ${CYAN}%-10s${NC} %-6s %-4s ${DIM}until %sZ${NC}\n" "$lc" "$lb" "$lm" "$lu"
       done <<< "$live"
@@ -202,7 +259,8 @@ view_event() {
       COUNT(DISTINCT operator_call) FILTER (WHERE operator_call IS NOT NULL) AS ops,
       COUNT(DISTINCT rcvd_section)  FILTER (WHERE rcvd_section IS NOT NULL AND rcvd_section != '' AND NOT is_dupe) AS sections
     FROM qsos WHERE event_id='$uuid' AND deleted_at IS NULL;" 2>/dev/null)
-  IFS='|' read -r qsos dupes ops sections <<< "$stats"
+  local qsos="" dupes="" ops="" sections=""
+  IFS="$FS" read -r qsos dupes ops sections <<< "$stats"
 
   label "QSOs (non-dupe):"; echo -e "${GREEN}${qsos}${NC}"
   label "Dupes:";            echo -e "${YELLOW}${dupes}${NC}"
@@ -217,7 +275,8 @@ view_event() {
     GROUP BY band, mode ORDER BY n DESC;" 2>/dev/null || true)
   if [[ -n "$band_rows" ]]; then
     echo -e "  ${BOLD}Band breakdown:${NC}"
-    while IFS='|' read -r band mode count; do
+    local band="" mode="" count=""
+    while IFS="$FS" read -r band mode count; do
       printf "    %-8s %-4s  %s QSOs\n" "$band" "$mode" "$count"
     done <<< "$band_rows"
     echo
@@ -230,7 +289,8 @@ view_event() {
     GROUP BY operator_call ORDER BY n DESC;" 2>/dev/null || true)
   if [[ -n "$op_rows" ]]; then
     echo -e "  ${BOLD}Operators:${NC}"
-    while IFS='|' read -r op count; do
+    local op=""
+    while IFS="$FS" read -r op count; do
       printf "    %-12s  %s QSOs\n" "$op" "$count"
     done <<< "$op_rows"
     echo
@@ -272,10 +332,17 @@ view_event() {
   case "$choice" in
     1) # CSV export
        local file="/tmp/qsos_${code}.csv"
-       sudo -u postgres psql -d "$DB" -c \
+       local out=""
+       # Every one of these used to log success unconditionally, so a full
+       # disk or a permission error still printed "Exported to …" over an
+       # empty file the operator would then take away as their log.
+       if out=$(sudo -u postgres psql -d "$DB" -v ON_ERROR_STOP=1 -c \
          "\COPY (SELECT * FROM qsos WHERE event_id='$uuid' AND deleted_at IS NULL ORDER BY datetime_utc) TO '${file}' CSV HEADER" \
-         >/dev/null
-       log "Exported to ${file}"
+         2>&1); then
+         log "Exported to ${file}"
+       else
+         err "CSV export failed:"; echo "$out" >&2
+       fi
        pause ;;
 
     2) # JSON backup
@@ -283,8 +350,15 @@ view_event() {
        # The fourth copy of the export query, and the second that used
        # SELECT e.* -- so this too wrote the encrypted QRZ credentials into
        # a file under /tmp. Same shared function, scoped to one event.
-       PG -c "SELECT ezfd_export_events('$uuid');" > "$file"
-       log "Backup written to ${file}"
+       local errf=""; errf=$(mktemp)
+       if PGS -c "SELECT ezfd_export_events('$uuid');" > "$file" 2>"$errf"; then
+         log "Backup written to ${file}"
+       else
+         err "Backup failed — the file is incomplete and has been removed:"
+         cat "$errf" >&2
+         rm -f "$file"
+       fi
+       rm -f "$errf"
        pause ;;
 
     3) # Change join code
@@ -292,7 +366,7 @@ view_event() {
        read -rp "$(echo -e "  New join code (6 chars, letters/digits): ")" new_code
        new_code="${new_code^^}"
        if [[ ! "$new_code" =~ ^[A-Z0-9]{4,8}$ ]]; then
-         warn "Invalid code — must be 4–8 alphanumeric characters."; pause; return
+         warn "Invalid code — must be 4–8 alphanumeric characters."; pause; return 0
        fi
        if PG -c "UPDATE events SET join_code='$new_code' WHERE id='$uuid';" &>/dev/null; then
          log "Join code changed: ${code} → ${new_code}"
@@ -309,7 +383,7 @@ view_event() {
 
        if [[ "$etype" == "SES" ]]; then
          local cur_enf="" cur_slot="" cur_dupe="" cur_appr=""
-         IFS='|' read -r cur_enf cur_slot cur_dupe cur_appr < <(PG -c \
+         IFS="$FS" read -r cur_enf cur_slot cur_dupe cur_appr < <(PG -c \
            "SELECT slot_enforcement, slot_minutes, dupe_rule, require_operator_approval
             FROM events WHERE id='$uuid';" 2>/dev/null)
 
@@ -367,11 +441,11 @@ view_event() {
            PG -c "UPDATE events SET require_operator_approval = NOT require_operator_approval WHERE id='$uuid';" >/dev/null
            log "Operator approval requirement toggled."
          fi
-         pause; return
+         pause; return 0
        fi
 
        local cur_power="" cur_class="" cur_section=""
-       IFS='|' read -r cur_power cur_class cur_section < <(PG -c \
+       IFS="$FS" read -r cur_power cur_class cur_section < <(PG -c \
          "SELECT power, COALESCE(class,''), COALESCE(arrl_section,'') FROM events WHERE id='$uuid';" 2>/dev/null)
 
        # Power
@@ -424,7 +498,7 @@ view_event() {
     5) # Manage the SES operator roster
        if [[ "$etype" != "SES" ]]; then
          warn "The operator roster only applies to special event stations."
-         pause; return
+         pause; return 0
        fi
        echo
        echo -e "  ${BOLD}Operator roster for ${CYAN}${code}${NC}"
@@ -436,10 +510,10 @@ view_event() {
          FROM ses_operators WHERE event_id='$uuid' ORDER BY op_call;" 2>/dev/null)
        if [[ -z "$rlist" ]]; then
          warn "No operators have joined this event yet."
-         pause; return
+         pause; return 0
        fi
        local rc="" rg="" rs="" ra=""
-       while IFS='|' read -r rc rg rs ra; do
+       while IFS="$FS" read -r rc rg rs ra; do
          [[ -z "$rc" ]] && continue
          if [[ "$ra" == "t" ]]; then
            printf "    ${GREEN}%-10s${NC} grid %-8s state %-4s ${DIM}approved${NC}\n" "$rc" "$rg" "$rs"
@@ -452,12 +526,18 @@ view_event() {
        read -rp "$(echo -e "  Operator callsign to change [Enter to cancel]: ")" target
        target="${target^^}"
        if [[ -z "$target" ]]; then
-         warn "Cancelled."; pause; return
+         warn "Cancelled."; pause; return 0
+       fi
+       # The only free text in this script that reached a SQL string literal
+       # unchecked. Everything runs as the postgres superuser, so an
+       # apostrophe here was more than a broken query.
+       if [[ ! "$target" =~ ^[A-Z0-9/]{3,16}$ ]]; then
+         err "'${target}' is not a callsign."; pause; return 0
        fi
        local exists=""; exists=$(PG -c \
-         "SELECT 1 FROM ses_operators WHERE event_id='$uuid' AND op_call='$target';" 2>/dev/null)
+         "SELECT 1 FROM ses_operators WHERE event_id='$uuid' AND op_call='$(sql_lit "$target")';" 2>/dev/null)
        if [[ -z "$exists" ]]; then
-         err "${target} is not on this event's roster."; pause; return
+         err "${target} is not on this event's roster."; pause; return 0
        fi
 
        local racts=""
@@ -501,12 +581,18 @@ view_event() {
        pause ;;
 
     6) # Clear dupes
-       local n; n=$(PG -c "SELECT COUNT(*) FROM qsos WHERE event_id='$uuid' AND is_dupe AND deleted_at IS NULL;" 2>/dev/null)
+       # The count and the UPDATE have to carry the same filter. They did not:
+       # the count skipped soft-deleted rows and the UPDATE cleared them too,
+       # so the console reported clearing fewer dupes than it changed and
+       # quietly rewrote contacts an operator had already deleted.
+       local n=""; n=$(PG -c "SELECT COUNT(*) FROM qsos
+                              WHERE event_id='$uuid' AND is_dupe AND deleted_at IS NULL;" 2>/dev/null)
        if [[ "$n" == "0" ]]; then
-         warn "No dupes to clear."; pause; return
+         warn "No dupes to clear."; pause; return 0
        fi
        if confirm_danger "This will mark ${n} dupe QSOs as non-dupe for ${code}."; then
-         PG -c "UPDATE qsos SET is_dupe=false WHERE event_id='$uuid' AND is_dupe=true;" >/dev/null
+         PG -c "UPDATE qsos SET is_dupe=false
+                WHERE event_id='$uuid' AND is_dupe=true AND deleted_at IS NULL;" >/dev/null
          log "${n} dupes cleared."
        else
          warn "Cancelled."
@@ -514,9 +600,19 @@ view_event() {
        pause ;;
 
     7) # Delete all QSOs
-       local n; n=$(PG -c "SELECT COUNT(*) FROM qsos WHERE event_id='$uuid' AND deleted_at IS NULL;" 2>/dev/null)
-       if confirm_danger "This will permanently delete ALL ${n} QSOs for event ${code}."; then
-         PG -c "DELETE FROM qsos WHERE event_id='$uuid' AND deleted_at IS NULL;" >/dev/null
+       # "ALL" means all: a soft-deleted QSO is still a row, is still carried
+       # in the backup, and is still restored by it. Deleting only the live
+       # ones left the deleted ones behind for the next export to pick up,
+       # which is not what an operator clearing an event down expects.
+       local live="" gone=""
+       IFS="$FS" read -r live gone < <(PG -c "
+         SELECT COUNT(*) FILTER (WHERE deleted_at IS NULL),
+                COUNT(*) FILTER (WHERE deleted_at IS NOT NULL)
+         FROM qsos WHERE event_id='$uuid';" 2>/dev/null)
+       local msg="This will permanently delete ALL ${live:-0} QSOs for event ${code}."
+       [[ "${gone:-0}" != "0" ]] && msg+=" ${gone} previously deleted QSO(s) go too."
+       if confirm_danger "$msg"; then
+         PG -c "DELETE FROM qsos WHERE event_id='$uuid';" >/dev/null
          log "All QSOs deleted."
        else
          warn "Cancelled."
@@ -528,66 +624,161 @@ view_event() {
          PG -c "DELETE FROM events WHERE id='$uuid';" >/dev/null
          log "Event ${code} deleted."
          pause
-         return  # back to list — event is gone
+         return 1  # back to list — event is gone
        else
          warn "Cancelled."; pause
        fi ;;
 
-    9) return 0 ;;
+    9) return 1 ;;
   esac
 
-  # Re-show detail after action (unless deleted)
-  [[ "$choice" != "7" ]] && view_event "$code"
+  return 0
+}
+
+view_event() {
+  while view_event_once "$1"; do :; done
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
 # Event list screen
+#
+# One line per event, numbered where it is printed. The list used to print the
+# whole table and then a second numbered menu repeating every row as "Open
+# event XXXXXX", so twenty events filled forty-odd lines to offer twenty
+# choices, and the top of the table scrolled away before the prompt appeared.
+# Rows carry their own number now, the list pages, and a join code typed
+# straight in beats hunting for its row at all.
 # ─────────────────────────────────────────────────────────────────────────────
+
+# How many event rows fit between the banner and the prompt. Everything else
+# on the screen is fixed height, so this is the terminal minus that chrome.
+page_size() {
+  local rows=""
+  rows=$(tput lines 2>/dev/null || true)
+  [[ "$rows" =~ ^[0-9]+$ ]] || rows=24
+  local size=$(( rows - 13 ))
+  [[ "$size" -lt 5  ]] && size=5
+  [[ "$size" -gt 40 ]] && size=40
+  printf '%s' "$size"
+}
+
+# Width of the event table's printf format above, so its rule matches it.
+TABLE_W=79
+
 list_events() {
+  local page=1 filter=""
   while true; do
     banner
 
-    local event_data; event_data=$(fetch_events)
+    local event_data=""; event_data=$(fetch_events "$filter")
 
-    if [[ -z "$event_data" ]]; then
-      echo -e "  ${YELLOW}No events found.${NC}"
-      echo
-      menu_pick choice "← Back to main menu"
-      return
-    fi
-
-    # Print table header
-    printf "  ${BOLD}%-8s  %-24s %-7s %-4s  %-5s  %6s  %5s  %4s${NC}\n" \
-      "Code" "Club" "Type" "Pwr" "Class" "QSOs" "Dupes" "Ops"
-    hr
-
-    # Collect codes for selection
-    local -a codes=()
-    local code="" name="" call="" year="" class="" section="" etype="" power=""
-    local location="" created="" qsos="" dupes="" ops=""
-    # Every column of the SELECT has to be named here or the fields shift;
-    # not all of them are printed in the summary row below.
-    # shellcheck disable=SC2034
-    while IFS='|' read -r code name call year class section etype power location created qsos dupes ops; do
-      codes+=("$code")
-      printf "  ${CYAN}%-8s${NC}  %-24s %-7s %-4s  %-5s  ${GREEN}%6s${NC}  ${YELLOW}%5s${NC}  %4s\n" \
-        "$code" "${name:0:24}" "$etype" "$power" "$class" "$qsos" "$dupes" "$ops"
+    local -a rows=()
+    local line=""
+    while IFS= read -r line; do
+      [[ -n "$line" ]] && rows+=("$line")
     done <<< "$event_data"
 
-    echo
-    hr
-
-    # Build menu options
-    local -a opts=()
-    for c in "${codes[@]}"; do opts+=("Open event $c"); done
-    opts+=("← Back to main menu")
-
-    menu_pick choice "${opts[@]}"
-
-    if [[ "$choice" -le "${#codes[@]}" ]]; then
-      view_event "${codes[$((choice-1))]}"
-    else
+    local total="${#rows[@]}"
+    if [[ "$total" -eq 0 ]]; then
+      if [[ -n "$filter" ]]; then
+        echo -e "  ${YELLOW}No events match \"${filter}\".${NC}"
+        echo
+        echo -e "  ${DIM}Enter to clear the filter · b to go back${NC}"
+        local none=""
+        read -rp "  > " none
+        [[ "${none,,}" == "b" || "${none,,}" == "q" ]] && return 0
+        filter=""; page=1; continue
+      fi
+      echo -e "  ${YELLOW}No events found.${NC}"
+      pause
       return 0
+    fi
+
+    local per=""; per=$(page_size)
+    local pages=$(( (total + per - 1) / per ))
+    [[ "$page" -gt "$pages" ]] && page="$pages"
+    [[ "$page" -lt 1 ]] && page=1
+    local first=$(( (page - 1) * per ))
+    local last=$(( first + per - 1 ))
+    [[ "$last" -ge "$total" ]] && last=$(( total - 1 ))
+
+    if [[ -n "$filter" ]]; then
+      echo -e "  ${DIM}Filter:${NC} ${BOLD}${filter}${NC}  ${DIM}(${total} matching)  ·  Enter / to clear${NC}"
+      echo
+    fi
+
+    printf "  ${BOLD}%3s  %-8s  %-24s %-4s %-4s  %-5s  %6s  %5s  %4s${NC}\n" \
+      "#" "Code" "Club" "Type" "Pwr" "Class" "QSOs" "Dupes" "Ops"
+    rule "$TABLE_W"
+
+    # Only the rows on this page are parsed and printed; the page number is
+    # what the operator types, so it restarts at 1 on every page.
+    local -a codes=()
+    local i="" n=1
+    local code="" name="" call="" year="" class="" section="" etype="" power=""
+    local location="" created="" qsos="" dupes="" ops=""
+    for (( i = first; i <= last; i++ )); do
+      # Every column of the SELECT has to be named here or the fields shift;
+      # not all of them are printed in the summary row below.
+      # shellcheck disable=SC2034
+      IFS="$FS" read -r code name call year class section etype power location created qsos dupes ops <<< "${rows[$i]}"
+      codes+=("$code")
+      printf "  ${BOLD}%3d${NC}  ${CYAN}%-8s${NC}  %-24s %-4s %-4s  %-5s  ${GREEN}%6s${NC}  ${YELLOW}%5s${NC}  %4s\n" \
+        "$n" "$code" "${name:0:24}" "$etype" "$power" "$class" "$qsos" "$dupes" "$ops"
+      n=$(( n + 1 ))
+    done
+
+    rule "$TABLE_W"
+    if [[ "$pages" -gt 1 ]]; then
+      echo -e "  ${DIM}Showing $(( first + 1 ))–$(( last + 1 )) of ${total}  ·  page ${page}/${pages}${NC}"
+    else
+      echo -e "  ${DIM}${total} event(s)${NC}"
+    fi
+
+    local hint="  ${BOLD}1-$(( last - first + 1 ))${NC} open"
+    [[ "$pages" -gt 1 ]] && hint+="  ${BOLD}n${NC}/${BOLD}p${NC} page"
+    hint+="  ${BOLD}/text${NC} filter  ${BOLD}CODE${NC} open by join code  ${BOLD}b${NC} back"
+    echo -e "$hint"
+
+    local pick=""
+    read -rp "$(echo -e "  ${BOLD}>${NC} ")" pick
+    pick="${pick#"${pick%%[![:space:]]*}"}"   # trim leading whitespace
+    pick="${pick%"${pick##*[![:space:]]}"}"   # trim trailing whitespace
+
+    case "$pick" in
+      "") continue ;;
+      b|B|q|Q) return 0 ;;
+      n|N)
+        if [[ "$page" -lt "$pages" ]]; then page=$(( page + 1 ))
+        else warn "Already on the last page."; sleep 1; fi
+        continue ;;
+      p|P)
+        if [[ "$page" -gt 1 ]]; then page=$(( page - 1 ))
+        else warn "Already on the first page."; sleep 1; fi
+        continue ;;
+      /*)
+        filter="${pick#/}"; page=1; continue ;;   # "/" alone clears it
+    esac
+
+    if [[ "$pick" =~ ^[0-9]+$ ]]; then
+      if [[ "$pick" -ge 1 && "$pick" -le "${#codes[@]}" ]]; then
+        view_event "${codes[$(( pick - 1 ))]}"
+      else
+        warn "Enter a number between 1 and ${#codes[@]}, or a join code."
+        sleep 1
+      fi
+      continue
+    fi
+
+    # Anything else is taken as a join code — with a long list that is faster
+    # than finding its row, and it works from any page.
+    local typed=""; typed=$(PG -c \
+      "SELECT join_code FROM events WHERE UPPER(join_code)=UPPER('$(sql_lit "$pick")');" 2>/dev/null)
+    if [[ -n "$typed" ]]; then
+      view_event "$typed"
+    else
+      warn "No event with join code '${pick}'. Use /${pick} to search names."
+      sleep 2
     fi
   done
 }
@@ -611,7 +802,8 @@ server_stats() {
       MIN(e.created_at)::date,
       MAX(e.created_at)::date
     FROM events e LEFT JOIN qsos q ON q.event_id = e.id AND q.deleted_at IS NULL;" 2>/dev/null)
-  IFS='|' read -r tot_events tot_qsos tot_dupes tot_ops tot_sections first_event last_event <<< "$totals"
+  local tot_events="" tot_qsos="" tot_dupes="" tot_ops="" tot_sections="" first_event="" last_event=""
+  IFS="$FS" read -r tot_events tot_qsos tot_dupes tot_ops tot_sections first_event last_event <<< "$totals"
 
   label "Total events:";       echo "$tot_events"
   label "Total QSOs:";         echo "$tot_qsos"
@@ -628,7 +820,7 @@ server_stats() {
     SELECT operator_call, COUNT(*) AS n FROM qsos
     WHERE operator_call IS NOT NULL AND NOT is_dupe AND deleted_at IS NULL
     GROUP BY operator_call ORDER BY n DESC LIMIT 10;" 2>/dev/null | \
-  while IFS='|' read -r op count; do
+  while IFS="$FS" read -r op count; do
     printf "    %-12s  %s QSOs\n" "$op" "$count"
   done
   echo
@@ -639,7 +831,7 @@ server_stats() {
     SELECT e.event_type, COUNT(q.id) FILTER (WHERE NOT q.is_dupe) AS n
     FROM events e LEFT JOIN qsos q ON q.event_id = e.id AND q.deleted_at IS NULL
     GROUP BY e.event_type ORDER BY n DESC;" 2>/dev/null | \
-  while IFS='|' read -r etype count; do
+  while IFS="$FS" read -r etype count; do
     printf "    %-8s  %s QSOs\n" "$etype" "$count"
   done
   echo
@@ -665,9 +857,16 @@ backup_all() {
   # encrypted QRZ credentials into the file, and it carried neither the SES
   # roster nor the checkout history, so a restored special event lost the
   # per-operator grid/state the ADIF MY_* fields are built from.
-  PG -c "SELECT ezfd_export_events();" > "$file"
+  local errf=""; errf=$(mktemp)
+  if ! PGS -c "SELECT ezfd_export_events();" > "$file" 2>"$errf"; then
+    err "Backup failed — the file is incomplete and has been removed:"
+    cat "$errf" >&2
+    rm -f "$file" "$errf"
+    pause; return
+  fi
+  rm -f "$errf"
   log "Backup complete: $file"
-  local size; size=$(du -sh "$file" | awk '{print $1}')
+  local size=""; size=$(du -sh "$file" | awk '{print $1}')
   echo -e "  ${DIM}File size: ${size}${NC}"
   echo
   echo -e "  ${DIM}To transfer off-server:${NC}"
@@ -722,15 +921,19 @@ restore_from_json() {
     err "File not found: $json_file"; pause; return
   fi
 
-  # Postgres reads the file server-side (pg_read_file) so the JSON content
-  # never has to pass through shell/psql -c string interpolation — only the
-  # file path does.
-  local preview
-  preview=$(PG -c "
+  # Counted the same way the restore below reads it: as a psql variable off
+  # this host's disk. It used to use pg_read_file(), which reads the *database
+  # server's* filesystem -- so with DATABASE_URL pointed at another host, as
+  # docs/deployment.md describes, the count failed on a file the restore
+  # itself would have read perfectly well. Passing the payload rather than the
+  # path also keeps the filename out of a SQL string literal.
+  local preview=""
+  preview=$(PGS -v payload="$(cat "$json_file")" <<< "
     SELECT jsonb_array_length(
-      CASE WHEN jsonb_typeof(d) = 'array' THEN d ELSE jsonb_build_array(d) END
-    )
-    FROM (SELECT pg_read_file('$json_file')::jsonb AS d) t;" 2>&1)
+      CASE WHEN jsonb_typeof(:'payload'::jsonb) = 'array'
+           THEN :'payload'::jsonb
+           ELSE jsonb_build_array(:'payload'::jsonb) END
+    );" 2>&1)
 
   if [[ ! "$preview" =~ ^[0-9]+$ ]]; then
     err "Could not read/parse that file as JSON on the server:"
@@ -750,7 +953,7 @@ restore_from_json() {
   echo
   echo -e "  ${DIM}Restoring…${NC}"
 
-  local result
+  local result=""
   # The backup is read here and passed in as a parameter, rather than with
   # pg_read_file() which reads the *database server's* filesystem. That used
   # to require the database to be on this host -- docs/deployment.md documents
@@ -759,7 +962,11 @@ restore_from_json() {
   # the same code.
   # Fed on stdin, not with -c: psql only interpolates :'variables' when it
   # lexes the input, which it does for stdin and -f but not for -c.
-  result=$(PG -v payload="$(cat "$json_file")" \
+  # PGS, not PG: fed on stdin, psql exits 0 even when a statement failed
+  # unless ON_ERROR_STOP is set -- so a restore that errored out reported
+  # "Restore complete" and then printed the error text through the results
+  # table. scripts/test-restore.sh has always set it; this call had drifted.
+  result=$(PGS -v payload="$(cat "$json_file")" \
               <<< "SELECT orig_code, new_code, qso_count FROM ezfd_restore_events(:'payload'::jsonb);" 2>&1)
   local status=$?
 
@@ -773,7 +980,7 @@ restore_from_json() {
   echo -e "  ${BOLD}Restored:${NC}"
   printf "  ${BOLD}%-10s  %-10s  %6s${NC}\n" "Old Code" "New Code" "QSOs"
   hr
-  while IFS='|' read -r orig new_code qso_count; do
+  while IFS="$FS" read -r orig new_code qso_count; do
     [[ -z "$orig" ]] && continue
     printf "  ${DIM}%-10s${NC}  ${CYAN}%-10s${NC}  %6s\n" "$orig" "$new_code" "$qso_count"
   done <<< "$result"
@@ -834,6 +1041,29 @@ update_app() {
     err "Build failed."; pause; return
   fi
 
+  # Checked before anything is copied over the running install: finding out
+  # .env is missing after the rsync leaves the server unable to start at all.
+  if [[ ! -f "$APP_DIR/.env" ]]; then
+    err ".env is missing from $APP_DIR — run deploy.sh to recreate it before updating."
+    pause; return
+  fi
+
+  # The schema goes first, while the old build is still the one on disk. It
+  # used to run after the rsync, with its errors sent to /dev/null behind a
+  # `|| true` and the service restarted regardless — so a new build met an old
+  # schema and failed on its first query with nothing on screen to say why.
+  # The schema is additive and idempotent (CI applies it twice), so the old
+  # build keeps running against it happily and a failure here is real.
+  echo -e "  ${DIM}Applying database migrations…${NC}"
+  local migrate_out=""
+  if ! migrate_out=$(sudo -u postgres psql -d "$DB" -v ON_ERROR_STOP=1 -q \
+                       -f "$REPO_DIR/db/schema.sql" 2>&1); then
+    err "Database migration failed — nothing has been deployed."
+    echo "$migrate_out" | tail -20 >&2
+    echo -e "  ${DIM}The running install is untouched. Fix the schema error and re-run.${NC}"
+    pause; return
+  fi
+
   echo -e "  ${DIM}Deploying files…${NC}"
   # --exclude='.env' prevents rsync --delete from removing the live secrets file,
   # which lives in $APP_DIR but is not part of the standalone build output.
@@ -842,14 +1072,6 @@ update_app() {
   rsync -a --delete "${REPO_DIR}/public/"            "$APP_DIR/public/"
   cp "$REPO_DIR/ezfd-admin.sh" "$APP_DIR/ezfd-admin.sh"
   chmod +x "$APP_DIR/ezfd-admin.sh"
-
-  if [[ ! -f "$APP_DIR/.env" ]]; then
-    err ".env is missing from $APP_DIR — run deploy.sh to recreate it before restarting."
-    pause; return
-  fi
-
-  echo -e "  ${DIM}Applying database migrations…${NC}"
-  sudo -u postgres psql -d ezfd -f "$REPO_DIR/db/schema.sql" >/dev/null 2>&1 || true
 
   echo -e "  ${DIM}Restarting service…${NC}"
   systemctl restart ezfd
@@ -1015,7 +1237,8 @@ main_menu() {
       SELECT COUNT(DISTINCT e.id),
              COUNT(q.id) FILTER (WHERE NOT q.is_dupe)
       FROM events e LEFT JOIN qsos q ON q.event_id = e.id AND q.deleted_at IS NULL;" 2>/dev/null)
-    IFS='|' read -r tot_events tot_qsos <<< "$totals"
+    local tot_events="" tot_qsos=""
+    IFS="$FS" read -r tot_events tot_qsos <<< "$totals"
     echo -e "  ${DIM}${tot_events} event(s)  ·  ${tot_qsos} QSO(s) on this server${NC}"
     echo
 
