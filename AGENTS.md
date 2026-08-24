@@ -30,6 +30,81 @@ When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
 exclusion constraint.
 
+## Documentation is part of the change, not a follow-up
+
+A change is not finished until the documentation describes what the app now
+does. This applies to additions, changes **and removals** — a deleted feature
+whose guide survives is worse than one that was never documented, because the
+guide now instructs an operator to do something impossible.
+
+Stale docs here have already cost real accuracy. `docs/field-day.md` and
+`docs/troubleshooting.md` carried a "known bug" notice telling clubs to
+hand-correct the Cabrillo claimed score for months after that bug was fixed —
+following the guide would have *introduced* the error it warned about. The
+README rewrite silently dropped the licence and the AI disclaimer because the
+file was replaced rather than edited. Neither had a test, and nothing caught
+either one.
+
+**Ask three questions of every change**, and act on each in the same PR:
+
+1. **Does an operator do something differently now?** → the user-facing guide
+2. **Does the shape of the system change?** → the architecture/reference guide
+3. **Would a reader believe something that is no longer true?** → find and fix
+   every place that says it, not just the obvious one
+
+### Where each kind of change is documented
+
+Match the change to the audience section in `docs/README.md`, not to whichever
+file is easiest to edit:
+
+| What changed | Update |
+|---|---|
+| The logging screen, entry flow, dupes, QSY, offline behaviour | `docs/operating.md`, and `docs/quick-start.md` if it affects the first five minutes |
+| Scoring, bonuses, classes, the exchange, submission | `docs/field-day.md`; check the values against `docs/rules-reference.md` |
+| A contest rule value | `docs/rules-reference.md` **first** — it is the transcription of the official documents, and the code is checked against it, never the reverse |
+| SES checkout, the roster, per-operator ADIF | `docs/special-events.md` |
+| Rig control, CAT, CW macros | `docs/rig-control.md` |
+| WSJT-X, JTDX, ADIF import | `docs/digital-modes.md` |
+| A new route, or a changed request/response shape | `docs/api.md` |
+| A table, column, index or constraint | `docs/database.md` **and** the schema comment in `db/schema.sql` |
+| Real-time, offline queue, coordination, how the pieces fit | `docs/architecture.md` |
+| `deploy.sh`, TLS, systemd, nginx | `docs/deployment.md` |
+| `ezfd-admin.sh`, backup, restore, recovery | `docs/administration.md` |
+| An environment variable | `docs/configuration.md` — every one is listed there |
+| Local setup, a new test suite, a convention | `docs/development.md`, and the test table above |
+| A new failure mode an operator can hit | `docs/troubleshooting.md`, as symptom → cause → fix |
+| A headline capability | `README.md` feature list — and check the screenshot gallery still matches |
+
+**Adding a guide takes two edits, not one.** The `/docs` sidebar is derived
+from the directory by `listDocs()`, so a new file appears there automatically —
+but the index table in `docs/README.md` is hand-written and will silently not
+mention it. Put it under the audience heading that fits.
+
+### Screenshots and examples
+
+Update a screenshot when the change alters what the reader sees in it. A guide
+whose prose is current but whose picture shows the old layout is still wrong,
+and it is the half a reader trusts most.
+
+- Live in `docs/images/`, referenced as `images/foo.png` — relative, because
+  the guides render on GitHub *and* at `/docs`, and `renderMarkdown()` rewrites
+  them to absolute app paths.
+- Capture against a **built** server with realistic fixture data. Screenshots
+  taken against a bare fixture have shipped artefacts before: every QSO stamped
+  with the same second, and a false red band-conflict banner from an operator
+  with no presence row. Fix the fixture, not the image.
+- Alt text describes what the picture *shows*, since it is what a screen reader
+  and a broken-image reader get. Check the caption names the right screen — the
+  quick start once showed the operator sign-in captioned as the join screen.
+- Prefer a worked example with real numbers over prose for anything
+  arithmetic. `docs/field-day.md`'s bonus table carries the rule number on
+  every row so a reader can check a line against the source.
+
+`scripts/test-e2e.sh` asserts the index renders, a guide renders, cross-links
+are rewritten, heading anchors exist and the referenced screenshots are served.
+That catches a broken link or a missing image — it cannot tell you the prose is
+out of date. That part is on you.
+
 ## Critical gotchas
 
 - **`pg` returns `TIMESTAMPTZ` as JS `Date` objects**, not strings. `lib/adif.ts` and `lib/cabrillo.ts` must handle both shapes.
