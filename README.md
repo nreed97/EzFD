@@ -1,5 +1,7 @@
 # EzFD
 
+> **⚠️ Vibe-coded disclaimer:** This project was built entirely with AI assistance (Claude). It works, but the code may contain rough edges, non-idiomatic patterns, or choices a seasoned developer would raise an eyebrow at. Use it, hack it, improve it — but don't cite it as a reference implementation for anything critical. You have been warned.
+
 A self-hosted, real-time, multi-operator logger for **ARRL Field Day**,
 **Winter Field Day**, and **special event stations**.
 
@@ -176,3 +178,29 @@ query, restore and end-to-end suites.
 When adding a test, break the thing it guards and watch it fail before
 trusting it. That practice has already caught a bug the test was written to
 prevent.
+
+## License
+
+```
+GLWT (Good Luck With That) Public License
+Copyright (c) 2026 Nick Reed (W0NY)
+
+Everyone is permitted to copy, distribute, modify, merge, sell, publish,
+sublicense, or do anything else with this software, with or without
+modification, for any purpose.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND.
+The author is not responsible if this software:
+  - Causes you to miss a multiplier
+  - Crashes at 0200Z on Field Day night
+  - Logs your club's dupe count to the ARRL
+  - Achieves sentience and starts logging QSOs autonomously
+  - Otherwise ruins your Field Day
+
+USE AT YOUR OWN RISK.
+
+IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.
+
+73 de W0NY — good luck out there.
+```
