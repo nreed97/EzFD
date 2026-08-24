@@ -225,15 +225,18 @@ else
   no "  FD ADIF still carries the contest exchange"
 fi
 
-# ── Worked All Sections accounting ───────────────────────────────────────────
+# ── Section accounting and bonus arithmetic ──────────────────────────────────
 #
 # calculateScore runs server-side for the Cabrillo CLAIMED-SCORE header, so the
-# bonus gate is reachable end to end. Two things are asserted here that used to
-# be wrong: an unrecognised exchange must not count toward the 100-point bonus
-# (a handful of typos could otherwise push a log over the line), and DX — the
-# legal exchange from outside the US and Canada — must be accepted without
+# whole scoring path is reachable end to end here.
+#
+# Sections earn nothing. ARRL Field Day rule 7.3 runs 7.3.1 to 7.3.18 and none
+# of them concerns sections; this app awarded 100 points for a clean sweep for
+# several releases, and this suite asserted it — a fourth copy of the same
+# wrong belief, after the scorer, the summary sheet and the unit suite. What is
+# asserted now is that a sweep changes nothing, and that DX is accepted without
 # counting as a section.
-echo "── Worked All Sections ──"
+echo "── sections are not a bonus ──"
 
 # Build an ADIF holding one QSO per section, straight from the app's own list
 # so this can never drift from it. Each is 1 point (phone), power LOW = x2.
@@ -264,26 +267,27 @@ ALL_ID=$(req GET "/api/events/$ALL" | jq_get id)
 ADIF_ALL=$(adif_for "$SECTIONS" | python3 -c "import sys,json;print(json.dumps(sys.stdin.read()))")
 req POST /api/import/adif "{\"event_id\":\"$ALL_ID\",\"adif\":$ADIF_ALL,\"operator_call\":\"W0AAA\"}" > /dev/null
 FULL=$(claimed_score "$ALL")
-# N QSOs x 1 pt x 2 (LOW) + 100 Worked All Sections
-EXPECT_FULL=$(( N_SECTIONS * 2 + 100 ))
+# N QSOs x 1 pt x 2 (LOW), and nothing else — a sweep is worth no bonus.
+EXPECT_FULL=$(( N_SECTIONS * 2 ))
 if [[ "$FULL" == "$EXPECT_FULL" ]]; then
-  ok "  working all $N_SECTIONS sections awards the 100-point bonus"
+  ok "  working all $N_SECTIONS sections awards no bonus"
 else
-  no "  working all $N_SECTIONS sections awards the 100-point bonus" "got $FULL, expected $EXPECT_FULL"
+  no "  working all $N_SECTIONS sections awards no bonus" "got $FULL, expected $EXPECT_FULL"
 fi
 
-# (b) one section swapped for a typo → same QSO count, no bonus
+# (b) one section swapped for a typo → identical score, since sections are
+#     worth nothing either way. The typo must still be surfaced as an
+#     unrecognised exchange so an operator can find and correct it.
 TYPO_LIST="$(echo "$SECTIONS" | cut -d" " -f2-) ZZZ"
 TYPO=$(req POST /api/events '{"club_name":"E2E Typo","club_call":"W0TYP","event_type":"FD","class":"1A","arrl_section":"MN","power":"LOW"}' | jq_get join_code)
 TYPO_ID=$(req GET "/api/events/$TYPO" | jq_get id)
 ADIF_TYPO=$(adif_for "$TYPO_LIST" | python3 -c "import sys,json;print(json.dumps(sys.stdin.read()))")
 req POST /api/import/adif "{\"event_id\":\"$TYPO_ID\",\"adif\":$ADIF_TYPO,\"operator_call\":\"W0AAA\"}" > /dev/null
 TYPO_SCORE=$(claimed_score "$TYPO")
-EXPECT_TYPO=$(( N_SECTIONS * 2 ))
-if [[ "$TYPO_SCORE" == "$EXPECT_TYPO" ]]; then
-  ok "  an unrecognised exchange does not count toward the bonus"
+if [[ "$TYPO_SCORE" == "$FULL" ]]; then
+  ok "  one section short scores exactly the same — sections do not move a score"
 else
-  no "  an unrecognised exchange does not count toward the bonus" "got $TYPO_SCORE, expected $EXPECT_TYPO"
+  no "  one section short scores exactly the same" "got $TYPO_SCORE, expected $FULL"
 fi
 
 # (c) DX is accepted and logged, but is not a section
@@ -299,6 +303,49 @@ if [[ "$(req GET "/api/export/$DXE?format=cabrillo")" == *"DX"* ]]; then
   ok "  DX survives into the Cabrillo log"
 else
   no "  DX survives into the Cabrillo log"
+fi
+
+# (d) emergency power pays per transmitter, over the real route.
+#
+# Rule 7.3.1 is 100 points per claimed transmitter, capped at 20. The app used
+# to add the entire base score again, so a large log over-claimed by thousands
+# — and because the class drives the transmitter count, this is only reachable
+# end to end, through an event created with a real class.
+echo "── emergency power is per transmitter (7.3.1) ──"
+
+bonus_score() {  # $1 = class, $2 = bonuses JSON → CLAIMED-SCORE
+  local code="" id=""
+  code=$(req POST /api/events \
+    "{\"club_name\":\"E2E Bonus\",\"club_call\":\"W0BON\",\"event_type\":\"FD\",\"class\":\"$1\",\"arrl_section\":\"MN\",\"power\":\"HIGH\"}" \
+    | jq_get join_code)
+  id=$(req GET "/api/events/$code" | jq_get id)
+  req POST /api/qso "{\"event_id\":\"$id\",\"callsign\":\"K1EMG\",\"band\":\"20m\",\"mode\":\"CW\",\"rcvd_class\":\"1A\",\"rcvd_section\":\"MN\",\"operator_call\":\"W0AAA\"}" > /dev/null
+  req PATCH "/api/events/$code/bonuses" "$2" > /dev/null
+  claimed_score "$code"
+}
+
+# 1 CW QSO = 2 points, HIGH power x1 = 2 base.
+EMG_3A=$(bonus_score "3A" '{"emergency_power":true}')
+if [[ "$EMG_3A" == "302" ]]; then
+  ok "  a 3A entry claims 3 x 100, not the base score again"
+else
+  no "  a 3A entry claims 3 x 100" "got $EMG_3A, expected 302"
+fi
+
+# Rule 7.3.1 caps the bonus at 20 transmitters / 2,000 points.
+EMG_22A=$(bonus_score "22A" '{"emergency_power":true}')
+if [[ "$EMG_22A" == "2002" ]]; then
+  ok "  and a 22A entry is capped at 20 transmitters"
+else
+  no "  a 22A entry is capped at 20 transmitters" "got $EMG_22A, expected 2002"
+fi
+
+# GOTA is 5 points per contact under 7.3.13.1, uncapped, and is not multiplied.
+GOTA=$(bonus_score "1A" '{"gota_qsos":40}')
+if [[ "$GOTA" == "202" ]]; then
+  ok "  GOTA contacts are 5 points each"
+else
+  no "  GOTA contacts are 5 points each" "got $GOTA, expected 202"
 fi
 
 # ── Self-service event portability ───────────────────────────────────────────
