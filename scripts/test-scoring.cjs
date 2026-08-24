@@ -8,18 +8,24 @@
 // paths. Every bonus, every multiplier and every exclusion rule is asserted
 // here instead, in a few milliseconds and with no services running.
 //
-// Two of these guard bugs this project has actually shipped:
+// Several of these guard bugs this project has actually shipped:
 //   * sections multiplying the score instead of the power multiplier
-//   * the Worked All Sections bonus counting unrecognised exchanges
+//   * a Worked All Sections bonus that the Field Day rules do not contain
+//   * emergency power doubling the whole score instead of paying per transmitter
+//
+// The Field Day expectations below are transcribed from the official ARRL
+// rules (Revised 4/2026); each carries its rule number so a reader can check
+// the assertion against the source rather than against lib/scoring.ts.
 //
 // lib/scoring.ts is TypeScript; scripts/_compile-ts.cjs compiles it and hands
 // back a require-able module. That keeps the suite dependency free — same as
 // every other script here, plain `node`, no test runner.
 
 const { compile } = require('./_compile-ts.cjs');
-const ts = compile(['lib/scoring.ts']);
+const ts = compile(['lib/scoring.ts', 'lib/bonuses.ts']);
 const { calculateScore, calculateBonusPoints, powerMultiplier } = ts.load('scoring');
 const { ARRL_SECTIONS } = ts.load('types');
+const { FD_BONUSES, WFD_BONUSES, transmittersFromClass } = ts.load('bonuses');
 
 let failures = 0;
 const ok = m => console.log(`ok    ${m}`);
@@ -101,64 +107,136 @@ console.log('\n── sections ──');
   eq(s.qso_points, 5, 'every QSO still scores, whatever the exchange');
 }
 
-// ── Worked All Sections ─────────────────────────────────────────────────
-console.log('\n── Worked All Sections ──');
+// ── Sections are tracked, but are not a bonus ───────────────────────────
+// Field Day rule 7.3 runs 7.3.1 to 7.3.18 and none of them concerns sections.
+// This app awarded 100 points for a clean sweep for several releases — points
+// an entrant would have copied onto a summary sheet and not earned.
+console.log('\n── sections are not a bonus ──');
 {
   const all = ARRL_SECTIONS.map(x => qso({ rcvd_section: x }));
   const full = calculateScore(all);
   eq(full.sections_worked, ARRL_SECTIONS.length, `all ${ARRL_SECTIONS.length} sections worked`);
-  eq(full.bonus_points, 100, 'a full sweep awards the 100-point bonus');
+  eq(full.bonus_points, 0, 'a full sweep awards no bonus — there is no such rule');
+  eq(full.claimed_score, full.total_score, 'and the claimed score is just the base');
 
-  const oneShort = calculateScore(all.slice(0, -1));
-  eq(oneShort.bonus_points, 0, 'one section short awards nothing');
-
-  // The #34 bug: unrecognised exchanges must not reach the threshold.
+  // The #34 bug: unrecognised exchanges must not inflate sections_worked.
   const withTypo = calculateScore([...all.slice(0, -1), qso({ rcvd_section: 'ZZQ' })]);
-  eq(withTypo.bonus_points, 0, 'a typo cannot substitute for the last section');
+  eq(withTypo.sections_worked, ARRL_SECTIONS.length - 1, 'a typo is not a section');
+  eq(withTypo.unknown_sections[0], 'ZZQ', 'and is surfaced as unrecognised');
   eq(withTypo.qso_points, ARRL_SECTIONS.length, 'though the QSO itself still scores');
 
   const withDx = calculateScore([...all.slice(0, -1), qso({ rcvd_section: 'DX' })]);
-  eq(withDx.bonus_points, 0, 'nor can DX');
+  eq(withDx.sections_worked, ARRL_SECTIONS.length - 1, 'nor is DX a section');
+  eq(withDx.unknown_sections.length, 0, 'but DX is not a typo either');
 }
 
-// ── Bonuses ─────────────────────────────────────────────────────────────
-console.log('\n── bonuses ──');
-eq(calculateBonusPoints({ emergency_power: true }, 500, 0), 500,
-   'emergency power adds the base score again');
+// ── Field Day bonuses, rule 7.3 ─────────────────────────────────────────
+const fd = (bonuses, ctx) => calculateBonusPoints(bonuses, 'FD', ctx);
 
-for (const k of ['w1aw_bulletin', 'satellite', 'natural_power', 'public_info_table',
-                 'media_publicity', 'educational', 'message_to_sm', 'all_licensed']) {
-  eq(calculateBonusPoints({ [k]: true }, 0, 0), 100, `${k} is 100 points`);
+console.log('\n── FD flat bonuses ──');
+for (const [k, pts, rule] of [
+  ['media_publicity',       100, '7.3.2'],
+  ['public_location',       100, '7.3.3'],
+  ['public_info_table',     100, '7.3.4'],
+  ['message_to_sm',         100, '7.3.5'],
+  ['satellite',             100, '7.3.7'],
+  ['natural_power',         100, '7.3.8'],
+  ['w1aw_bulletin',         100, '7.3.9'],
+  ['educational',           100, '7.3.10'],
+  ['elected_official',      100, '7.3.11'],
+  ['served_agency',         100, '7.3.12'],
+  ['gota_coach',            100, '7.3.13.2'],
+  ['web_posting',            50, '7.3.14'],
+  ['social_media',          100, '7.3.16'],
+  ['safety_officer',        100, '7.3.17'],
+  ['site_responsibilities',  50, '7.3.18'],
+]) {
+  eq(fd({ [k]: true }), pts, `${k} is ${pts} points (rule ${rule})`);
 }
-for (const k of ['elected_official', 'web_posting', 'social_media']) {
-  eq(calculateBonusPoints({ [k]: true }, 0, 0), 50, `${k} is 50 points`);
-}
-eq(calculateBonusPoints({ safety_officer: true }, 0, 0), 25, 'safety_officer is 25 points');
 
-console.log('\n── variable bonuses and their caps ──');
-eq(calculateBonusPoints({ youth_ops: 3 }, 0, 0), 60, 'youth operators are 20 points each');
-eq(calculateBonusPoints({ gota_qsos: 50 }, 0, 0), 500, 'GOTA QSOs are 10 points each');
-eq(calculateBonusPoints({ gota_qsos: 500 }, 0, 0), 1000, 'GOTA is capped at 1000');
-eq(calculateBonusPoints({ served_agency: 5 }, 0, 0), 50, 'served agency reps are 10 points each');
-eq(calculateBonusPoints({ served_agency: 50 }, 0, 0), 100, 'served agency is capped at 100');
-eq(calculateBonusPoints({ nts_traffic: 5 }, 0, 0), 50, 'NTS messages are 10 points each');
-eq(calculateBonusPoints({ nts_traffic: 50 }, 0, 0), 100, 'NTS is capped at 100');
-eq(calculateBonusPoints({}, 1000, 0), 0, 'no bonuses claimed is zero, not the base score');
+console.log('\n── FD emergency power is per transmitter, not a doubling (7.3.1) ──');
+eq(fd({ emergency_power: true }, { transmitters: 1 }),  100, '1A claims 100');
+eq(fd({ emergency_power: true }, { transmitters: 3 }),  300, '3A claims 300');
+eq(fd({ emergency_power: true }, { transmitters: 20 }), 2000, '20A claims the 2,000 maximum');
+eq(fd({ emergency_power: true }, { transmitters: 22 }), 2000, 'and 22A claims no more (7.3.1 caps at 20)');
+// The shipped bug: a 5,000-point base used to add 5,000 here.
+eq(fd({ emergency_power: true }, { transmitters: 3, baseScore: 5000 }), 300,
+   'the base score does not enter into it');
+
+console.log('\n── FD counted bonuses and their caps ──');
+eq(fd({ nts_traffic: 5 }),   50,  'formal messages are 10 each (7.3.6)');
+eq(fd({ nts_traffic: 50 }),  100, 'and cap at 100');
+eq(fd({ gota_qsos: 50 }),    250, 'GOTA contacts are 5 points each (7.3.13.1)');
+eq(fd({ gota_qsos: 5000 }),  25000, 'with no cap — 7.3.13.1 sets no limit');
+eq(fd({ youth_ops: 3 }),     60,  'youth participants are 20 each (7.3.15)');
+eq(fd({ youth_ops: 50 }),    100, 'and cap at 100');
+
+console.log('\n── bonuses Field Day does not have ──');
+eq(fd({ all_licensed: true }), 0, 'there is no all-licensed bonus in the FD rules');
+eq(fd({}), 0, 'nothing claimed is zero, not the base score');
+// A count stored before 7.3.12 was corrected from a tally to a single bonus.
+eq(fd({ served_agency: 3 }), 100, 'a legacy served-agency count still claims the one bonus');
+
+console.log('\n── the FD table matches the rules it cites ──');
+{
+  const rules = FD_BONUSES.map(d => d.rule);
+  eq(new Set(rules).size, rules.length, 'no rule number is claimed twice');
+  eq(rules.every(r => /^7\.3\.\d+(\.\d+)?$/.test(r)), true, 'every FD bonus cites a 7.3.x rule');
+  eq(FD_BONUSES.some(d => d.key === 'all_licensed'), false, 'and all_licensed is not among them');
+}
+
+console.log('\n── transmitters come from the entry class (rule 4) ──');
+eq(transmittersFromClass('3A'),  3, '"3A" is three transmitters');
+eq(transmittersFromClass('20A'), 20, 'and "20A" is twenty');
+eq(transmittersFromClass('1D'),  1, 'a class D home station is one');
+// Rule 4: "the minimum number of transmitters that must be claimed is one".
+eq(transmittersFromClass(null),  1, 'a null class floors at one, not zero');
+eq(transmittersFromClass(''),    1, 'and so does an empty one');
+
+console.log('\n── Winter Field Day keeps its own (unverified) table ──');
+{
+  // WFD is a different organisation's contest. These values are not checked
+  // against the WFDA rules; the assertion is only that correcting Field Day
+  // did not quietly move them.
+  eq(calculateBonusPoints({ emergency_power: true }, 'WFD', { baseScore: 500 }), 500,
+     "WFD emergency power still doubles the base");
+  eq(calculateBonusPoints({ safety_officer: true }, 'WFD'), 25, 'WFD safety officer is still 25');
+  eq(calculateBonusPoints({ social_media: true }, 'WFD'), 50, 'WFD social media is still 50');
+  eq(calculateBonusPoints({ gota_qsos: 50 }, 'WFD'), 500, 'WFD GOTA is still 10 each');
+  eq(WFD_BONUSES.every(d => d.rule === undefined), true,
+     'and no WFD row cites an ARRL rule number');
+}
+
+console.log('\n── a special event has no bonuses at all ──');
+eq(calculateBonusPoints({ emergency_power: true, w1aw_bulletin: true }, 'SES', { transmitters: 3 }), 0,
+   'an SES scores nothing, however much is ticked');
 
 // ── Claimed score ───────────────────────────────────────────────────────
 console.log('\n── claimed score ──');
 {
   // 2 CW QSOs = 4 points, LOW power x2 = 8 base.
-  // Emergency power (+8) and W1AW (+100) = 108 bonus.
+  // A 3A entry on emergency power claims 3 x 100, plus W1AW's 100 = 400.
   const s = calculateScore(
     [qso({ mode: 'CW' }), qso({ mode: 'CW', rcvd_section: 'MDC' })],
     { emergency_power: true, w1aw_bulletin: true },
     'LOW',
+    { eventType: 'FD', entryClass: '3A' },
   );
   eq(s.total_score, 8, 'base score is points x power');
-  eq(s.bonus_points, 108, 'emergency power doubles the base, plus the flat bonus');
-  eq(s.claimed_score, 116, 'claimed score is base plus bonuses');
+  eq(s.bonus_points, 400, 'emergency power pays per transmitter, plus the flat bonus');
+  eq(s.claimed_score, 408, 'claimed score is base plus bonuses');
   eq(s.claimed_score, s.total_score + s.bonus_points, 'claimed score reconciles with its parts');
+
+  // Bonuses are added after the multiplier (rule 7.3): a QRP entry's bonuses
+  // are worth exactly the same as a high-power entry's.
+  const qrp = calculateScore(
+    [qso({ mode: 'CW' }), qso({ mode: 'CW', rcvd_section: 'MDC' })],
+    { emergency_power: true, w1aw_bulletin: true },
+    'QRP',
+    { eventType: 'FD', entryClass: '3A' },
+  );
+  eq(qrp.bonus_points, 400, 'the power multiplier does not touch bonus points');
+  eq(qrp.total_score, 20, 'though it does multiply the QSO points');
 }
 
 // ── Per-band breakdown ──────────────────────────────────────────────────

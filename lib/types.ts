@@ -18,24 +18,39 @@ export type SlotEnforcement = 'SOFT' | 'HARD';
  *  NONE  = never flag a dupe. */
 export type DupeRule = 'EVENT' | 'DAY' | 'NONE';
 
+/**
+ * Claimed bonuses, stored as JSONB on the event.
+ *
+ * The point values are NOT here — they live in `lib/bonuses.ts`, which is the
+ * one table both the scorer and the UI read, and which differs between Field
+ * Day and Winter Field Day. This is only the shape of what was claimed.
+ */
 export interface Bonuses {
   emergency_power?: boolean;
   w1aw_bulletin?: boolean;
   satellite?: boolean;
   natural_power?: boolean;
   public_info_table?: boolean;
+  public_location?: boolean;
   media_publicity?: boolean;
   educational?: boolean;
   message_to_sm?: boolean;
-  all_licensed?: boolean;
   elected_official?: boolean;
   web_posting?: boolean;
   social_media?: boolean;
   safety_officer?: boolean;
+  gota_coach?: boolean;
+  site_responsibilities?: boolean;
   youth_ops?: number;
   gota_qsos?: number;
-  served_agency?: number;
   nts_traffic?: number;
+  /** Field Day rule 7.3.12 is one 100-point bonus for a visit, so this is a
+   *  boolean there. Winter Field Day still counts representatives, and events
+   *  scored before the 2026 rules correction stored a count either way — any
+   *  truthy value claims the Field Day bonus. */
+  served_agency?: boolean | number;
+  /** Winter Field Day only — Field Day has no such bonus. */
+  all_licensed?: boolean;
 }
 
 export interface Event {

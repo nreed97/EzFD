@@ -1,23 +1,7 @@
 'use client';
 
-import { ARRL_SECTIONS } from '@/lib/types';
 import type { Event, Score, Bonuses } from '@/lib/types';
-
-const BOOL_LABELS: Partial<Record<keyof Bonuses, string>> = {
-  emergency_power:   'Emergency power',
-  w1aw_bulletin:     'W1AW FD bulletin',
-  satellite:         'Satellite QSO',
-  natural_power:     'Natural power (solar/wind)',
-  public_info_table: 'Public information table',
-  media_publicity:   'Media publicity',
-  educational:       'Educational activity',
-  message_to_sm:     'Message to section manager',
-  all_licensed:      '100% attendees licensed',
-  elected_official:  'Elected official visit',
-  web_posting:       'Club website posting',
-  social_media:      'Social media post',
-  safety_officer:    'Safety officer',
-};
+import { bonusDefs, bonusPoints, transmittersFromClass } from '@/lib/bonuses';
 
 interface Props {
   event: Event;
@@ -27,29 +11,36 @@ interface Props {
   onClose: () => void;
 }
 
-function bonusLineItems(bonuses: Bonuses, score: Score): { label: string; pts: number }[] {
+/**
+ * The bonus lines on the sheet, straight from the same table the scorer sums.
+ *
+ * This used to re-derive each value from the key name, so the sheet an
+ * operator transcribes onto their ARRL entry could differ from the claimed
+ * score printed beneath it. Filtering on the computed value means an
+ * unclaimed bonus is a zero and a claimed one is exactly what was scored.
+ */
+function bonusLineItems(event: Event, bonuses: Bonuses, score: Score): { label: string; pts: number }[] {
+  const ctx = {
+    transmitters: transmittersFromClass(event.class),
+    baseScore: score.total_score,
+  };
   const items: { label: string; pts: number }[] = [];
-  for (const [k, label] of Object.entries(BOOL_LABELS)) {
-    if (bonuses[k as keyof Bonuses]) {
-      const pts = k === 'emergency_power' ? score.total_score : k.endsWith('_official') || k === 'web_posting' || k === 'social_media' ? 50 : k === 'safety_officer' ? 25 : 100;
-      items.push({ label, pts });
-    }
+  for (const def of bonusDefs(event.event_type)) {
+    const pts = bonusPoints(def, bonuses, ctx);
+    if (pts === 0) continue;
+    const claimed = bonuses[def.key];
+    // A counted bonus shows its count, so the sheet says where the number
+    // came from — "GOTA QSOs (42)" rather than a bare 210.
+    const label = def.kind === 'per-unit' ? `${def.label} (${claimed})` : def.label;
+    items.push({ label, pts });
   }
-  if (bonuses.youth_ops)    items.push({ label: `Youth operators (${bonuses.youth_ops})`,        pts: bonuses.youth_ops * 20 });
-  if (bonuses.gota_qsos)    items.push({ label: `GOTA QSOs (${bonuses.gota_qsos})`,              pts: Math.min(bonuses.gota_qsos * 10, 1000) });
-  if (bonuses.served_agency) items.push({ label: `Served agency reps (${bonuses.served_agency})`, pts: Math.min(bonuses.served_agency * 10, 100) });
-  if (bonuses.nts_traffic)  items.push({ label: `NTS messages (${bonuses.nts_traffic})`,          pts: Math.min(bonuses.nts_traffic * 10, 100) });
-  // Derived from ARRL_SECTIONS so this line item can never disagree with the
-  // bonus lib/scoring.ts actually awarded.
-  if (score.sections_worked >= ARRL_SECTIONS.length)
-    items.push({ label: `Worked all ${ARRL_SECTIONS.length} sections`, pts: 100 });
   return items;
 }
 
 export default function SummarySheet({ event, score, bonuses, operators, onClose }: Props) {
   const bonusPoints = score.bonus_points;
   const claimedScore = score.claimed_score;
-  const lineItems = bonusLineItems(bonuses, score);
+  const lineItems = bonusLineItems(event, bonuses, score);
   const now = new Date();
 
   return (

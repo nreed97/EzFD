@@ -103,7 +103,7 @@ Sections or appear on the map.
 
 `DX` is accepted — that's the correct exchange from a station outside the US
 and Canada. It's logged and exported normally, but it isn't a section, so it
-doesn't count toward Worked All Sections or appear on the map.
+doesn't count toward your sections-worked total or appear on the map.
 
 Otherwise this is usually a typo. The other cause is an abbreviation RAC has
 retired:

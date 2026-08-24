@@ -140,7 +140,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   // all three previously only updated when something else forced a render.
   const nowMs = useNow(PRESENCE_POLL_MS);
 
-  const score = calculateScore(qsos, bonuses, event.power);
+  const score = calculateScore(qsos, bonuses, event.power, { eventType: event.event_type, entryClass: event.class });
   const oneHourAgo = new Date(nowMs - 60 * 60 * 1000).toISOString();
   const recentQSOs = qsos.filter(q => !q.is_dupe && (typeof q.datetime_utc === 'string' ? q.datetime_utc : q.datetime_utc.toISOString()) > oneHourAgo).length;
 
@@ -326,6 +326,8 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
               <BonusTracker
                 joinCode={event.join_code}
                 initialBonuses={bonuses}
+                eventType={event.event_type}
+                entryClass={event.class}
                 baseScore={score.total_score}
                 onBonusesChange={setBonuses}
                 readOnly={isVisitor}
