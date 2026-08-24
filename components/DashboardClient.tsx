@@ -321,14 +321,13 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
             </div>
           ) : (
             <>
-              <Scoreboard score={score} bonusPoints={score.bonus_points} />
+              <Scoreboard score={score} bonusPoints={score.bonus_points} isWfd={event.event_type === 'WFD'} />
 
               <BonusTracker
                 joinCode={event.join_code}
                 initialBonuses={bonuses}
                 eventType={event.event_type}
                 entryClass={event.class}
-                baseScore={score.total_score}
                 onBonusesChange={setBonuses}
                 readOnly={isVisitor}
               />

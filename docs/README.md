@@ -19,6 +19,7 @@ Start with whichever describes you.
 | [Getting started](getting-started.md) | From an empty server to a logged QSO — install included |
 | [Operating](operating.md) | The logging screen in depth — entry, QSY, dupes, offline |
 | [Field Day](field-day.md) | Classes, the exchange, scoring, bonuses, submitting your entry |
+| [Rules reference](rules-reference.md) | The scoring rules for both contests, transcribed from the official documents |
 | [Special event stations](special-events.md) | One callsign across many operators, and how the checkout works |
 | [Rig control and CW](rig-control.md) | CAT via Hamlib, automatic band/mode tracking, macro keying |
 | [Digital modes](digital-modes.md) | WSJT-X and JTDX auto-logging, ADIF import |

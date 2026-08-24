@@ -1,9 +1,14 @@
 import type { QSO, Score, Band, BandStats, Bonuses, EventType } from './types';
-import { MODE_POINTS, DX_EXCHANGE, isARRLSection } from './types';
-import { bonusDefs, bonusPoints, transmittersFromClass, type BonusContext } from './bonuses';
+import { MODE_POINTS, DX_EXCHANGE, MX_EXCHANGE, isARRLSection, transmitterCount } from './types';
+import { bonusDefs, bonusPoints, objectiveMultiplier, type BonusContext } from './bonuses';
 
-// ARRL Field Day power multiplier
-// QRP (≤5 W) = ×5, Low Power (≤150 W) = ×2, High Power = ×1
+/**
+ * ARRL Field Day power multiplier (rule 7.2): QRP ×5, low ×2, high ×1.
+ *
+ * Field Day only. Winter Field Day has no power multiplier — every station is
+ * capped at 100 W PEP and running QRP is an objective worth ×4 in the OM,
+ * so a WFD score never passes through here.
+ */
 export function powerMultiplier(power: 'HIGH' | 'LOW' | 'QRP' | string): number {
   if (power === 'QRP') return 5;
   if (power === 'LOW') return 2;
@@ -71,10 +76,12 @@ export function calculateScore(
     if (qso.rcvd_section) {
       const sec = qso.rcvd_section.toUpperCase();
       if (isARRLSection(sec)) sections.add(sec);
-      // DX is a legal Field Day exchange from outside the US and Canada. It
-      // isn't a section, so it doesn't count — but it isn't a mistake either,
-      // so it doesn't get flagged as one.
-      else if (sec !== DX_EXCHANGE) unknownSections.add(sec);
+      // DX is a legal exchange from outside the US and Canada, and MX is
+      // Winter Field Day's for Mexico. Neither is a section, so neither
+      // counts — but neither is a mistake either, so neither gets flagged as
+      // one. Counting them would move the sections-worked figure off the
+      // list it is supposed to measure against.
+      else if (sec !== DX_EXCHANGE && sec !== MX_EXCHANGE) unknownSections.add(sec);
     }
 
     if (!byBand[qso.band]) byBand[qso.band] = { ph: 0, cw: 0, dig: 0 };
@@ -84,14 +91,25 @@ export function calculateScore(
     else if (qso.mode === 'DIG') bs.dig++;
   }
 
-  const mult         = powerMultiplier(power);
   const sectionsWorked = sections.size;
-  const totalScore   = qsoPoints * mult;
-  // Bonuses are added after the multiplier (rule 7.3) — none of them is
-  // multiplied, including GOTA contacts, which 7.3.13.1 calls out explicitly.
-  const bonusTotal   = calculateBonusPoints(bonuses, entry.eventType, {
-    transmitters: transmittersFromClass(entry.entryClass),
-    baseScore: totalScore,
+  const isWfd = entry.eventType === 'WFD';
+
+  // The two contests do not share a scoring model, only a QSO point table.
+  //
+  //   Field Day:        QSO points × power multiplier, then bonuses added
+  //   Winter Field Day: QSO points × (Objective Multiplier + 1), no bonuses
+  //
+  // Running one formula for both is what made a WFD claimed score a number
+  // the WFD rules cannot produce by any route.
+  const powerMult = isWfd ? 1 : powerMultiplier(power);
+  const objMult   = isWfd ? objectiveMultiplier(bonuses) : 1;
+  const totalScore = qsoPoints * powerMult * objMult;
+
+  // Field Day bonuses are added after the multiplier (rule 7.3) and none of
+  // them is multiplied — 7.3.13.1 calls that out explicitly for GOTA. WFD has
+  // no bonus points at all, so bonusDefs returns nothing for it.
+  const bonusTotal = calculateBonusPoints(bonuses, entry.eventType, {
+    transmitters: transmitterCount(entry.entryClass),
   });
 
   return {
@@ -101,7 +119,8 @@ export function calculateScore(
     cw_qsos:         cwQSOs,
     digital_qsos:    digitalQSOs,
     qso_points:      qsoPoints,
-    power_multiplier: mult,
+    power_multiplier: powerMult,
+    objective_multiplier: objMult,
     sections_worked: sectionsWorked,
     total_score:     totalScore,
     bonus_points:    bonusTotal,

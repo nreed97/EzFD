@@ -25,7 +25,7 @@ const { compile } = require('./_compile-ts.cjs');
 const ts = compile(['lib/scoring.ts', 'lib/bonuses.ts']);
 const { calculateScore, calculateBonusPoints, powerMultiplier } = ts.load('scoring');
 const { ARRL_SECTIONS } = ts.load('types');
-const { FD_BONUSES, WFD_BONUSES, transmittersFromClass } = ts.load('bonuses');
+const { FD_BONUSES, WFD_OBJECTIVES, WFD_MAX_MULTIPLIER, objectiveMultiplier, transmittersFromClass } = ts.load('bonuses');
 
 let failures = 0;
 const ok = m => console.log(`ok    ${m}`);
@@ -193,23 +193,71 @@ eq(transmittersFromClass('1D'),  1, 'a class D home station is one');
 eq(transmittersFromClass(null),  1, 'a null class floors at one, not zero');
 eq(transmittersFromClass(''),    1, 'and so does an empty one');
 
-console.log('\n── Winter Field Day keeps its own (unverified) table ──');
+// ── Winter Field Day, a different scoring model ─────────────────────────
+// WFD has no bonus points and no power multiplier. Objectives each carry an
+// Objective Multiplier; the completed ones are summed, one is added, and that
+// multiplies the QSO points:  score = QSO points × (OM + 1).
+console.log('\n── WFD scores by objective multiplier, not bonuses ──');
+eq(calculateBonusPoints({ wfd_qrp: true, wfd_alt_power: true }, 'WFD'), 0,
+   'WFD awards no bonus points at all');
+eq(calculateBonusPoints({ emergency_power: true, safety_officer: true }, 'WFD'), 0,
+   'and a Field Day bonus claimed on a WFD event is worth nothing');
+
+console.log('\n── the OM sums, and always has 1 added ──');
+eq(objectiveMultiplier({}), 1, 'no objectives completed is ×1, so QSOs still score');
+eq(objectiveMultiplier({ wfd_alt_power: true }), 2, 'alternative power is OM 1 → ×2');
+eq(objectiveMultiplier({ wfd_qrp: true }), 5, 'QRP is OM 4 → ×5');
+eq(objectiveMultiplier({ wfd_six_bands: true }), 7, 'six bands is OM 6 → ×7');
+eq(objectiveMultiplier({ wfd_six_bands: true, wfd_twelve_bands: true }), 13,
+   'six and twelve bands both count — twelve does not replace six');
+eq(objectiveMultiplier({ wfd_qrp: true, wfd_away_from_home: true, wfd_multi_mode: true }), 10,
+   'OM values add: 4 + 3 + 2 = 9, +1');
 {
-  // WFD is a different organisation's contest. These values are not checked
-  // against the WFDA rules; the assertion is only that correcting Field Day
-  // did not quietly move them.
-  eq(calculateBonusPoints({ emergency_power: true }, 'WFD', { baseScore: 500 }), 500,
-     "WFD emergency power still doubles the base");
-  eq(calculateBonusPoints({ safety_officer: true }, 'WFD'), 25, 'WFD safety officer is still 25');
-  eq(calculateBonusPoints({ social_media: true }, 'WFD'), 50, 'WFD social media is still 50');
-  eq(calculateBonusPoints({ gota_qsos: 50 }, 'WFD'), 500, 'WFD GOTA is still 10 each');
-  eq(WFD_BONUSES.every(d => d.rule === undefined), true,
-     'and no WFD row cites an ARRL rule number');
+  const all = Object.fromEntries(WFD_OBJECTIVES.map(o => [o.key, true]));
+  eq(objectiveMultiplier(all), WFD_MAX_MULTIPLIER, 'every objective gives the maximum multiplier');
+  eq(WFD_MAX_MULTIPLIER, 33, 'which is 32 OM + 1');
+}
+
+console.log('\n── the WFD formula end to end ──');
+{
+  // 3 CW QSOs = 6 QSO points. QRP (OM 4) + six bands (OM 6) = OM 10, ×11.
+  const qsos = [qso({ mode: 'CW' }), qso({ mode: 'CW', callsign: 'K2B' }), qso({ mode: 'CW', callsign: 'K3C' })];
+  const s = calculateScore(qsos, { wfd_qrp: true, wfd_six_bands: true }, 'HIGH',
+                           { eventType: 'WFD', entryClass: '2O' });
+  eq(s.qso_points, 6, 'QSO points are the same table as Field Day');
+  eq(s.objective_multiplier, 11, 'the objective multiplier is OM + 1');
+  eq(s.total_score, 66, 'score is QSO points × (OM + 1)');
+  eq(s.bonus_points, 0, 'with no bonus points');
+  eq(s.claimed_score, 66, 'so the claimed score is just the product');
+}
+
+console.log('\n── WFD has no power multiplier ──');
+{
+  // Every WFD station is capped at 100 W PEP; running QRP is an objective
+  // worth OM 4, not a ×5 multiplier. Passing a power here must change nothing.
+  const qsos = [qso({ mode: 'CW' })];
+  const entry = { eventType: 'WFD', entryClass: '1H' };
+  const hi  = calculateScore(qsos, {}, 'HIGH', entry);
+  const qrp = calculateScore(qsos, {}, 'QRP', entry);
+  eq(hi.power_multiplier, 1, 'power multiplier is 1 on WFD');
+  eq(qrp.power_multiplier, 1, 'whatever power is recorded');
+  eq(hi.total_score, qrp.total_score, 'so power cannot change a WFD score');
+  eq(qrp.total_score, 2, 'and the score is just the QSO points');
+}
+
+console.log('\n── Field Day is unaffected by the objective multiplier ──');
+{
+  const s = calculateScore([qso({ mode: 'CW' })], { wfd_qrp: true }, 'QRP',
+                           { eventType: 'FD', entryClass: '1A' });
+  eq(s.objective_multiplier, 1, 'objective multiplier is 1 on Field Day');
+  eq(s.total_score, 10, 'and the power multiplier still applies (2 pts × 5)');
 }
 
 console.log('\n── a special event has no bonuses at all ──');
 eq(calculateBonusPoints({ emergency_power: true, w1aw_bulletin: true }, 'SES', { transmitters: 3 }), 0,
    'an SES scores nothing, however much is ticked');
+eq(calculateScore([qso({ mode: 'CW' })], { wfd_qrp: true }, 'QRP', { eventType: 'SES' }).objective_multiplier, 1,
+   'and an SES has no objective multiplier either');
 
 // ── Claimed score ───────────────────────────────────────────────────────
 console.log('\n── claimed score ──');

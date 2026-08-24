@@ -1,7 +1,7 @@
 'use client';
 
 import type { Event, Score, Bonuses } from '@/lib/types';
-import { bonusDefs, bonusPoints, transmittersFromClass } from '@/lib/bonuses';
+import { bonusDefs, bonusPoints, transmittersFromClass, WFD_OBJECTIVES } from '@/lib/bonuses';
 
 interface Props {
   event: Event;
@@ -25,6 +25,9 @@ function bonusLineItems(event: Event, bonuses: Bonuses, score: Score): { label: 
     baseScore: score.total_score,
   };
   const items: { label: string; pts: number }[] = [];
+  // WFD objectives are multipliers, not points, so they are listed separately
+  // below rather than being summed into a bonus total that does not exist.
+  if (event.event_type === 'WFD') return items;
   for (const def of bonusDefs(event.event_type)) {
     const pts = bonusPoints(def, bonuses, ctx);
     if (pts === 0) continue;
@@ -38,6 +41,9 @@ function bonusLineItems(event: Event, bonuses: Bonuses, score: Score): { label: 
 }
 
 export default function SummarySheet({ event, score, bonuses, operators, onClose }: Props) {
+  // Winter Field Day multiplies QSO points by its Objective Multiplier + 1 and
+  // has no bonus points, so the sheet shows a different calculation entirely.
+  const isWfd = event.event_type === 'WFD';
   const bonusPoints = score.bonus_points;
   const claimedScore = score.claimed_score;
   const lineItems = bonusLineItems(event, bonuses, score);
@@ -126,8 +132,12 @@ export default function SummarySheet({ event, score, bonuses, operators, onClose
                 <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">Score Calculation</h3>
                 <div className="flex flex-col gap-1 font-mono text-xs">
                   <ScoreRow label="QSO points" value={score.qso_points} />
-                  <ScoreRow label={`Power mult (×${score.power_multiplier})`} value={score.power_multiplier} op="×" />
-                  <ScoreRow label="Base score" value={score.total_score} bold />
+                  {isWfd ? (
+                    <ScoreRow label={`Objective mult (OM ${score.objective_multiplier - 1} + 1)`} value={score.objective_multiplier} op="×" />
+                  ) : (
+                    <ScoreRow label={`Power mult (×${score.power_multiplier})`} value={score.power_multiplier} op="×" />
+                  )}
+                  <ScoreRow label={isWfd ? 'Total score' : 'Base score'} value={score.total_score} bold />
 
                   {lineItems.length > 0 && (
                     <>
@@ -146,6 +156,28 @@ export default function SummarySheet({ event, score, bonuses, operators, onClose
                   </div>
                 </div>
               </section>
+
+              {/* Objectives — WFD only, listed with the OM each contributed
+                  so the sheet shows how the multiplier was arrived at. */}
+              {isWfd && (
+                <section>
+                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                    Objectives ({WFD_OBJECTIVES.filter(o => bonuses[o.key]).length} of {WFD_OBJECTIVES.length})
+                  </h3>
+                  <div className="flex flex-col gap-0.5 font-mono text-xs">
+                    {WFD_OBJECTIVES.filter(o => bonuses[o.key]).map(o => (
+                      <div key={o.key} className="flex items-baseline justify-between">
+                        <span className="text-zinc-300 light:text-zinc-700">{o.label}</span>
+                        <span className="text-zinc-400 light:text-zinc-600">OM +{o.om}</span>
+                      </div>
+                    ))}
+                    <div className="mt-1 flex items-baseline justify-between border-t border-zinc-800 pt-1 font-semibold light:border-zinc-200">
+                      <span className="text-zinc-200 light:text-zinc-800">Objective multiplier</span>
+                      <span className="text-amber-400 light:text-amber-700">×{score.objective_multiplier}</span>
+                    </div>
+                  </div>
+                </section>
+              )}
 
               {/* Sections worked */}
               {score.sections.length > 0 && (

@@ -25,30 +25,17 @@ export type BonusDef =
   | { key: keyof Bonuses; label: string; rule?: string; kind: 'per-transmitter'; points: number; maxTransmitters: number }
   /** A counted bonus — n × points, optionally capped. */
   | { key: keyof Bonuses; label: string; rule?: string; kind: 'per-unit'; points: number; max: number | null; unit: string; inputMax: number }
-  /** Adds the whole pre-bonus score again. Winter Field Day only, and
-   *  unverified — kept solely so splitting the table changes no WFD number. */
-  | { key: keyof Bonuses; label: string; rule?: string; kind: 'double-base' };
+  ;
 
 export interface BonusContext {
   /** Transmitters claimed, i.e. the leading number of the entry class. */
   transmitters?: number;
-  /** QSO points × power multiplier, before bonuses. WFD's emergency power only. */
-  baseScore?: number;
 }
 
-/**
- * The transmitter count from an entry class — "3A" → 3.
- *
- * Rule 4: the class is the maximum number of simultaneously transmitted
- * signals, and "the minimum number of transmitters that must be claimed is
- * one (1)", so an unparseable or absent class floors at 1 rather than zeroing
- * the emergency power bonus. NULL is normal here: `events.class` is NULL for
- * every SES row.
- */
-export function transmittersFromClass(cls: string | null | undefined): number {
-  const n = parseInt(String(cls ?? ''), 10);
-  return Number.isFinite(n) && n > 0 ? n : 1;
-}
+/** Re-exported so the bonus table's one caller-facing helper lives beside the
+ *  table. The implementation stays in lib/types.ts, which already had it — a
+ *  second copy here is exactly the drift this file exists to end. */
+export { transmitterCount as transmittersFromClass } from './types';
 
 /**
  * ARRL Field Day, rule 7.3. Ordered by rule number.
@@ -86,39 +73,72 @@ export const FD_BONUSES: BonusDef[] = [
 ];
 
 /**
- * Winter Field Day — NOT VERIFIED against a rules document.
+ * Winter Field Day objectives, from the WFDA rules for 2026.
  *
- * WFD is run by the Winter Field Day Association, not the ARRL, and has its
- * own scoring. These are the values this app has always used, preserved
- * unchanged so that correcting Field Day moves no WFD number; they should not
- * be taken as accurate. See the WFD scoring issue before trusting a WFD
- * claimed score.
+ * WFD does not have bonus points. It has *objectives*, each carrying an
+ * Objective Multiplier (OM); the OM values of everything completed are summed,
+ * one is added, and the result multiplies the QSO points:
+ *
+ *     total score = (total QSO points) × (OM + 1)
+ *
+ * The "+1" is why a station that completes nothing still scores its QSOs. This
+ * is a different scoring model from Field Day's `points × power + bonuses`,
+ * not a different set of numbers within the same one — the app applied Field
+ * Day's model to WFD for several releases, which produced a score that could
+ * not be arrived at from the WFD rules by any route.
+ *
+ * Note there is no power multiplier in WFD at all: every station is capped at
+ * 100 W PEP, and running QRP is an objective (×4) rather than a multiplier.
  */
-export const WFD_BONUSES: BonusDef[] = [
-  { key: 'emergency_power',   label: 'Emergency power',            kind: 'double-base' },
-  { key: 'w1aw_bulletin',     label: 'W1AW bulletin',              kind: 'flat', points: 100 },
-  { key: 'satellite',         label: 'Satellite QSO',              kind: 'flat', points: 100 },
-  { key: 'natural_power',     label: 'Natural power (solar/wind)', kind: 'flat', points: 100 },
-  { key: 'public_info_table', label: 'Public info table',          kind: 'flat', points: 100 },
-  { key: 'media_publicity',   label: 'Media publicity',            kind: 'flat', points: 100 },
-  { key: 'educational',       label: 'Educational activity',       kind: 'flat', points: 100 },
-  { key: 'message_to_sm',     label: 'Message to section manager', kind: 'flat', points: 100 },
-  { key: 'all_licensed',      label: '100% attendees licensed',    kind: 'flat', points: 100 },
-  { key: 'elected_official',  label: 'Elected official visit',     kind: 'flat', points: 50 },
-  { key: 'web_posting',       label: 'Club website posting',       kind: 'flat', points: 50 },
-  { key: 'social_media',      label: 'Social media post',          kind: 'flat', points: 50 },
-  { key: 'safety_officer',    label: 'Safety officer',             kind: 'flat', points: 25 },
-  { key: 'youth_ops',     label: 'Youth operators (under 18)', kind: 'per-unit', points: 20, max: null, unit: 'ops',  inputMax: 99 },
-  { key: 'gota_qsos',     label: 'GOTA station QSOs',          kind: 'per-unit', points: 10, max: 1000, unit: 'QSOs', inputMax: 9999 },
-  { key: 'served_agency', label: 'Served agency reps',         kind: 'per-unit', points: 10, max: 100,  unit: 'reps', inputMax: 10 },
-  { key: 'nts_traffic',   label: 'NTS messages',               kind: 'per-unit', points: 10, max: 100,  unit: 'msgs', inputMax: 10 },
+export interface ObjectiveDef {
+  key: keyof Bonuses;
+  label: string;
+  /** The Objective Multiplier this objective contributes. */
+  om: number;
+}
+
+export const WFD_OBJECTIVES: ObjectiveDef[] = [
+  { key: 'wfd_alt_power',      om: 1, label: 'Operate 100% on alternative power' },
+  { key: 'wfd_away_from_home', om: 3, label: 'Operate away from home' },
+  { key: 'wfd_antennas',       om: 1, label: 'Contact on two or more new antennas' },
+  { key: 'wfd_sat_fm',         om: 2, label: 'FM satellite contact' },
+  { key: 'wfd_sat_ssb_cw',     om: 3, label: 'SSB or CW satellite contact' },
+  { key: 'wfd_winlink',        om: 1, label: 'Send and receive a Winlink email' },
+  { key: 'wfd_bulletin',       om: 1, label: 'Copy the WFD special bulletin' },
+  { key: 'wfd_six_bands',      om: 6, label: 'Three contacts on six bands' },
+  { key: 'wfd_twelve_bands',   om: 6, label: 'Three contacts on twelve bands' },
+  { key: 'wfd_multi_mode',     om: 2, label: 'Use multiple modes' },
+  { key: 'wfd_qrp',            om: 4, label: 'Operate the event QRP' },
+  { key: 'wfd_six_hours',      om: 2, label: 'Operate six continuous hours' },
 ];
 
-/** A special event station has no contest score, so it has no bonuses. */
+/**
+ * The multiplier WFD applies to QSO points: the OM values of every completed
+ * objective, plus one.
+ *
+ * Never returns zero — the rules add the 1 precisely so that a station which
+ * completes no objectives still scores its contacts.
+ */
+export function objectiveMultiplier(bonuses: Bonuses): number {
+  let om = 0;
+  for (const def of WFD_OBJECTIVES) if (bonuses[def.key]) om += def.om;
+  return om + 1;
+}
+
+/** Every objective completed. Worth stating as a derived constant rather than
+ *  a literal, for the same reason the section total is derived. */
+export const WFD_MAX_MULTIPLIER = WFD_OBJECTIVES.reduce((n, d) => n + d.om, 0) + 1;
+
+/**
+ * The bonus schedule for an event type.
+ *
+ * Only Field Day has one. A special event station has no contest score at all,
+ * and Winter Field Day scores through WFD_OBJECTIVES instead — its objectives
+ * multiply QSO points rather than adding points after the fact, so they cannot
+ * be summed into a bonus total and must not be routed through here.
+ */
 export function bonusDefs(eventType: EventType | undefined): BonusDef[] {
-  if (eventType === 'WFD') return WFD_BONUSES;
-  if (eventType === 'SES') return [];
-  return FD_BONUSES;
+  return eventType === 'FD' || eventType === undefined ? FD_BONUSES : [];
 }
 
 /** What one bonus is actually worth given what has been claimed. Zero when
@@ -138,8 +158,6 @@ export function bonusPoints(def: BonusDef, bonuses: Bonuses, ctx: BonusContext =
       const raw = n * def.points;
       return def.max === null ? raw : Math.min(raw, def.max);
     }
-    case 'double-base':
-      return ctx.baseScore ?? 0;
   }
 }
 
@@ -157,7 +175,5 @@ export function bonusRate(def: BonusDef, ctx: BonusContext = {}): string {
       return def.max === null
         ? `+${def.points} each`
         : `+${def.points} each, max ${def.max}`;
-    case 'double-base':
-      return '+100% of base';
   }
 }

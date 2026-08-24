@@ -49,8 +49,28 @@ export interface Bonuses {
    *  scored before the 2026 rules correction stored a count either way — any
    *  truthy value claims the Field Day bonus. */
   served_agency?: boolean | number;
-  /** Winter Field Day only — Field Day has no such bonus. */
+  /** Winter Field Day only — Field Day has no such bonus. Retained so an
+   *  event scored before WFD moved to the objectives model still round-trips
+   *  through a backup; nothing reads it. */
   all_licensed?: boolean;
+
+  // --- Winter Field Day objectives -------------------------------------
+  // Not bonuses: each carries an Objective Multiplier that multiplies QSO
+  // points, rather than adding points after the multiplier. See
+  // WFD_OBJECTIVES in lib/bonuses.ts. Prefixed so they cannot be confused
+  // with a Field Day bonus key in stored JSON.
+  wfd_alt_power?: boolean;
+  wfd_away_from_home?: boolean;
+  wfd_antennas?: boolean;
+  wfd_sat_fm?: boolean;
+  wfd_sat_ssb_cw?: boolean;
+  wfd_winlink?: boolean;
+  wfd_bulletin?: boolean;
+  wfd_six_bands?: boolean;
+  wfd_twelve_bands?: boolean;
+  wfd_multi_mode?: boolean;
+  wfd_qrp?: boolean;
+  wfd_six_hours?: boolean;
 }
 
 export interface Event {
@@ -116,10 +136,17 @@ export function isSES(event: Pick<Event, 'event_type'>): boolean {
   return event.event_type === 'SES';
 }
 
-/** Transmitter count implied by a contest class (e.g. "3A" → 3, "1D" → 1).
- *  SES has no class, so callers pass `event.class` which is nullable. */
-export function transmitterCount(eventClass: string | null): number {
-  return parseInt(eventClass?.match(/^\d+/)?.[0] ?? '1', 10);
+/**
+ * Transmitter count implied by a contest class (e.g. "3A" → 3, "1D" → 1).
+ *
+ * SES has no class, so callers pass `event.class`, which is nullable. Field
+ * Day rule 4 says "the minimum number of transmitters that must be claimed is
+ * one (1)", so anything unparseable or non-positive floors at 1 rather than
+ * zeroing the per-transmitter emergency power bonus that reads this.
+ */
+export function transmitterCount(eventClass: string | null | undefined): number {
+  const n = parseInt(eventClass?.match(/^\d+/)?.[0] ?? '', 10);
+  return Number.isFinite(n) && n > 0 ? n : 1;
 }
 
 /** One operator's claim on the shared callsign for a band/mode over a time
@@ -221,8 +248,17 @@ export interface Score {
   cw_qsos: number;
   digital_qsos: number;
   qso_points: number;
+  /** Field Day's power multiplier. Always 1 on Winter Field Day, which has no
+   *  power multiplier at all — every station is capped at 100 W and running
+   *  QRP is an objective, not a multiplier. */
   power_multiplier: number;
-  /** Distinct *recognised* sections — the Worked All Sections numerator. */
+  /** Winter Field Day's Objective Multiplier + 1, the number QSO points are
+   *  multiplied by. Always 1 on Field Day, which has no such concept. The two
+   *  multipliers are kept as separate fields rather than one "multiplier"
+   *  because the UI names them differently and only ever shows one. */
+  objective_multiplier: number;
+  /** Distinct *recognised* sections. Not a bonus — Field Day has no such rule
+   *  — but the number operators chase, so it is surfaced everywhere. */
   sections_worked: number;
   total_score: number;
   bonus_points: number;
@@ -300,13 +336,24 @@ export type ARRLSection = typeof ARRL_SECTIONS[number];
 export const DX_EXCHANGE = 'DX';
 
 /** Everything the entry form should accept without complaining. */
+/** Winter Field Day only: Mexican stations send MX. Field Day has no such
+ *  exchange — a Mexican station there sends DX like any other. */
+export const MX_EXCHANGE = 'MX';
+
 export const VALID_EXCHANGES: readonly string[] = [...ARRL_SECTIONS, DX_EXCHANGE];
 
-export function isValidExchange(value: string): boolean {
-  return VALID_EXCHANGES.includes(value.toUpperCase());
+/** Everything an entry form should accept for an event type. Kept separate
+ *  from ARRL_SECTIONS, which stays the sections-worked denominator: neither DX
+ *  nor MX is a section and neither may ever be counted as one. */
+export function validExchangesFor(eventType: EventType | undefined): readonly string[] {
+  return eventType === 'WFD' ? [...VALID_EXCHANGES, MX_EXCHANGE] : VALID_EXCHANGES;
 }
 
-/** True only for real sections — the things Worked All Sections counts. */
+export function isValidExchange(value: string, eventType?: EventType): boolean {
+  return validExchangesFor(eventType).includes(value.toUpperCase());
+}
+
+/** True only for real sections — the sections-worked denominator. */
 export function isARRLSection(value: string): boolean {
   return (ARRL_SECTIONS as readonly string[]).includes(value.toUpperCase());
 }
