@@ -51,8 +51,9 @@ and ESM. The server is never involved.
 or bulk-import any ADIF file. Imports are idempotent, so re-importing can't
 double your log.
 
-**Correct scoring.** QSO points × power multiplier + bonuses, with all 17
-Field Day bonus categories tracked live. Sections do not multiply the score —
+**Correct scoring.** QSO points × power multiplier + bonuses, with all 19
+Field Day bonus categories from rule 7.3 tracked live and each labelled with
+its rule number. Sections neither multiply the score nor earn a bonus —
 a detail that's easy to get wrong and expensive when you do.
 
 **Special event stations.** A third event type for a callsign activated across

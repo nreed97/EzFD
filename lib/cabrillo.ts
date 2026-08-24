@@ -42,7 +42,7 @@ export function generateCabrillo(event: Event, qsos: QSO[]): string {
     (a, b) => new Date(a.datetime_utc).getTime() - new Date(b.datetime_utc).getTime()
   );
 
-  const score = calculateScore(qsos, event.bonuses ?? {}, event.power ?? 'HIGH');
+  const score = calculateScore(qsos, event.bonuses ?? {}, event.power ?? 'HIGH', { eventType: event.event_type, entryClass: event.class });
 
   const numTx = transmitterCount(eventClass);
 

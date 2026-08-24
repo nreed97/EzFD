@@ -45,10 +45,12 @@ score = QSO points × power multiplier + bonus points
 | `LOW` power (≤150 W) | ×2 |
 | `QRP` power (≤5 W) | ×5 |
 
-**Sections do not multiply the score.** They are a bonus trigger only. This is
-the single most commonly mis-implemented part of the Field Day formula, and
-getting it wrong inflates a score enormously — a 60-section event would come
-out sixty times too high.
+**Sections do not multiply the score, and they are not a bonus either.** Rule
+7.3 lists eighteen bonuses and none of them concerns sections. Working every
+section is an operating goal the app helps you chase; it is worth no points.
+Treating sections as a multiplier is the single most commonly mis-implemented
+part of the Field Day formula, and getting it wrong inflates a score
+enormously — a 60-section event would come out sixty times too high.
 
 Duplicates score nothing and are excluded from exports.
 
@@ -57,40 +59,50 @@ Duplicates score nothing and are excluded from exports.
 Tracked from the dashboard's **Bonus** panel. Changes save immediately and
 appear on every connected screen.
 
-| Bonus | Points |
-|---|---|
-| 100% emergency power | Doubles the base score |
-| W1AW bulletin | 100 |
-| Satellite QSO | 100 |
-| Natural power QSO | 100 |
-| Public information table | 100 |
-| Media publicity | 100 |
-| Educational activity | 100 |
-| Message to Section Manager | 100 |
-| All operators licensed | 100 |
-| Elected official visit | 50 |
-| Web submission | 50 |
-| Social media | 50 |
-| Safety officer | 25 |
-| Youth operators | 20 each |
-| GOTA QSOs | 10 each, capped at 1000 |
-| Served agency visit | 10 each, capped at 100 |
-| NTS traffic | 10 each, capped at 100 |
-| Worked All Sections | 100 |
+| Bonus | Rule | Points |
+|---|---|---|
+| 100% emergency power | 7.3.1 | **100 per transmitter**, max 2,000 |
+| Media publicity | 7.3.2 | 100 |
+| Public location | 7.3.3 | 100 |
+| Public information table | 7.3.4 | 100 |
+| Message to Section Manager | 7.3.5 | 100 |
+| Formal messages handled | 7.3.6 | 10 each, capped at 100 |
+| Satellite QSO | 7.3.7 | 100 |
+| Alternate power (5 QSOs) | 7.3.8 | 100 |
+| W1AW bulletin copied | 7.3.9 | 100 |
+| Educational activity | 7.3.10 | 100 |
+| Elected official visit | 7.3.11 | 100 |
+| Served agency rep visit | 7.3.12 | 100 |
+| GOTA station QSOs | 7.3.13.1 | 5 each, no cap |
+| GOTA coach | 7.3.13.2 | 100 |
+| Entry via ARRL web app | 7.3.14 | 50 |
+| Youth participants (≤18) | 7.3.15 | 20 each, capped at 100 |
+| Social media promotion | 7.3.16 | 100 |
+| Safety officer | 7.3.17 | 100 |
+| Site responsibilities | 7.3.18 | 50 |
 
-Emergency power is the one that isn't a flat number: it adds the entire base
-score again, so it roughly doubles a typical entry.
+Values are transcribed from the official ARRL rules (Revised 4/2026), and each
+row carries its rule number so you can check it against the source. Not every
+bonus is available to every class — 7.3.1 excludes Class D, 7.3.17 is Class A
+only, and so on. The app does not enforce class eligibility, so read the rule
+before ticking a box.
 
-Worked All Sections is worth 100 points for working all **85** ARRL/RAC
-sections. The scoring code, the summary sheet, the "Sections Needed" button and
-the section grid all derive that total from a single list, so they cannot
-disagree with each other.
+**Emergency power is per transmitter, not a doubling.** A 3A entry claims 300
+points, not "the whole score again" — the app read this wrong until the 2026
+rules were checked line by line, which inflated claimed scores by thousands of
+points. The panel shows the arithmetic (`+100 × 3 tx`) so the number is
+visible rather than implied.
 
-Only recognised sections count toward it. A station outside the US and Canada
-sends `DX`, which the entry form accepts and the log exports, but which is not
-a section and does not count. Anything else that isn't a section — almost
-always a typo — is listed in the "Sections Needed" panel so it can be
-corrected.
+Bonuses are added **after** the power multiplier is applied, so a QRP entry's
+bonuses are worth exactly the same as a high-power entry's. Rule 7.3.13.1 says
+so explicitly for GOTA contacts, and it holds for all of them.
+
+### Winter Field Day
+
+Winter Field Day is run by the Winter Field Day Association, not the ARRL, and
+has its own rules. The bonus values the app uses for a WFD event **have not
+been verified** against those rules — the panel says so, and you should check
+your claimed score against the current WFDA rules before submitting.
 
 ## Submitting
 
@@ -113,8 +125,8 @@ Both exports include only non-duplicate QSOs, in chronological order.
 
 ## Sections
 
-The app ships a list of ARRL and RAC sections used for validation, the map,
-the section grid, and the Worked All Sections bonus. It contains **85** entries
+The app ships a list of ARRL and RAC sections used for validation, the map and
+the section grid. It contains **85** entries
 — the 71 US sections plus the 14 current RAC sections, including Puerto Rico,
 the Virgin Islands and the Ontario splits (`ONE`, `ONN`, `ONS`, `GH`). If you
 work a section the app doesn't recognise you will get a warning and the QSO
@@ -123,4 +135,4 @@ the unrecognised values so a typo can be spotted and corrected.
 
 `DX` is accepted as an exchange without a warning — Field Day stations outside
 the US and Canada send it — but it is not a section, so it doesn't count toward
-Worked All Sections.
+your sections-worked total.

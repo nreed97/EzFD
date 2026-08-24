@@ -90,16 +90,30 @@ if (stale.length === 0) ok(`no retired sections (${retired.join(', ')}) remain i
 else no('no retired sections remain in the list', `still present: ${stale.join(', ')}`);
 
 // --- no hardcoded totals ------------------------------------------------
-console.log('\nWorked All Sections total is derived, not written out');
+//
+// Sections are an operating goal, not a bonus: ARRL Field Day rule 7.3 runs
+// 7.3.1 to 7.3.18 and none of them awards points for a clean sweep. Scoring no
+// longer compares a section count against anything, which is why only the
+// "how many left to chase" display remains here. The literal check below still
+// matters — that display is the sheet an operator reads to know what to work.
+console.log('\nThe sections-remaining total is derived, not written out');
 
 const derivedFrom = [
-  ['lib/scoring.ts',              'sectionsWorked >= ARRL_SECTIONS.length'],
-  ['components/SummarySheet.tsx', 'score.sections_worked >= ARRL_SECTIONS.length'],
-  ['components/LoggingClient.tsx','ARRL_SECTIONS.length - score.sections_worked'],
+  ['components/LoggingClient.tsx', 'ARRL_SECTIONS.length - score.sections_worked'],
 ];
 for (const [file, needle] of derivedFrom) {
   if (read(file).includes(needle)) ok(`${file} compares against ARRL_SECTIONS.length`);
   else no(`${file} compares against ARRL_SECTIONS.length`, `expected to find: ${needle}`);
+}
+
+// Scoring must not grow a sections bonus back. It had one for several
+// releases; ARRL has never had such a rule, so a clean sweep used to add 100
+// points to a claimed score that an entrant then copied onto their entry.
+{
+  const src = read('lib/scoring.ts') + read('lib/bonuses.ts');
+  if (!/ARRL_SECTIONS\.length/.test(src)) ok('lib/scoring.ts awards nothing for a section sweep');
+  else no('lib/scoring.ts awards nothing for a section sweep',
+          'ARRL_SECTIONS.length is back in the scorer — there is no such bonus');
 }
 
 // Catch the general shape too, so a *different* literal doesn't sneak back in.

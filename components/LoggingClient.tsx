@@ -193,7 +193,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
     ...pendingQSOs,
     ...confirmedQSOs.map(q => q as DisplayQSO),
   ];
-  const score = calculateScore(confirmedQSOs, {}, event.power);
+  const score = calculateScore(confirmedQSOs, {}, event.power, { eventType: event.event_type, entryClass: event.class });
 
   // Most recent confirmed QSO by this operator — SesCoordination auto-extends
   // a slot only for someone actually working the band.

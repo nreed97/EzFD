@@ -54,7 +54,11 @@ console.log('\n── CLAIMED-SCORE (#12) ──');
   const qsos = secs.map(s => qso({ mode: 'CW', rcvd_section: s, callsign: `K1${s}` }));
   const e = evt({ power: 'LOW' });
   const out = generateCabrillo(e, qsos);
-  const expected = calculateScore(qsos, e.bonuses, e.power).claimed_score;
+  // Scored the same way generateCabrillo scores it, entry details included —
+  // the bonus schedule reads the class, so omitting it here would compare the
+  // header against a different calculation than the one that produced it.
+  const entry = { eventType: e.event_type, entryClass: e.class };
+  const expected = calculateScore(qsos, e.bonuses, e.power, entry).claimed_score;
   eq(headerValue(out, 'CLAIMED-SCORE'), String(expected), 'CLAIMED-SCORE is calculateScore()');
   eq(expected, 16, 'and is points x power, not points x sections');
 }
@@ -63,9 +67,12 @@ console.log('\n── CLAIMED-SCORE (#12) ──');
   const e = evt({ bonuses: { emergency_power: true, w1aw_bulletin: true } });
   const qsos = [qso({ mode: 'CW' })];
   const out = generateCabrillo(e, qsos);
-  const expected = calculateScore(qsos, e.bonuses, e.power).claimed_score;
+  const entry = { eventType: e.event_type, entryClass: e.class };
+  const expected = calculateScore(qsos, e.bonuses, e.power, entry).claimed_score;
   eq(headerValue(out, 'CLAIMED-SCORE'), String(expected), 'bonus points are included');
-  eq(expected, 108, 'emergency power doubles the base and W1AW adds 100');
+  // 1 CW QSO = 2 points, LOW power x2 = 4 base. A 3A entry claims 3 x 100 for
+  // emergency power (rule 7.3.1) and 100 for the W1AW bulletin (7.3.9).
+  eq(expected, 404, 'emergency power pays per transmitter and W1AW adds 100');
 }
 
 // ── transmitter numbering (#16) ─────────────────────────────────────────
