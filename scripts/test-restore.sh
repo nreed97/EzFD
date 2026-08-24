@@ -105,6 +105,39 @@ else
   no "  ezfd-admin.sh builds no event export of its own" "$STRAY"
 fi
 
+# Fed on stdin, psql exits 0 even when a statement failed unless
+# ON_ERROR_STOP is set. This test has always set it; ezfd-admin.sh's own
+# restore had not, so a restore that died on a constraint violation printed
+# "Restore complete" and then rendered the error text as the results table.
+# The two are separate call sites, so only a check keeps them agreeing.
+echo "── restore reports failure ──"
+RESTORE_CALL=$(grep -c "ezfd_restore_events" "$REPO/ezfd-admin.sh")
+# Every call that feeds a payload on stdin has to go through PGS, the wrapper
+# that sets ON_ERROR_STOP -- both the restore itself and the count preceding
+# it. Checking for PGS anywhere in the file is not enough: with two such call
+# sites, one of them reverting still leaves the other to satisfy the grep.
+LAX=$(grep -nE '(^|[^A-Za-z])PG -v payload=' "$REPO/ezfd-admin.sh" || true)
+if [[ "$RESTORE_CALL" -eq 0 ]]; then
+  no "  ezfd-admin.sh calls ezfd_restore_events" "no call site found"
+elif [[ -z "$LAX" ]]; then
+  ok "  every payload psql call in ezfd-admin.sh sets ON_ERROR_STOP"
+else
+  no "  every payload psql call in ezfd-admin.sh sets ON_ERROR_STOP" "$LAX"
+fi
+
+# psql -A does not escape its field separator inside a value, so with the
+# default pipe a club called "Pipe|Name Club" shifted every following column
+# of the event table one field right. Rows are split on an ASCII unit
+# separator now; a reader that still splits on a pipe would silently
+# reintroduce it for whichever query it reads.
+echo "── no pipe-delimited row parsing ──"
+PIPE_READ=$(grep -n "IFS='|'" "$REPO/ezfd-admin.sh" || true)
+if [[ -z "$PIPE_READ" ]]; then
+  ok "  ezfd-admin.sh parses rows on the unit separator, not a pipe"
+else
+  no "  ezfd-admin.sh parses rows on the unit separator, not a pipe" "$PIPE_READ"
+fi
+
 echo "── round trips ──"
 
 # ── SES ──────────────────────────────────────────────────────────────────────
