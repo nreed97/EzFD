@@ -55,3 +55,24 @@
 .doc-body tbody td { @apply border-b border-zinc-800 px-2 py-1.5 align-top light:border-zinc-200; }
 .doc-body img { @apply my-4 max-w-full rounded-lg border border-zinc-800 light:border-zinc-200; }
 .doc-body hr { @apply my-8 border-zinc-800 light:border-zinc-200; }
+
+/* Arrival highlight for a QSO that appeared while someone was watching.
+   Runs once on mount — a row inserted by React is a new element, so the
+   animation fires on its own with no JS driving it, and existing rows never
+   re-run it because they never remount.
+
+   Deliberately a background flash and nothing else: a slide or a size change
+   would reflow the rows under a reader's eye, which on a projected dashboard
+   is worse than no animation at all. */
+@keyframes qso-arrived-flash {
+  from { background-color: rgb(251 191 36 / 0.28); }
+  to   { background-color: transparent; }
+}
+
+.qso-arrived {
+  animation: qso-arrived-flash 1.8s ease-out 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qso-arrived { animation: none; }
+}
