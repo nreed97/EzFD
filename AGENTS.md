@@ -53,6 +53,37 @@ either one.
 3. **Would a reader believe something that is no longer true?** → find and fix
    every place that says it, not just the obvious one
 
+### Every change gets a changelog line
+
+Add one line to the top of `docs/changelog.md`, in the same PR, under today's
+date (start a new date heading if there isn't one).
+
+**One sentence, saying what the change accomplishes — not what it edited.**
+The reader is someone deciding whether to update their server before an event,
+or working out why a number moved since last weekend. "Corrected the bonus
+table" tells them nothing; "any entry claiming bonuses was submitting a wrong
+total, and emergency power alone was over-claiming by thousands" tells them
+whether it matters to them. A line they cannot act on is noise.
+
+Link the PR, and label the line when it changes something the reader can see.
+Labels go in one bracketed group at the front, in this order, comma-separated:
+
+| Label | Use when |
+|---|---|
+| `[Scoring]` | A claimed score changes — anyone who already submitted may have submitted a wrong number |
+| `[Exports]` | An exported file changes — Cabrillo, ADIF, the summary sheet, a backup |
+| `[Display]` | An operator sees or does something different on screen |
+
+Unlabelled is the default and is fine: a test suite, a refactor, a CI gate.
+Label sparingly, or the labels stop meaning anything. No emoji — the labels are
+words so they read the same in a terminal, a diff and a rendered page, and stay
+greppable.
+
+There are no version numbers — EzFD is deployed by pulling the repository — so
+entries are dated by when they land on `master` rather than grouped into
+releases. Don't rewrite or reorder existing entries; the file is a record of
+what shipped, not a summary of the current state.
+
 ### Where each kind of change is documented
 
 Match the change to the audience section in `docs/README.md`, not to whichever
@@ -75,6 +106,7 @@ file is easiest to edit:
 | Local setup, a new test suite, a convention | `docs/development.md`, and the test table above |
 | A new failure mode an operator can hit | `docs/troubleshooting.md`, as symptom → cause → fix |
 | A headline capability | `README.md` feature list — and check the screenshot gallery still matches |
+| **Anything at all** | `docs/changelog.md` — one line, every change, no exceptions |
 
 **Adding a guide takes two edits, not one.** The `/docs` sidebar is derived
 from the directory by `listDocs()`, so a new file appears there automatically —
