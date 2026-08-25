@@ -17,6 +17,11 @@ code, safe to skip if you just run events.
 
 ## 2026-08-25
 
+- **[Display]** The dashboard has a filterable log view ([#66]) — every contact
+  in one table, narrowed by operator, station, band, mode, section, time or
+  duplicates, with the columns you choose; answers a question about the log
+  without exporting it mid-event, and gives a club something worth putting on
+  a screen at the site.
 - This changelog exists ([#67]) — so you can tell at a glance whether an
   update changes a score, an export or the screen, instead of reading commits.
 
@@ -147,4 +152,5 @@ continuous enough to be worth summarising.
 [#61]: https://github.com/nreed97/EzFD/pull/61
 [#62]: https://github.com/nreed97/EzFD/pull/62
 [#63]: https://github.com/nreed97/EzFD/pull/63
+[#66]: https://github.com/nreed97/EzFD/pull/66
 [#67]: https://github.com/nreed97/EzFD/pull/67
