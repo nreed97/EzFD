@@ -70,6 +70,13 @@ jobs:
           node scripts/test-adif.cjs
           node scripts/test-cabrillo.cjs
 
+      # The dashboard log view's filtering and column selection are pure
+      # functions precisely so they can be asserted here rather than only
+      # through a browser. The cases that matter are the ones where a wrong
+      # answer hides a contact an operator is looking for.
+      - name: Log view tests
+        run: node scripts/test-log-filters.cjs
+
       # Gated now that the react-hooks backlog is worked through. Anything it
       # reports is new.
       - name: Lint

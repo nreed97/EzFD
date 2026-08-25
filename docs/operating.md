@@ -159,6 +159,7 @@ A special event shows only the QSO count — there is no contest score.
 
 A separate read-only view for a second screen:
 
+- **Log** — every contact, filterable, with the columns you choose
 - **Map** — worked sections plotted geographically
 - **Sections** / **Needed** — grid of sections worked and the hunt list
 - **Rate** — QSOs per hour, with gaps visible
@@ -166,5 +167,46 @@ A separate read-only view for a second screen:
 - **Operators** — per-operator totals, rate, and current band/mode
 - **Summary** — printable ARRL-style worksheet
 
-Special events show Rate, Bands, Operators and a live **On The Air** list
-instead of the section-based views, which don't apply.
+Special events show Log, Rate, Bands, Operators and a live **On The Air**
+list instead of the section-based views, which don't apply.
+
+### The Log view
+
+![The dashboard log: filter bar with a band filter active, showing 33 of 97 contacts in a table of time, callsign, band, mode, class, section, operator and station](images/log-view.png)
+
+The whole log in one table. Two things it is for: answering a question about
+the log without exporting it mid-event, and putting a live log on a screen at
+the site.
+
+**Filters** combine. Pick any of them and the count beside the filter bar shows
+what survived — `33 of 97` above. **Clear** appears once anything is active.
+
+| Filter | Finds |
+|---|---|
+| Callsign | Any contact whose call contains what you type, so `K1AB` matches `K1ABC` and `K1ABC/P` |
+| Op | One or more operators. Contacts with no operator recorded — an ADIF import — match only when this is off |
+| Stn | Which radio logged it |
+| Band · Mode · Sect | Only the values actually present in your log, not every possibility |
+| Time | The last 15 minutes, hour, or four hours |
+| Dupes | Show all, hide them, or show only the duplicates |
+| Edited | Only contacts changed since they were logged — a reader for the audit trail |
+
+Unrecognised sections are offered in the **Sect** filter alongside the real
+ones. That is deliberate: a typo is exactly the thing you open this view to
+find and correct, so filtering it out would defeat the purpose. Fix it from the
+logging screen's log table, which is where editing lives.
+
+**Columns** picks what to show. The defaults differ by event type — a contest
+gets class and section, a special event gets RST, name and grid, because an SES
+has no contest exchange and those columns would be empty on every row. Your
+choice is remembered in that browser and does not affect anyone else, so the
+laptop driving the projector can show a different set from the one at the
+operating position. **Reset** puts the defaults back.
+
+A contact logged while you are watching flashes briefly as it arrives, so a
+projected log reads as live rather than as a static table that silently
+changes. Nothing moves — only the background — and the flash is suppressed
+entirely for anyone whose system asks for reduced motion.
+
+The view is read-only. Editing and deleting stay in the logging screen, along
+with the audit trail that records them.

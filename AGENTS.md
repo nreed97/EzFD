@@ -25,6 +25,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-scoring.cjs` | The ARRL scoring formula — multipliers, every rule-7.3 bonus and its cap, dupes, sections |
 | `scripts/test-adif.cjs` | ADIF parse and export — the `Date`/string shapes, per-operator `MY_*`, SES vs contest exchange |
 | `scripts/test-cabrillo.cjs` | Cabrillo submission — `CLAIMED-SCORE`, transmitter numbering, ordering, null class/section |
+| `scripts/test-log-filters.cjs` | The dashboard log view — filters combine, an empty filter restricts nothing, column defaults per event type |
 
 When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
@@ -176,6 +177,9 @@ Hard-won fixes worth knowing before touching this code:
 | `lib/events.ts` | Shared event SELECT column list + configurable dupe rule |
 | `lib/scoring.ts` | ARRL scoring formula (FD/WFD only — SES has no score) |
 | `lib/bonuses.ts` | The bonus schedule — one table, read by the scorer, the tracker and the summary sheet |
+| `components/LogView.tsx` | Dashboard log — filtering, column choice, arrival highlight |
+| `lib/logFilters.ts` | Log filtering, pure over an already-loaded array |
+| `lib/logColumns.ts` | The log column table and per-event-type defaults |
 | `lib/callHistory.ts` | N1MM call history file download/parse, per-event prefill lookup |
 | `lib/masterCallsigns.ts` | `MASTER.SCP` (Super Check Partial) download/parse, shared known-callsign lookup |
 | `ezfd-admin.sh` | Interactive server admin console |

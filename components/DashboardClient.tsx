@@ -17,10 +17,11 @@ import BandBreakdown from './BandBreakdown';
 import SummarySheet from './SummarySheet';
 import SectionsNeeded from './SectionsNeeded';
 import CheckoutBoard from './CheckoutBoard';
+import LogView from './LogView';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
-type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed' | 'checkouts';
+type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed' | 'checkouts' | 'log';
 
 interface StationPresence {
   op_call: string;
@@ -175,11 +176,13 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
 
   const VIEW_TABS: { id: MainView; label: string }[] = isSes
     ? [
+        { id: 'log',       label: 'Log' },
         { id: 'rate',      label: 'Rate' },
         { id: 'bands',     label: 'Bands' },
         { id: 'checkouts', label: 'Checkouts' },
       ]
     : [
+        { id: 'log',      label: 'Log' },
         { id: 'map',      label: 'Map' },
         { id: 'sections', label: 'Sections' },
         { id: 'needed',   label: 'Needed' },
@@ -271,8 +274,9 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
             Checkouts is a tall interactive form, so it gets more of the
             viewport than the at-a-glance map/chart views do on mobile. */}
         <div className={`shrink-0 overflow-hidden md:h-auto md:flex-1 ${
-          mainView === 'checkouts' ? 'h-[65vh]' : 'h-56'
+          mainView === 'checkouts' || mainView === 'log' ? 'h-[65vh]' : 'h-56'
         }`}>
+          {mainView === 'log'      && <LogView event={event} qsos={qsos} />}
           {mainView === 'map'      && <MapView workedSections={score.sections} />}
           {mainView === 'sections' && <SectionGrid workedSections={score.sections} />}
           {mainView === 'needed'   && <SectionsNeeded workedSections={score.sections} unknownSections={score.unknown_sections} />}
