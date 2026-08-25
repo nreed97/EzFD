@@ -9,12 +9,12 @@ Every operator logs into one shared log. Every QSO appears on every other
 device within milliseconds. When the network drops — and at a Field Day site
 it will — logging carries on locally and syncs when it comes back.
 
-🚀 **Just operating?** [Quick start](docs/quick-start.md) — you have a join
+**Just operating?** [Quick start](docs/quick-start.md) — you have a join
 code and a radio, and five minutes. **Setting the event up?**
 [Getting started](docs/getting-started.md) covers install through to the
 final backup.
 
-📖 **[Full documentation](docs/)** — and the same guides ship inside the app,
+**[Full documentation](docs/)** — and the same guides ship inside the app,
 so they work on a field server with no internet.
 
 <p align="center">
