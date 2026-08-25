@@ -47,7 +47,8 @@ For a feature: what gap this closes.
 - [ ] `npx tsc --noEmit` is clean
 - [ ] `npm run build` is clean
 - [ ] `docs/changelog.md` has a line for this change — one sentence on what it
-      accomplishes, marked ⚠️/📋/👁 if a score, an export or the screen changes
+      accomplishes, labelled `[Scoring]`, `[Exports]` and/or `[Display]` if a
+      claimed score, an exported file or the screen changes
 
 <!--
 Required only for the areas checked above — CI runs all of these on every

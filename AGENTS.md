@@ -64,16 +64,19 @@ table" tells them nothing; "any entry claiming bonuses was submitting a wrong
 total, and emergency power alone was over-claiming by thousands" tells them
 whether it matters to them. A line they cannot act on is noise.
 
-Link the PR, and mark the line when it changes something the reader can see:
+Link the PR, and label the line when it changes something the reader can see.
+Labels go in one bracketed group at the front, in this order, comma-separated:
 
-| Mark | Use when |
+| Label | Use when |
 |---|---|
-| ⚠️ | A claimed score changes — anyone who already submitted may have submitted a wrong number |
-| 📋 | An exported file changes — Cabrillo, ADIF, the summary sheet, a backup |
-| 👁 | An operator sees or does something different on screen |
+| `[Scoring]` | A claimed score changes — anyone who already submitted may have submitted a wrong number |
+| `[Exports]` | An exported file changes — Cabrillo, ADIF, the summary sheet, a backup |
+| `[Display]` | An operator sees or does something different on screen |
 
-Unmarked is the default and is fine: a test suite, a refactor, a CI gate. Mark
-sparingly, or the marks stop meaning anything.
+Unlabelled is the default and is fine: a test suite, a refactor, a CI gate.
+Label sparingly, or the labels stop meaning anything. No emoji — the labels are
+words so they read the same in a terminal, a diff and a rendered page, and stay
+greppable.
 
 There are no version numbers — EzFD is deployed by pulling the repository — so
 entries are dated by when they land on `master` rather than grouped into
