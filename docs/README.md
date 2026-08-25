@@ -32,6 +32,7 @@ Start with whichever describes you.
 | [Deployment](deployment.md) | One-command install on a VPS, TLS, updates |
 | [Administration](administration.md) | `ezfd-admin.sh`, backups, restores, recovery |
 | [Configuration](configuration.md) | Every environment variable |
+| [Changelog](changelog.md) | What changed, newest first — read before and after an update |
 
 ## I want to work on the code
 
