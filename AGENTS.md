@@ -53,30 +53,41 @@ either one.
 3. **Would a reader believe something that is no longer true?** → find and fix
    every place that says it, not just the obvious one
 
-### Every change gets a changelog line
+### Every change gets a changelog entry
 
-Add one line to the top of `docs/changelog.md`, in the same PR, under today's
-date (start a new date heading if there isn't one).
+Add one to `docs/changelog.md` in the same PR, under today's date and under the
+heading for what the change did. Start whichever headings the date doesn't have
+yet, and keep them in this order so every date reads the same way:
 
-**One sentence, saying what the change accomplishes — not what it edited.**
-The reader is someone deciding whether to update their server before an event,
-or working out why a number moved since last weekend. "Corrected the bonus
-table" tells them nothing; "any entry claiming bonuses was submitting a wrong
-total, and emergency power alone was over-claiming by thousands" tells them
-whether it matters to them. A line they cannot act on is noise.
+**Added** · **Changed** · **Fixed** · **Removed** · **Security**
 
-Link the PR, and label the line when it changes something the reader can see.
-Labels go in one bracketed group at the front, in this order, comma-separated:
+The shape is a bold subject, any tags, then one or two sentences:
 
-| Label | Use when |
+```markdown
+- **Field Day bonus schedule** `Scoring` `Exports` — Ten of eighteen bonus
+  values were wrong, three were missing, and two were awarded that no rule
+  contains. Any entry claiming bonuses was submitting a wrong total. ([#59])
+```
+
+**The subject names the thing that changed; the sentence says what it does for
+the reader — not what it edited.** Someone reads this deciding whether to
+update their server before an event, or working out why a number moved since
+last weekend. "Corrected the bonus table" tells them nothing; the example above
+tells them whether it matters to them. An entry they cannot act on is noise.
+
+Tag an entry when it affects what a reader submits or sees. Tags are inline
+code, after the subject:
+
+| Tag | Use when |
 |---|---|
-| `[Scoring]` | A claimed score changes — anyone who already submitted may have submitted a wrong number |
-| `[Exports]` | An exported file changes — Cabrillo, ADIF, the summary sheet, a backup |
-| `[Display]` | An operator sees or does something different on screen |
+| `Scoring` | A claimed score moves — anyone who already submitted may have submitted a wrong number |
+| `Exports` | An exported file changes — Cabrillo, ADIF, the summary sheet, a backup |
+| `Display` | An operator sees or does something different on screen |
+| `Setup` | Deployment, the admin console, or how the server is run |
 
-Unlabelled is the default and is fine: a test suite, a refactor, a CI gate.
-Label sparingly, or the labels stop meaning anything. No emoji — the labels are
-words so they read the same in a terminal, a diff and a rendered page, and stay
+Untagged is the default and is fine: a test suite, a refactor, a CI gate. Tag
+sparingly, or the tags stop meaning anything. No emoji anywhere in the file —
+words read the same in a terminal, a diff and a rendered page, and stay
 greppable.
 
 There are no version numbers — EzFD is deployed by pulling the repository — so
@@ -106,7 +117,7 @@ file is easiest to edit:
 | Local setup, a new test suite, a convention | `docs/development.md`, and the test table above |
 | A new failure mode an operator can hit | `docs/troubleshooting.md`, as symptom → cause → fix |
 | A headline capability | `README.md` feature list — and check the screenshot gallery still matches |
-| **Anything at all** | `docs/changelog.md` — one line, every change, no exceptions |
+| **Anything at all** | `docs/changelog.md` — one entry, every change, no exceptions |
 
 **Adding a guide takes two edits, not one.** The `/docs` sidebar is derived
 from the directory by `listDocs()`, so a new file appears there automatically —

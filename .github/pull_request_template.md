@@ -46,9 +46,9 @@ For a feature: what gap this closes.
 
 - [ ] `npx tsc --noEmit` is clean
 - [ ] `npm run build` is clean
-- [ ] `docs/changelog.md` has a line for this change — one sentence on what it
-      accomplishes, labelled `[Scoring]`, `[Exports]` and/or `[Display]` if a
-      claimed score, an exported file or the screen changes
+- [ ] `docs/changelog.md` has an entry for this change — under today's date and
+      an Added/Fixed/Changed/Removed/Security heading, tagged `Scoring`,
+      `Exports`, `Display` and/or `Setup` if any of those change
 
 <!--
 Required only for the areas checked above — CI runs all of these on every
