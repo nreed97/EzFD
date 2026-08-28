@@ -177,6 +177,23 @@ export default function LoggingClient({
     return () => { cancelled = true; };
   }, [isSes, event.id, operatorCall, askedFor.explicit]);
 
+  // Keep the remembered position in step with where the operator actually is.
+  // The picker writes it at sign-in, but they QSY afterwards, and a reload
+  // should come back to the band they are on rather than the one they started
+  // on an hour ago. Session storage only — this is where *this browser* is
+  // sitting, not an event setting.
+  useEffect(() => {
+    const key = `ezfd_op_${event.join_code}`;
+    try {
+      const saved = sessionStorage.getItem(key);
+      if (!saved) return;
+      const rec = JSON.parse(saved) as Record<string, unknown>;
+      sessionStorage.setItem(key, JSON.stringify({ ...rec, band: currentBand, mode: currentMode }));
+    } catch {
+      // Private mode, or a corrupt record. The position just isn't remembered.
+    }
+  }, [event.join_code, currentBand, currentMode]);
+
   /** Drain the offline queue. Resolves true if at least one contact was
    *  accepted, which is what tells the retry timer it is making progress. */
   const logQSO = useCallback(async (data: QSOSubmission) => {

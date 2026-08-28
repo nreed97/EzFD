@@ -17,8 +17,9 @@ is the point. See [the quick start](quick-start.md#pick-where-youre-operating)
 for the colour coding.
 
 Returning to an event in the same browser session skips both steps and goes
-straight back to the logger. Change band from the **QSY** drawer once you're
-in.
+straight back to the logger, on the band and mode you were last on — QSY
+included, so a reload mid-shift lands where you actually are rather than where
+you started. Change band from the **QSY** drawer once you're in.
 
 ## The entry form
 

@@ -40,10 +40,17 @@ export default function EventJoinPage() {
         setLoading(false);
 
         // If already joined, go straight to log
+        // Returning in the same browser session skips both steps. The stored
+        // position goes back with them — without it a reload mid-shift, or a
+        // trip to the dashboard and back, dropped the operator onto the
+        // fallback band rather than where they are actually sitting.
         const saved = sessionStorage.getItem(`ezfd_op_${code}`);
         if (saved) {
-          const { call, station: savedStation } = JSON.parse(saved);
-          if (call) router.replace(`/event/${code}/log?op=${call}&station=${savedStation ?? 1}`);
+          const { call, station: savedStation, band, mode } = JSON.parse(saved);
+          if (call) {
+            const slot = band && mode ? `&band=${band}&mode=${mode}` : '';
+            router.replace(`/event/${code}/log?op=${call}&station=${savedStation ?? 1}${slot}`);
+          }
         }
       });
   }, [code, router]);
@@ -74,8 +81,13 @@ export default function EventJoinPage() {
     setStep('position');
   }
 
-  const goLog = (band: Band, mode: Mode) =>
+  const goLog = (band: Band, mode: Mode) => {
+    // Remembered alongside the callsign so returning to the event comes back
+    // to the same position rather than the fallback.
+    sessionStorage.setItem(`ezfd_op_${code}`,
+      JSON.stringify({ call: opCall, station, band, mode }));
     router.push(`/event/${code}/log?op=${opCall}&station=${station}&band=${band}&mode=${mode}`);
+  };
 
   if (loading) return <div className="flex min-h-screen items-center justify-center text-zinc-400">Loading...</div>;
   if (notFound) return (
