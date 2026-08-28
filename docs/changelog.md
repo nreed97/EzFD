@@ -23,6 +23,18 @@ only run events.
 
 ---
 
+## 2026-08-28
+
+### Added
+
+- **The station number in the logger header** `Display` — The station you pick
+  at sign-in is now shown beside your callsign, in the main window and the CW
+  keying window alike. Nothing on screen used to confirm it, so a mis-click at
+  sign-in tagged a whole shift's contacts with the wrong transmitter and the
+  first sign of it was the Cabrillo export. ([#72])
+
+---
+
 ## 2026-08-25
 
 ### Added
@@ -223,3 +235,4 @@ continuous enough to be worth summarising.
 [#69]: https://github.com/nreed97/EzFD/pull/69
 [#70]: https://github.com/nreed97/EzFD/pull/70
 [#71]: https://github.com/nreed97/EzFD/pull/71
+[#72]: https://github.com/nreed97/EzFD/pull/72

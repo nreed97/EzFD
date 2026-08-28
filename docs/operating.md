@@ -167,8 +167,18 @@ toggle and persists across sessions.
 | `3 pending ↑` | QSOs queued locally, click to retry |
 | `● RIG 14.250` | A radio is connected; click for details |
 | `⚡ CW` | The rig supports CAT keying; opens the macro window |
+| `Op On W0NY` | Who this window logs as; click to sign in as someone else, or to move position |
+| `ST2` | Which station this window is |
 
 A special event shows only the QSO count — there is no contest score.
+
+`ST2` appears only where the number can be wrong: a multi-transmitter entry,
+where you chose it at sign-in, or any window opened with **+ Radio**. A 1A club
+on its only radio has nothing to confuse and does not see it. Check it before
+you start a shift — every contact you log carries that transmitter number into
+the Cabrillo export, and the export is where a wrong one used to first show up.
+The CW keying window shows the same badge, which is what tells two of them
+apart when you are running two radios.
 
 ## The dashboard
 
