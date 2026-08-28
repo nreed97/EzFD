@@ -4,6 +4,7 @@ import { useState, useRef, useEffect, useCallback, forwardRef, useImperativeHand
 import { useStoredFlag } from '@/lib/useStoredFlag';
 import type { Band, Mode, DisplayQSO, QSO, EventType, DupeRule } from '@/lib/types';
 import { validExchangesFor, isValidExchange } from '@/lib/types';
+import { BAND_GRID, EXTRA_BANDS, SES_EXTRA_BANDS, MODES } from '@/lib/bands';
 
 export interface QSOFormHandle {
   getValues: () => {
@@ -34,17 +35,6 @@ export interface QSOSubmission {
  *  Prefilled so the common case is a single keystroke away from logged. */
 const DEFAULT_RST: Record<Mode, string> = { PH: '59', CW: '599', DIG: '-10' };
 
-const BAND_GRID: Band[][] = [
-  ['160m', '80m',  '40m'],
-  ['20m',  '15m',  '10m'],
-  ['6m',   '2m',   'SAT'],
-];
-
-const EXTRA_BANDS: Band[] = ['1.25m', '70cm'];
-// WARC bands + 60m are excluded from ARRL FD/WFD scoring, so only an SES
-// (no contest exchange, not bound by that rule) offers them.
-const SES_EXTRA_BANDS: Band[] = ['60m', '30m', '17m', '12m', '1.25m', '70cm'];
-const MODES: Mode[] = ['PH', 'CW', 'DIG'];
 
 const MODE_STYLE: Record<Mode, string> = {
   PH:  'bg-blue-400/15 border-blue-400/40 text-blue-400 light:bg-blue-50 light:border-blue-500 light:text-blue-700',

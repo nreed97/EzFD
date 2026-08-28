@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useStoredFlag } from '@/lib/useStoredFlag';
 import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
@@ -8,6 +8,7 @@ import { useRigBridge, rigPortForStation } from '@/lib/useRigBridge';
 import { useQsoQueue } from '@/lib/useQsoQueue';
 import { applyQsoEvent } from '@/lib/qsoStream';
 import { ARRL_SECTIONS } from '@/lib/types';
+import { bandsFor, MODES } from '@/lib/bands';
 import type { Event, QSO, Band, Mode, DisplayQSO, SesReservation } from '@/lib/types';
 import type { QSOSubmission } from './QSOForm';
 import QSOForm from './QSOForm';
@@ -31,9 +32,18 @@ interface Props {
   /** SES with roster approval on, and this operator isn't approved yet.
    *  The server rejects their QSOs; this is the up-front warning. */
   approvalPending?: boolean;
+  /** Where the operator said they were sitting, from the position picker.
+   *  Validated here rather than trusted: these arrive in the URL, so a typo
+   *  or a stale bookmark must fall back rather than put the form on a band
+   *  the event does not offer. */
+  initialBand?: string;
+  initialMode?: string;
 }
 
-export default function LoggingClient({ event, initialQSOs, operatorCall, stationNumber, approvalPending = false }: Props) {
+export default function LoggingClient({
+  event, initialQSOs, operatorCall, stationNumber, approvalPending = false,
+  initialBand, initialMode,
+}: Props) {
   const router = useRouter();
   const [confirmedQSOs, setConfirmedQSOs] = useState<QSO[]>(initialQSOs);
   // One implementation of the offline queue, shared with the CW popout.
@@ -56,8 +66,20 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
   const [submitError, setSubmitError] = useState<string | null>(null);
   const [lastLogged, setLastLogged] = useState<DisplayQSO | null>(null);
   const [nightMode, setNightMode] = useStoredFlag('ezfd_night');
-  const [currentBand, setCurrentBand] = useState<Band>('20m');
-  const [currentMode, setCurrentMode] = useState<Mode>('PH');
+  // 20m phone is the fallback, not the default: an operator who came through
+  // the position picker has already said where they are sitting. The values
+  // arrive in the URL, so they are validated rather than trusted — a stale
+  // bookmark must not put the form on a band this event does not offer.
+  const askedFor = useMemo(() => {
+    const band = (bandsFor(event.event_type) as string[]).includes(initialBand ?? '')
+      ? initialBand as Band : null;
+    const mode = (MODES as string[]).includes(initialMode ?? '')
+      ? initialMode as Mode : null;
+    return { band, mode, explicit: band !== null || mode !== null };
+  }, [event.event_type, initialBand, initialMode]);
+
+  const [currentBand, setCurrentBand] = useState<Band>(askedFor.band ?? '20m');
+  const [currentMode, setCurrentMode] = useState<Mode>(askedFor.mode ?? 'PH');
   const [mobileTab, setMobileTab] = useState<'log' | 'qsos'>('log');
   const [showAdifImport, setShowAdifImport] = useState(false);
   const [showWsjtxHelp, setShowWsjtxHelp] = useState(false);
@@ -124,10 +146,16 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
 
   // If this operator already holds a live checkout when they sign in — e.g.
   // arriving right at the start of their scheduled slot — start the form on
-  // that band/mode instead of the 20m/PH default, since that's what they're
+  // that band/mode instead of the 20m/PH fallback, since that's what they're
   // here to work.
+  //
+  // Skipped when they came through the position picker having named a band and
+  // mode. That is a deliberate, more recent statement of where they are
+  // sitting; an older claim on a different band must not silently pull the
+  // form away from it. Someone who picked the band they already hold sees no
+  // difference either way.
   useEffect(() => {
-    if (!isSes) return;
+    if (!isSes || askedFor.explicit) return;
     let cancelled = false;
     fetch(`/api/ses/reservations?event_id=${event.id}`)
       .then(r => r.ok ? r.json() as Promise<SesReservation[]> : null)
@@ -147,7 +175,7 @@ export default function LoggingClient({ event, initialQSOs, operatorCall, statio
       })
       .catch(() => {});
     return () => { cancelled = true; };
-  }, [isSes, event.id, operatorCall]);
+  }, [isSes, event.id, operatorCall, askedFor.explicit]);
 
   /** Drain the offline queue. Resolves true if at least one contact was
    *  accepted, which is what tells the retry timer it is making progress. */

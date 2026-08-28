@@ -77,6 +77,12 @@ jobs:
       - name: Log view tests
         run: node scripts/test-log-filters.cjs
 
+      # What the operating position picker shows before someone sits down. A
+      # wrong answer sends an operator to a band another station is already
+      # signing the callsign on, which is what the checkout exists to prevent.
+      - name: Slot board tests
+        run: node scripts/test-slot-board.cjs
+
       # Gated now that the react-hooks backlog is worked through. Anything it
       # reports is new.
       - name: Lint

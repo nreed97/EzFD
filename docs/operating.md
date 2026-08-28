@@ -4,6 +4,22 @@ The logging screen. Everything here applies to all three event types unless
 noted; the exchange fields differ, which is covered per type in
 [Field Day](field-day.md) and [Special event stations](special-events.md).
 
+## Getting to the logger
+
+Signing in asks two questions: your callsign, then where you're operating. The
+second shows every band and mode with what's free, what somebody is on, and
+what somebody has checked out — so you choose a position knowing the answer
+rather than finding out from the band activity panel afterwards.
+
+The band and mode you pick is where the entry form opens. Checking out is
+offered on the same screen and is optional on a contest; on a special event it
+is the point. See [the quick start](quick-start.md#pick-where-youre-operating)
+for the colour coding.
+
+Returning to an event in the same browser session skips both steps and goes
+straight back to the logger. Change band from the **QSY** drawer once you're
+in.
+
 ## The entry form
 
 ![The logging screen: entry form, QSY drawer, operators, score and QSO log](images/logging-screen.png)
