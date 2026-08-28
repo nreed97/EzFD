@@ -31,7 +31,22 @@ const STATE_STYLE: Record<SlotInfo['state'], string> = {
   busy:    'border-amber-500/50 bg-amber-500/10 text-amber-400 light:border-amber-600 light:bg-amber-50 light:text-amber-700',
 };
 
+/** How often to re-ask for presence, which has no notify channel. */
 const POLL_MS = 15_000;
+
+/**
+ * How often the board re-reads the clock.
+ *
+ * Separate from the poll, and finer, because `buildSlotBoard` decides whether
+ * a claim is live by comparing its window against this value. Tied to the
+ * poll it was the limiting factor once checkouts started arriving on the
+ * stream: a claim made *now* starts a moment after the last tick, so the
+ * refetch landed with fresh data and the board still called it not-yet-active
+ * until the clock caught up. It also cuts the lag on the other end — a slot
+ * whose window has run out stops looking live within a second instead of
+ * sitting there expired.
+ */
+const CLOCK_MS = 1_000;
 
 interface Props {
   event: Event;
@@ -45,7 +60,7 @@ interface Props {
 
 export default function OperatingPosition({ event, opCall, station, onStart, onDashboard, onBack }: Props) {
   const isSes = event.event_type === 'SES';
-  const nowMs = useNow(POLL_MS);
+  const nowMs = useNow(CLOCK_MS);
 
   const [reservations, setReservations] = useState<SesReservation[]>([]);
   const [presence, setPresence] = useState<PresenceRow[]>([]);
@@ -70,6 +85,40 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { load(); }, [load]);
 
+  // Checkouts arrive live. The realtime route already LISTENs on the event's
+  // reservation channel for the logging screen's coordination panel, so a
+  // claim made anywhere reaches this document the moment the database says so
+  // rather than up to a poll later — and the poll interval was the window in
+  // which two operators could both be looking at the same free band.
+  //
+  // The payload carries the raw range column rather than the timestamps the
+  // board wants, exactly as it does for the panel, so this is a "refetch"
+  // signal and not a patch.
+  //
+  // Every document owns its own connection, per the convention in AGENTS.md:
+  // the picker is not the logging window, and the CW popout is a third.
+  useEffect(() => {
+    const es = new EventSource(`/api/realtime/${event.id}`);
+    es.addEventListener('reservation', () => { void load(); });
+
+    // A reconnect is the earliest evidence the server was away and is back,
+    // and the board is stale by definition across that gap — nothing was
+    // delivered while the stream was down.
+    let dropped = false;
+    es.onerror = () => { dropped = true; };
+    es.onopen = () => {
+      if (!dropped) return;    // the initial connect is not a recovery
+      dropped = false;
+      void load();
+    };
+
+    return () => es.close();
+  }, [event.id, load]);
+
+  // Presence has no notify trigger — a logging window reports itself over
+  // HTTP on a heartbeat — so who is on air is still polled. The poll also
+  // covers claims a second time, which is not redundant: an SSE stream can
+  // die quietly, and this is what makes the board eventually right anyway.
   useEffect(() => {
     const id = setInterval(() => { void load(); }, POLL_MS);
     return () => clearInterval(id);
