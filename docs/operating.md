@@ -157,7 +157,7 @@ A special event shows only the QSO count — there is no contest score.
 
 ![The dashboard: section map, live score, sections worked and operators](images/dashboard.png)
 
-A separate read-only view for a second screen:
+A separate read-only view for a second screen. It opens on the **Log**:
 
 - **Log** — every contact, filterable, with the columns you choose
 - **Map** — worked sections plotted geographically
