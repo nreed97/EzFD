@@ -40,6 +40,18 @@ colour-coded:
 | Red | Somebody has it checked out |
 | Green | You have it checked out |
 
+One may already be picked for you, with a line underneath saying why:
+
+- **You have it checked out.** Your booking for this shift, which is the whole
+  reason for checking out in the first place.
+- **This radio was last on it.** Where this browser was logging before —
+  usually the rig in front of you, since a club's laptop stays at its radio
+  while the operators rotate through.
+
+A checkout wins where both apply, and a band somebody *else* has checked out
+is never offered this way. Either way it is only a starting guess: click any
+other band and it changes.
+
 Pick one and you get two buttons. **Check out and start logging** claims the
 band and mode so nobody else takes it; **Start without checking out** just
 tunes the form there. On a special event, check out — that's what stops two

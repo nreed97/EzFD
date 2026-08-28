@@ -27,6 +27,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-cabrillo.cjs` | Cabrillo submission — `CLAIMED-SCORE`, transmitter numbering, ordering, null class/section |
 | `scripts/test-log-filters.cjs` | The dashboard log view — filters combine, an empty filter restricts nothing, column defaults per event type |
 | `scripts/test-slot-board.cjs` | The operating position board — released/expired claims, station vs operator attribution, the contest band list |
+| `scripts/test-last-position.cjs` | What the position picker preselects — a claim outranks a remembered position, and a remembered one is validated against the event's bands |
 
 When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
@@ -226,6 +227,7 @@ Hard-won fixes worth knowing before touching this code:
 | `lib/logColumns.ts` | The log column table and per-event-type defaults |
 | `components/OperatingPosition.tsx` | Sign-in step two — pick a band/mode, optionally check it out |
 | `lib/slotBoard.ts` | What each band/mode is doing, from claims plus presence |
+| `lib/lastPosition.ts` | What the picker preselects — the remembered position and the claim that outranks it |
 | `lib/bands.ts` | Which bands an event offers — WARC excluded for contests |
 | `lib/callHistory.ts` | N1MM call history file download/parse, per-event prefill lookup |
 | `lib/masterCallsigns.ts` | `MASTER.SCP` (Super Check Partial) download/parse, shared known-callsign lookup |

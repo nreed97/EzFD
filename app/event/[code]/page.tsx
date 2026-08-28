@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { eventTypeLabel, transmitterCount } from '@/lib/types';
 import type { Band, Event, Mode } from '@/lib/types';
 import OperatingPosition from '@/components/OperatingPosition';
+import { rememberPosition } from '@/lib/lastPosition';
 
 export default function EventJoinPage() {
   const params = useParams();
@@ -86,6 +87,10 @@ export default function EventJoinPage() {
     // to the same position rather than the fallback.
     sessionStorage.setItem(`ezfd_op_${code}`,
       JSON.stringify({ call: opCall, station, band, mode }));
+    // And again outside the session, so the next operator at this radio is
+    // offered the band it is already on. Signing out clears the record above;
+    // this one is about the laptop, not the person sitting at it.
+    rememberPosition(code, station, band, mode);
     router.push(`/event/${code}/log?op=${opCall}&station=${station}&band=${band}&mode=${mode}`);
   };
 

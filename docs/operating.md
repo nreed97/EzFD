@@ -16,6 +16,14 @@ offered on the same screen and is optional on a contest; on a special event it
 is the point. See [the quick start](quick-start.md#pick-where-youre-operating)
 for the colour coding.
 
+A position may already be selected when the screen opens — a band you have
+checked out, or failing that the one this browser was last logging on. The
+screen says which of the two it used, and never preselects a band somebody
+else has checked out: you can still choose one, but not by default. It is a guess at where you are about to
+sit, not a decision: clicking any other band replaces it. The memory is kept
+per event and per station, and outlives signing out on purpose, because the
+laptop stays at the radio while the operators rotate through it.
+
 Returning to an event in the same browser session skips both steps and goes
 straight back to the logger, on the band and mode you were last on — QSY
 included, so a reload mid-shift lands where you actually are rather than where
