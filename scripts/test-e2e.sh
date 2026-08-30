@@ -532,6 +532,27 @@ else
   no "  headings carry anchors, so a #link lands on its section"
 fi
 
+# An apostrophe reaches the slugifier as `&#39;`, not as a character. Stripping
+# only named entities left "39" sitting in the id, so every heading with an
+# apostrophe got an id GitHub would never generate and every cross-link to one
+# quietly landed at the top of the page. The old check used a heading with no
+# punctuation in it and so never saw this.
+# The index is docs/README.md on GitHub but is served at /docs, so a guide
+# linking its own index must be rewritten to /docs and not to /docs/README,
+# which is not a page. The changelog links it twice.
+if [[ "$(req GET /docs/changelog)" != *'href="/docs/README'* ]]; then
+  ok "  a link to the docs index points at /docs, not /docs/README"
+else
+  no "  a link to the docs index points at /docs, not /docs/README"
+fi
+
+QS_DOC=$(req GET /docs/quick-start)
+if [[ "$QS_DOC" == *'id="pick-where-youre-operating"'* ]]; then
+  ok "  an apostrophe in a heading slugs the way GitHub slugs it"
+else
+  no "  an apostrophe in a heading slugs the way GitHub slugs it" "got: $(printf '%s' "$QS_DOC" | grep -o 'id=\"pick[^\"]*\"' | head -1)"
+fi
+
 if [[ "$(curl -s -o /dev/null -w '%{content_type}' "$BASE/docs/images/dashboard.png")" == "image/png" ]]; then
   ok "  screenshots referenced by the guides are served"
 else

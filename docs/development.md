@@ -37,8 +37,25 @@ Both must be clean. This is the gate `AGENTS.md` sets and CI enforces.
 
 ## Tests
 
-Four suites, all runnable locally against any database with the schema
-applied, all run by CI.
+Twelve suites, all run by CI. They come in two kinds, and the split is worth
+knowing when you are deciding what to run before a commit.
+
+**Eight need nothing at all** — no database, no build, no server. They cover
+pure functions, so they run in about a second and are the ones to reach for
+first:
+
+```bash
+$ node scripts/test-sections.cjs        # the ARRL/RAC section list, in all three places
+$ node scripts/test-scoring.cjs         # the ARRL formula, bonuses and their caps
+$ node scripts/test-adif.cjs            # ADIF parse and export
+$ node scripts/test-cabrillo.cjs        # Cabrillo submission
+$ node scripts/test-log-filters.cjs     # the dashboard log view
+$ node scripts/test-slot-board.cjs      # the operating position board
+$ node scripts/test-last-position.cjs   # what the position picker preselects
+$ node scripts/test-changelog-links.cjs # the changelog's links into these guides
+```
+
+**Four need a database, or a running server:**
 
 ```bash
 # The SES overlap guarantee lives in a database constraint,
@@ -94,6 +111,13 @@ assert the absence of the bad form, not the presence of the good one.
 conflicts, both enforcement modes, the offline replay bypass, roster approval,
 per-operator ADIF, and Field Day regressions.
 
+**`scripts/test-changelog-links.cjs`** checks that every guide the changelog
+points at exists and that every `#anchor` lands on a real heading. A renamed
+section leaves the link resolving to the top of the page, which looks fine in
+a diff and wastes the reader's time; nothing else in the repository would
+notice. It reproduces the slug rules in `lib/docs.ts` so the anchors are
+checked the way both GitHub and `/docs` will resolve them.
+
 ### Writing a test
 
 **Check it can fail.** Break the thing it guards, watch it go red, put it
@@ -109,13 +133,18 @@ A test that has never been observed failing is a test you don't know works.
 
 | Job | Runs |
 |---|---|
-| `build` | Typecheck, build, then the end-to-end suite against the built server |
+| `build` | The eight pure suites, then lint, typecheck and build, then the end-to-end suite against the built server |
 | `schema` | Schema applied twice for idempotency, then the constraint, query and restore suites |
-| `shell` | `bash -n` on every tracked `.sh`; `shellcheck` advisory |
+| `shell` | `bash -n` on every tracked `.sh`, the rig-bridge copy check, then `shellcheck` |
 
-Lint and `shellcheck` are deliberately not gated — both report pre-existing
-findings that would fail every PR. Tracked as an issue; the jobs are wired so
-enabling them is a one-line change once the backlogs clear.
+**Everything is gated.** Lint and `shellcheck` were advisory for a while, held
+back by a backlog of pre-existing findings that would have failed every pull
+request. That backlog is cleared and both are enforced, so anything either one
+reports now is something the change introduced.
+
+The pure suites run first in `build` because they need no database and no
+compile: a drifted section list or a broken scorer fails in seconds rather
+than after the build and a server start.
 
 ## Conventions
 
