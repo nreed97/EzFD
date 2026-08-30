@@ -16,6 +16,13 @@ offered on the same screen and is optional on a contest; on a special event it
 is the point. See [the quick start](quick-start.md#pick-where-youre-operating)
 for the colour coding.
 
+The board is live. A checkout made anywhere else — another operator, another
+station, the coordination panel in someone's logging window — appears while
+you are looking at it, so the band you are about to take cannot quietly become
+somebody else's between the screen loading and your click. Who is *on air*
+without a checkout is refreshed every 15 seconds instead, which is as fast as
+a logging window reports itself.
+
 A position may already be selected when the screen opens — a band you have
 checked out, or failing that the one this browser was last logging on. The
 screen says which of the two it used, and never preselects a band somebody

@@ -31,8 +31,24 @@ event checkouts. One SSE endpoint serves both, tagging each message with an
 event name so the client can tell them apart. That keeps it to one connection
 per browser window rather than one per data type.
 
+Three screens open a stream, each on its own connection: the logging window,
+the CW keying popout — a separate document — and the operating position
+picker, which is watching for a checkout made somewhere else while an operator
+decides where to sit.
+
+Presence is the exception. A logging window reports itself over HTTP on a
+heartbeat rather than through the database, so there is no channel to listen
+on and who is on air is polled. Screens that show both therefore poll anyway,
+which doubles as the recovery path: an SSE stream can die quietly, and the
+poll is what makes the display eventually right regardless.
+
 Consequences:
 
+- Anything deciding whether a claim is live from a clock has to read that
+  clock at least as often as it expects data. The position picker read it on
+  the poll interval, which was invisible until checkouts started arriving on
+  the stream — a claim made *now* begins after the last tick, so fresh data
+  landed and the board still called it not yet started.
 - A connection pooler in transaction mode breaks this silently. See
   [Configuration](configuration.md#database_url).
 - nginx must not buffer the SSE response. The app sets

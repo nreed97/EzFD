@@ -183,7 +183,13 @@ Server-Sent Events. Two event types:
 A keepalive comment every 25 seconds keeps proxies from timing the stream out.
 
 The reservation payload carries the raw range column rather than decomposed
-timestamps — treat it as a signal to refetch, not as data.
+timestamps — treat it as a signal to refetch, not as data. The logging
+window's coordination panel and the operating position picker both do exactly
+that.
+
+There is no presence event. A logging window reports itself over HTTP rather
+than through the database, so who is on air is polled by whatever displays
+it.
 
 ## Import and export
 

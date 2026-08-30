@@ -39,6 +39,15 @@ only run events.
   survives signing out, so the next operator at a club laptop is offered the
   radio's own band. ([#73])
 
+### Fixed
+
+- **Checkouts appear in the position picker as they happen** `Display` — The
+  picker refreshed on a timer, so for up to fifteen seconds it could show a
+  band as free that somebody had already taken — the exact window in which two
+  operators pick the same one. It now listens on the same live stream the
+  logging screen uses. Its clock was the other half: a checkout made *this
+  second* was arriving and being drawn as not yet started. ([#74])
+
 ---
 
 ## 2026-08-25
@@ -243,3 +252,4 @@ continuous enough to be worth summarising.
 [#71]: https://github.com/nreed97/EzFD/pull/71
 [#72]: https://github.com/nreed97/EzFD/pull/72
 [#73]: https://github.com/nreed97/EzFD/pull/73
+[#74]: https://github.com/nreed97/EzFD/pull/74
