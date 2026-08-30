@@ -569,6 +569,13 @@ else
   no "  the log view screenshot is served"
 fi
 
+# The operating position screenshot is referenced from the quick start.
+if [[ "$(curl -s -o /dev/null -w '%{content_type}' "$BASE/docs/images/operating-position.png")" == "image/png" ]]; then
+  ok "  the operating position screenshot is served"
+else
+  no "  the operating position screenshot is served"
+fi
+
 # The slug reaches the filesystem, so it must not be able to leave docs/.
 if [[ "$(status GET "/docs/images/..%2f..%2fpackage.json")" == "404" ]]; then
   ok "  a traversal attempt on the docs images is refused"

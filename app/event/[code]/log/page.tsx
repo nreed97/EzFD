@@ -8,10 +8,10 @@ export default async function LogPage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ op?: string; station?: string }>;
+  searchParams: Promise<{ op?: string; station?: string; band?: string; mode?: string }>;
 }) {
   const { code } = await params;
-  const { op, station } = await searchParams;
+  const { op, station, band, mode } = await searchParams;
   const stationNumber = Math.max(1, parseInt(station ?? '1', 10) || 1);
   const pool = getPool();
 
@@ -45,6 +45,8 @@ export default async function LogPage({
       operatorCall={op.toUpperCase()}
       stationNumber={stationNumber}
       approvalPending={approvalPending}
+      initialBand={band}
+      initialMode={mode}
     />
   );
 }

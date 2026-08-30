@@ -26,6 +26,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-adif.cjs` | ADIF parse and export — the `Date`/string shapes, per-operator `MY_*`, SES vs contest exchange |
 | `scripts/test-cabrillo.cjs` | Cabrillo submission — `CLAIMED-SCORE`, transmitter numbering, ordering, null class/section |
 | `scripts/test-log-filters.cjs` | The dashboard log view — filters combine, an empty filter restricts nothing, column defaults per event type |
+| `scripts/test-slot-board.cjs` | The operating position board — released/expired claims, station vs operator attribution, the contest band list |
 
 When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
@@ -223,6 +224,9 @@ Hard-won fixes worth knowing before touching this code:
 | `components/LogView.tsx` | Dashboard log — filtering, column choice, arrival highlight |
 | `lib/logFilters.ts` | Log filtering, pure over an already-loaded array |
 | `lib/logColumns.ts` | The log column table and per-event-type defaults |
+| `components/OperatingPosition.tsx` | Sign-in step two — pick a band/mode, optionally check it out |
+| `lib/slotBoard.ts` | What each band/mode is doing, from claims plus presence |
+| `lib/bands.ts` | Which bands an event offers — WARC excluded for contests |
 | `lib/callHistory.ts` | N1MM call history file download/parse, per-event prefill lookup |
 | `lib/masterCallsigns.ts` | `MASTER.SCP` (Super Check Partial) download/parse, shared known-callsign lookup |
 | `ezfd-admin.sh` | Interactive server admin console |

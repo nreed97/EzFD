@@ -26,6 +26,33 @@ Two things you may also be asked for:
 - **Your grid and state**, on a special event. Each operator has their own
   location, so this can't come from the event.
 
+## Pick where you're operating
+
+![Choosing an operating position: bands laid out by mode, colour-coded for what is free, checked out, or already on air](images/operating-position.png)
+
+Next you're asked where you're sitting. Bands are laid out by mode and
+colour-coded:
+
+| Colour | Meaning |
+|---|---|
+| Plain | Free |
+| Amber | Somebody is logging there but hasn't checked it out |
+| Red | Somebody has it checked out |
+| Green | You have it checked out |
+
+Pick one and you get two buttons. **Check out and start logging** claims the
+band and mode so nobody else takes it; **Start without checking out** just
+tunes the form there. On a special event, check out — that's what stops two
+operators signing the same callsign on one band. On a contest it's optional,
+and a casual club can ignore it entirely.
+
+If you pick something someone else holds, you can still start there. The log
+warns on each contact rather than refusing it, because a contact that already
+happened on the air has to be logged either way.
+
+**Just show me the dashboard** at the bottom skips logging altogether — for
+when you came to watch rather than operate.
+
 ## 2. Log a contact
 
 The cursor is already in the callsign box. Type, press **Tab** or **Space**

@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { eventTypeLabel, transmitterCount } from '@/lib/types';
-import type { Event } from '@/lib/types';
+import type { Band, Event, Mode } from '@/lib/types';
+import OperatingPosition from '@/components/OperatingPosition';
 
 export default function EventJoinPage() {
   const params = useParams();
@@ -20,6 +21,10 @@ export default function EventJoinPage() {
   const [opGrid, setOpGrid] = useState('');
   const [opState, setOpState] = useState('');
   const [station, setStation] = useState(1);
+  // Signing in and choosing where to sit are two questions, asked in that
+  // order. Previously only the first was asked and the logger opened on a
+  // hard-coded 20m phone, which on a busy site is a guess.
+  const [step, setStep] = useState<'signin' | 'position'>('signin');
 
   // Multi-transmitter events (2A/3A+) need to know which station an operator
   // is at — otherwise every QSO reports transmitter 0 in the Cabrillo export
@@ -35,10 +40,17 @@ export default function EventJoinPage() {
         setLoading(false);
 
         // If already joined, go straight to log
+        // Returning in the same browser session skips both steps. The stored
+        // position goes back with them — without it a reload mid-shift, or a
+        // trip to the dashboard and back, dropped the operator onto the
+        // fallback band rather than where they are actually sitting.
         const saved = sessionStorage.getItem(`ezfd_op_${code}`);
         if (saved) {
-          const { call, station: savedStation } = JSON.parse(saved);
-          if (call) router.replace(`/event/${code}/log?op=${call}&station=${savedStation ?? 1}`);
+          const { call, station: savedStation, band, mode } = JSON.parse(saved);
+          if (call) {
+            const slot = band && mode ? `&band=${band}&mode=${mode}` : '';
+            router.replace(`/event/${code}/log?op=${call}&station=${savedStation ?? 1}${slot}`);
+          }
         }
       });
   }, [code, router]);
@@ -65,8 +77,17 @@ export default function EventJoinPage() {
       }).catch(() => {});
     }
 
-    router.push(`/event/${code}/log?op=${call}&station=${station}`);
+    setOpCall(call);
+    setStep('position');
   }
+
+  const goLog = (band: Band, mode: Mode) => {
+    // Remembered alongside the callsign so returning to the event comes back
+    // to the same position rather than the fallback.
+    sessionStorage.setItem(`ezfd_op_${code}`,
+      JSON.stringify({ call: opCall, station, band, mode }));
+    router.push(`/event/${code}/log?op=${opCall}&station=${station}&band=${band}&mode=${mode}`);
+  };
 
   if (loading) return <div className="flex min-h-screen items-center justify-center text-zinc-400">Loading...</div>;
   if (notFound) return (
@@ -97,6 +118,8 @@ export default function EventJoinPage() {
           {event.location && <p className="mt-1 text-sm text-zinc-500 light:text-zinc-500">{event.location}</p>}
         </div>
 
+        {step === 'signin' ? (
+          <>
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-6 light:border-zinc-200 light:bg-zinc-50">
           <h2 className="mb-4 font-semibold text-zinc-200 light:text-zinc-800">Sign In as Operator</h2>
           <form onSubmit={handleJoin} className="flex flex-col gap-3">
@@ -179,6 +202,17 @@ export default function EventJoinPage() {
             View Live Stats (Visitor)
           </Link>
         </div>
+          </>
+        ) : (
+          <OperatingPosition
+            event={event}
+            opCall={opCall}
+            station={station}
+            onStart={goLog}
+            onDashboard={() => router.push(`/event/${code}/dashboard`)}
+            onBack={() => setStep('signin')}
+          />
+        )}
       </div>
     </main>
   );

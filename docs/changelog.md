@@ -27,6 +27,11 @@ only run events.
 
 ### Added
 
+- **An operating position step when you sign in** `Display` — After your
+  callsign you are asked where you are sitting, with every band and mode shown
+  as free, on air, or checked out, and the option to claim it there. The logger
+  used to open on a hard-coded 20m phone, which on a busy site is a guess — and
+  on a special event could put you on a band somebody else had booked. ([#71])
 - **Dashboard log view** `Display` — Every contact in one table, narrowed by
   operator, station, band, mode, section, time or duplicates, with the columns
   you choose. Answers a question about the log without exporting it mid-event,
@@ -217,3 +222,4 @@ continuous enough to be worth summarising.
 [#68]: https://github.com/nreed97/EzFD/pull/68
 [#69]: https://github.com/nreed97/EzFD/pull/69
 [#70]: https://github.com/nreed97/EzFD/pull/70
+[#71]: https://github.com/nreed97/EzFD/pull/71
