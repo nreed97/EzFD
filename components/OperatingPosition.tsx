@@ -4,6 +4,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { Band, Event, Mode, SesReservation } from '@/lib/types';
 import { bandsFor, MODES } from '@/lib/bands';
 import { buildSlotBoard, countOpen, slotKey, type PresenceRow, type SlotInfo } from '@/lib/slotBoard';
+import { NO_POSITION, positionKey, suggestPosition, validPosition, type StoredPosition } from '@/lib/lastPosition';
+import { useStoredJson } from '@/lib/useStoredJson';
 import { useNow } from '@/lib/useNow';
 
 /**
@@ -80,11 +82,26 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
   );
   const { open, total } = useMemo(() => countOpen(board), [board]);
 
-  const current = picked ? board.get(slotKey(picked.band, picked.mode)) : null;
+  // Where this browser last operated, kept across an operator change because
+  // the laptop stays at the radio while the operators rotate.
+  const [stored] = useStoredJson<StoredPosition>(
+    positionKey(event.join_code, station), NO_POSITION);
+  const remembered = useMemo(
+    () => validPosition(stored, event.event_type), [stored, event.event_type]);
+  const suggestion = useMemo(
+    () => suggestPosition(board, remembered), [board, remembered]);
+
+  // An explicit click always wins. Until there is one, the suggestion stands
+  // in — derived rather than written into state, so it needs no effect and
+  // cannot get stuck holding a band that has since been claimed by somebody
+  // else while the operator was reading the screen.
+  const active = picked ?? suggestion;
+
+  const current = active ? board.get(slotKey(active.band, active.mode)) : null;
   const takenByOther = current?.state === 'claimed';
 
   async function claimAndStart() {
-    if (!picked) return;
+    if (!active) return;
     setClaiming(true);
     setClaimError(null);
     const res = await fetch('/api/ses/reservations', {
@@ -93,8 +110,8 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
       body: JSON.stringify({
         event_id: event.id,
         op_call: opCall,
-        band: picked.band,
-        mode: picked.mode,
+        band: active.band,
+        mode: active.mode,
         // A contest claim is held by the station; a special event claim by the
         // operator. Same split the logging gate uses, so a claim made here is
         // one checkSlot will recognise as yours.
@@ -111,7 +128,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
       void load();
       return;
     }
-    onStart(picked.band, picked.mode);
+    onStart(active.band, active.mode);
   }
 
   return (
@@ -135,7 +152,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
             <div className="flex flex-wrap gap-1">
               {bands.map(band => {
                 const slot = board.get(slotKey(band, mode))!;
-                const isPicked = picked?.band === band && picked?.mode === mode;
+                const isPicked = active?.band === band && active?.mode === mode;
                 const title = slot.state === 'claimed' || slot.state === 'mine'
                   ? `${slot.heldBy} holds this${slot.onAir.length ? ` · on air: ${slot.onAir.join(', ')}` : ''}`
                   : slot.onAir.length
@@ -179,15 +196,26 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
         ))}
       </div>
 
-      {picked && (
+      {active && (
         <div className="mt-4 rounded-lg border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
           <p className="text-sm text-zinc-300 light:text-zinc-700">
-            <span className="font-mono font-semibold text-amber-400">{picked.band} {MODE_LABEL[picked.mode]}</span>
+            <span className="font-mono font-semibold text-amber-400">{active.band} {MODE_LABEL[active.mode]}</span>
             {current?.state === 'open' && ' — open.'}
             {current?.state === 'mine' && ' — already yours.'}
             {current?.state === 'busy' && ` — ${current.onAir.join(', ')} on air here, not checked out.`}
             {takenByOther && ` — ${current?.heldBy} has this checked out.`}
           </p>
+
+          {/* Say why it is already selected. A band that highlights itself with
+              no explanation reads as a bug, and an operator who disagrees with
+              the guess needs to know what it was guessing from. */}
+          {!picked && suggestion && (
+            <p className="mt-1 text-[11px] text-zinc-500">
+              {suggestion.reason === 'held'
+                ? 'Picked for you — you have this checked out. Choose another band to change it.'
+                : 'Picked for you — this radio was last on it. Choose another band to change it.'}
+            </p>
+          )}
 
           {claimError && (
             <p className="mt-2 text-xs text-red-400">{claimError}</p>
@@ -206,7 +234,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
             )}
             <button
               type="button"
-              onClick={() => onStart(picked.band, picked.mode)}
+              onClick={() => onStart(active.band, active.mode)}
               className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-700 light:hover:bg-zinc-100"
             >
               {takenByOther ? 'Start here anyway' : 'Start without checking out'}

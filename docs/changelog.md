@@ -32,6 +32,12 @@ only run events.
   keying window alike. Nothing on screen used to confirm it, so a mis-click at
   sign-in tagged a whole shift's contacts with the wrong transmitter and the
   first sign of it was the Cabrillo export. ([#72])
+- **The operating position picker opens on a band** `Display` — Rather than
+  forty-five blank buttons, it preselects one you have checked out, or failing
+  that the band this browser was last logging on, and says which of the two it
+  used. Clicking any other band changes it. The memory is per station and
+  survives signing out, so the next operator at a club laptop is offered the
+  radio's own band. ([#73])
 
 ---
 
@@ -236,3 +242,4 @@ continuous enough to be worth summarising.
 [#70]: https://github.com/nreed97/EzFD/pull/70
 [#71]: https://github.com/nreed97/EzFD/pull/71
 [#72]: https://github.com/nreed97/EzFD/pull/72
+[#73]: https://github.com/nreed97/EzFD/pull/73

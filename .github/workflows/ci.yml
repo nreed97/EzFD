@@ -83,6 +83,12 @@ jobs:
       - name: Slot board tests
         run: node scripts/test-slot-board.cjs
 
+      # What that picker opens on. A claim outranks a remembered position, and
+      # a position read back out of localStorage is checked against the bands
+      # the event offers rather than trusted.
+      - name: Last position tests
+        run: node scripts/test-last-position.cjs
+
       # Gated now that the react-hooks backlog is worked through. Anything it
       # reports is new.
       - name: Lint

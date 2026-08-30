@@ -9,6 +9,7 @@ import { useQsoQueue } from '@/lib/useQsoQueue';
 import { applyQsoEvent } from '@/lib/qsoStream';
 import { ARRL_SECTIONS, transmitterCount } from '@/lib/types';
 import { bandsFor, MODES } from '@/lib/bands';
+import { rememberPosition } from '@/lib/lastPosition';
 import type { Event, QSO, Band, Mode, DisplayQSO, SesReservation } from '@/lib/types';
 import type { QSOSubmission } from './QSOForm';
 import QSOForm from './QSOForm';
@@ -194,9 +195,14 @@ export default function LoggingClient({
   // Keep the remembered position in step with where the operator actually is.
   // The picker writes it at sign-in, but they QSY afterwards, and a reload
   // should come back to the band they are on rather than the one they started
-  // on an hour ago. Session storage only — this is where *this browser* is
-  // sitting, not an event setting.
+  // on an hour ago.
+  //
+  // Two records, because they answer different questions. The session one is
+  // *this operator's* position and is cleared when they sign out. The durable
+  // one is *this radio's*, and outliving the sign-out is the point: the next
+  // operator at the same laptop gets offered the band it is already on.
   useEffect(() => {
+    rememberPosition(event.join_code, stationNumber, currentBand, currentMode);
     const key = `ezfd_op_${event.join_code}`;
     try {
       const saved = sessionStorage.getItem(key);
@@ -206,7 +212,7 @@ export default function LoggingClient({
     } catch {
       // Private mode, or a corrupt record. The position just isn't remembered.
     }
-  }, [event.join_code, currentBand, currentMode]);
+  }, [event.join_code, stationNumber, currentBand, currentMode]);
 
   /** Drain the offline queue. Resolves true if at least one contact was
    *  accepted, which is what tells the retry timer it is making progress. */
