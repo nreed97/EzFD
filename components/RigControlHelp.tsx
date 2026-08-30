@@ -1,10 +1,15 @@
 'use client';
 
 import { useState } from 'react';
+import type { SerialRigState } from '@/lib/useSerialRig';
 
 interface Props {
+  /** The Python bridge's WebSocket connection. */
   rigConnected: boolean;
   canCw?: boolean;
+  /** The browser-native path (#65). Offered alongside the bridge, never
+   *  instead of it — see the panel copy for when each applies. */
+  serial?: SerialRigState;
   onClose: () => void;
 }
 
@@ -25,7 +30,7 @@ function Step({ n, children }: { n: number; children: React.ReactNode }) {
   );
 }
 
-export default function RigControlHelp({ rigConnected, canCw, onClose }: Props) {
+export default function RigControlHelp({ rigConnected, canCw, serial, onClose }: Props) {
   const [showPlatform, setShowPlatform] = useState<'win' | 'mac' | 'linux'>('win');
   const [showTroubleshoot, setShowTroubleshoot] = useState(false);
 
@@ -66,6 +71,71 @@ export default function RigControlHelp({ rigConnected, canCw, onClose }: Props) 
               </p>
             </div>
           </div>
+
+          {/* The browser-native path. Put above the bridge setup because when
+              it works it is the shorter road — no Python, no Hamlib, no second
+              process — but framed as the narrower one, since it is Chromium
+              only and speaks a fraction of the radios Hamlib does. */}
+          {serial && (
+            <div className="rounded-lg border border-zinc-700 bg-zinc-800/40 p-4 flex flex-col gap-2 light:border-zinc-200 light:bg-zinc-50">
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-xs font-semibold uppercase tracking-wider text-zinc-500">
+                  Connect directly — no bridge
+                </p>
+                {serial.connected && (
+                  <span className="rounded border border-green-700 bg-green-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-400">
+                    Connected
+                  </span>
+                )}
+              </div>
+
+              {serial.supported ? (
+                <>
+                  <p className="text-sm text-zinc-300 light:text-zinc-700">
+                    This browser can open the radio&apos;s CAT port itself. Nothing to
+                    install and nothing to keep running — but it currently speaks only
+                    the <strong className="text-zinc-200 light:text-zinc-800">Kenwood
+                    and Elecraft</strong> command set, which also covers FlexRadio&apos;s
+                    SmartCAT. For anything else, use the bridge below.
+                  </p>
+                  {serial.connected ? (
+                    <>
+                      <p className="font-mono text-sm text-green-400">
+                        {serial.freq !== null ? `${(serial.freq / 1e6).toFixed(4)} MHz` : 'reading…'}
+                        {serial.band ? ` · ${serial.band}` : ''}
+                        {serial.mode ? ` · ${serial.mode}` : ''}
+                      </p>
+                      <button
+                        type="button"
+                        onClick={() => { void serial.disconnect(); }}
+                        className="self-start rounded-lg border border-zinc-600 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-700 light:hover:bg-zinc-100"
+                      >
+                        Disconnect
+                      </button>
+                    </>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => { void serial.connect(); }}
+                      className="self-start rounded-lg bg-amber-400 px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-amber-300"
+                    >
+                      Choose the radio&apos;s port
+                    </button>
+                  )}
+                  {serial.error && <p className="text-xs text-red-400">{serial.error}</p>}
+                  <p className="text-[11px] text-zinc-500">
+                    Reading only for now — CW keying still needs the bridge. The browser
+                    asks which port each time a window is opened, and each window grants
+                    its own, so a second radio needs no second bridge.
+                  </p>
+                </>
+              ) : (
+                <p className="text-sm text-zinc-400 light:text-zinc-600">
+                  {serial.unsupportedReason} The bridge below works everywhere.
+                </p>
+              )}
+            </div>
+          )}
 
           {/* Download */}
           <a

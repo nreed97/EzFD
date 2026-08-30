@@ -11,6 +11,44 @@ Nothing about the radio reaches the server; only logged QSOs do.
 This is entirely optional. Operators who don't use it lose nothing but the
 convenience.
 
+## Two ways to connect
+
+There are two transports. The bridge is the default and works everywhere; the
+browser can also open the CAT port itself on some setups, which needs nothing
+installed.
+
+| | Bridge | Directly from the browser |
+|---|---|---|
+| Needs installing | Python, and Hamlib | nothing |
+| Kept running | a second process, per radio | nothing |
+| Browsers | all of them | Chrome, Edge and other Chromium browsers only — not Firefox, not Safari, and no browser on iOS |
+| Served over plain HTTP | works | **not available** — the browser only offers serial ports on a secure page |
+| Radios | around 200, through Hamlib | Kenwood and Elecraft commands, which also covers FlexRadio SmartCAT |
+| Band and mode follow the VFO | yes | yes |
+| CW keying | yes | **no** — use the bridge |
+| Two radios | a second bridge on another port | nothing extra; each window grants its own port |
+
+**The bridge is not going away**, and if you already have one running it keeps
+working exactly as before — it is the better-informed of the two, since Hamlib
+knows each radio's quirks. Use the direct path when you want rig control at a
+site where installing Python is the thing standing in the way.
+
+### Connecting directly
+
+Open the **Rig** button in the Operators panel and choose **Choose the
+radio's port**. The browser asks which serial port to use — pick the radio's —
+and band and mode start following the VFO.
+
+Each browser window asks once, and the permission does not carry between
+windows, so a second radio in a second window simply grants its own port.
+
+If the panel says Web Serial is unavailable, it names the reason: either the
+browser has no support, or the page is served over plain HTTP. Both are cases
+for the bridge.
+
+Reading only, for now. CW keying goes through Hamlib's `\send_morse`, which
+has no direct equivalent here, so the macro window still needs the bridge.
+
 ## Setup
 
 Download `ezfd-rig-bridge.py` from the logger (the **Rig** button in the

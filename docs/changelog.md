@@ -27,6 +27,15 @@ only run events.
 
 ### Added
 
+- **Rig control without installing anything, on Chromium** `Display` — Chrome
+  and Edge can open the radio's CAT port directly, so band and mode follow the
+  VFO with no Python, no Hamlib and no second process to keep running — and a
+  second radio needs no second bridge. Kenwood and Elecraft commands for now,
+  which also covers FlexRadio SmartCAT, and reading only: CW keying still uses
+  the bridge. The bridge is unchanged and stays the default, and is still the
+  only option on Firefox, Safari, iOS and a plain-HTTP server. ([#79])
+  Docs: [Rig control → Two ways to connect](rig-control.md#two-ways-to-connect)
+
 - **A `LICENSE` file** — The licence was stated in the README and nowhere a
   tool looks, so GitHub reported the project as unlicensed and anyone checking
   before deploying it at a club found nothing. The text is unchanged and now
@@ -341,3 +350,4 @@ continuous enough to be worth summarising.
 [#76]: https://github.com/nreed97/EzFD/pull/76
 [#77]: https://github.com/nreed97/EzFD/pull/77
 [#78]: https://github.com/nreed97/EzFD/pull/78
+[#79]: https://github.com/nreed97/EzFD/pull/79

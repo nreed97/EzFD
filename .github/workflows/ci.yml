@@ -101,6 +101,12 @@ jobs:
       - name: Docs navigation tests
         run: node scripts/test-docs-nav.cjs
 
+      # The decoding half of browser-native rig control. A misread frequency
+      # picks a wrong band, and the band is what a contact is scored on — the
+      # failure looks like a plausible number, not like an error.
+      - name: CAT protocol tests
+        run: node scripts/test-cat-protocol.cjs
+
       # Gated now that the react-hooks backlog is worked through. Anything it
       # reports is new.
       - name: Lint

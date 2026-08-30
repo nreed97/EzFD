@@ -30,6 +30,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-last-position.cjs` | What the position picker preselects — a claim outranks a remembered position, and a remembered one is validated against the event's bands |
 | `scripts/test-changelog-links.cjs` | Every guide and `#anchor` the changelog points at resolves — a renamed section is otherwise invisible |
 | `scripts/test-docs-nav.cjs` | The `/docs` sidebar — every guide appears exactly once, grouped and ordered by the index |
+| `scripts/test-cat-protocol.cjs` | The Kenwood CAT decode — framing, mode letters, and that the native path's band and mode tables still match the bridge's |
 
 When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
@@ -234,6 +235,30 @@ out of date. That part is on you.
 
 ## Rig control / CW keying (`ezfd-rig-bridge.py`, `lib/useRigBridge.ts`)
 
+**The Python bridge is the default transport and is not going away.** `lib/useSerialRig.ts`
+adds a browser-native read path over Web Serial (#65), which is Chromium-only,
+needs a secure context — so it is unavailable on the plain-HTTP field servers
+this app supports — and speaks only the Kenwood/Elecraft dialect. It does
+nothing at all until an operator picks a port by hand, so any setup that does
+not use it behaves exactly as it did. Removing the bridge is not on the table.
+
+- **A Kenwood `MD` value above 9 arrives as a letter.** Hamlib reads it as
+  `modebuf[offs] - 'A' + 10`, so `MDA` is mode 10 (PSK). Parsing that field as
+  "a digit" — the obvious reading of one character — turns every data mode on a
+  newer rig into a decode failure, and the symptom is the mode quietly ceasing
+  to update rather than an error.
+- **Poll `FR` before reading the frequency.** `FA` is VFO A specifically, so
+  reading it unconditionally reports the wrong frequency whenever the operator
+  is on VFO B or working split. A wrong frequency picks a wrong band, and the
+  band is what the contact is logged and scored on — a plausible-looking number
+  with nothing on screen to say it is wrong.
+- **`lib/catProtocol.ts`'s tables are transcribed, not invented.** The mode
+  table comes from Hamlib's `kenwood_mode_table`, and the band edges and mode
+  classification from the bridge's own `BANDS` and `MODE_MAP`.
+  `scripts/test-cat-protocol.cjs` reads those back out of `ezfd-rig-bridge.py`
+  and fails if the two drift: an operator must not see a different band or mode
+  depending on which transport they happened to connect with.
+
 A local Python script bridges Hamlib `rigctld` ↔ WebSocket (`ws://localhost:4575`) ↔ browser. Runs entirely on the operator's machine; the EzFD server is never involved. `lib/useRigBridge.ts` is a shared hook used independently by both `LoggingClient` (main tab) and `CwLoggingClient` (CW popout) — each opens its own WS connection.
 
 Hard-won fixes worth knowing before touching this code:
@@ -263,6 +288,8 @@ Hard-won fixes worth knowing before touching this code:
 | `components/CwMacroPanel.tsx` | F1–F12 macros, Run/S&P modes, ESM, auto-CQ |
 | `components/BandActivity.tsx` | Presence/conflict panel — QRT, QSY occupancy |
 | `lib/useRigBridge.ts` | Shared rig WebSocket hook |
+| `lib/useSerialRig.ts` | Browser-native CAT over Web Serial — read path, additive to the bridge |
+| `lib/catProtocol.ts` | Kenwood/Elecraft CAT decoding, transcribed from Hamlib and the bridge |
 | `lib/useQsoQueue.ts` | Offline QSO queue — enqueue/submit, drain, retry; used by both logging windows |
 | `components/SesCoordination.tsx` | SES call checkout panel — claim/extend/release a band+mode |
 | `lib/ses.ts` | SES slot queries, `23P01` constant, UTC slot-time formatting |

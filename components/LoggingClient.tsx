@@ -5,6 +5,7 @@ import { useStoredFlag } from '@/lib/useStoredFlag';
 import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
 import { useRigBridge, rigPortForStation } from '@/lib/useRigBridge';
+import { useSerialRig } from '@/lib/useSerialRig';
 import { useQsoQueue } from '@/lib/useQsoQueue';
 import { applyQsoEvent } from '@/lib/qsoStream';
 import { ARRL_SECTIONS, transmitterCount } from '@/lib/types';
@@ -119,8 +120,21 @@ export default function LoggingClient({
     onMode: setCurrentMode,
     port: rigPortForStation(stationNumber),
   });
-  const rigConnected = rig.connected;
-  const rigFreq = rig.freq;
+
+  // The browser-native path (#65), which needs no bridge process. Additive:
+  // nothing here runs until an operator picks a port by hand, and the bridge
+  // stays the default and the only option on Firefox, Safari, iOS and a
+  // plain-HTTP field server.
+  // It drives band and mode through the same callbacks the bridge uses, so
+  // the logging screen does not care which transport is talking.
+  const serialRig = useSerialRig({ onBand: setCurrentBand, onMode: setCurrentMode });
+
+  // Either transport lights the RIG chip. The bridge's frequency wins when
+  // both are live: it goes through Hamlib, so it is the better-informed of
+  // the two, and an operator already running a bridge sees exactly what they
+  // saw before this existed.
+  const rigConnected = rig.connected || serialRig.connected;
+  const rigFreq = rig.connected ? rig.freq : serialRig.freq;
 
   function toggleNight() {
     setNightMode(prev => !prev);
@@ -608,8 +622,9 @@ export default function LoggingClient({
 
       {showRigHelp && (
         <RigControlHelp
-          rigConnected={rigConnected}
+          rigConnected={rig.connected}
           canCw={rig.canCw}
+          serial={serialRig}
           onClose={() => setShowRigHelp(false)}
         />
       )}
