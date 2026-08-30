@@ -1,5 +1,6 @@
 import Link from 'next/link';
-import { listDocs } from '@/lib/docs';
+import { docsNav } from '@/lib/docs';
+import DocsNav from '@/components/DocsNav';
 import ThemeToggle from '@/components/ThemeToggle';
 
 /**
@@ -11,7 +12,7 @@ import ThemeToggle from '@/components/ThemeToggle';
  * GitHub at the time.
  */
 export default function DocsLayout({ children }: { children: React.ReactNode }) {
-  const docs = listDocs();
+  const groups = docsNav();
   return (
     <div className="mx-auto flex min-h-screen max-w-6xl flex-col">
       <header className="flex items-center justify-between gap-3 border-b border-zinc-800 px-4 py-3 light:border-zinc-200">
@@ -32,20 +33,7 @@ export default function DocsLayout({ children }: { children: React.ReactNode }) 
       </header>
 
       <div className="flex flex-1 flex-col gap-6 px-4 py-6 md:flex-row">
-        <nav className="shrink-0 md:w-56">
-          <ul className="flex flex-wrap gap-x-4 gap-y-1 md:flex-col md:gap-1">
-            {docs.map(d => (
-              <li key={d.slug}>
-                <Link
-                  href={`/docs/${d.slug}`}
-                  className="block rounded px-2 py-1 text-sm text-zinc-400 hover:bg-zinc-800 hover:text-zinc-200 light:text-zinc-600 light:hover:bg-zinc-100 light:hover:text-zinc-900"
-                >
-                  {d.title}
-                </Link>
-              </li>
-            ))}
-          </ul>
-        </nav>
+        <DocsNav groups={groups} />
         <main className="min-w-0 flex-1">{children}</main>
       </div>
     </div>

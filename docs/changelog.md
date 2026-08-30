@@ -34,6 +34,15 @@ only run events.
   the top of the page. ([#76])
   Docs: [Development → Tests](development.md#tests)
 
+- **The documentation sidebar is grouped, and shows where you are** `Display` —
+  It listed all seventeen guides alphabetically with nothing to say which was
+  yours and no mark on the one you were reading. It now follows the index's own
+  audience grouping, highlights the current guide, and carries previous/next
+  links so the set can be read straight through. On a phone it collapses, so a
+  guide starts at the top of the screen rather than below a list of links.
+  ([#77])
+  Docs: [EzFD documentation → Reading these in the app](README.md#reading-these-in-the-app)
+
 ### Fixed
 
 - **The development guide described a CI that no longer existed** — It said
@@ -325,3 +334,4 @@ continuous enough to be worth summarising.
 [#74]: https://github.com/nreed97/EzFD/pull/74
 [#75]: https://github.com/nreed97/EzFD/pull/75
 [#76]: https://github.com/nreed97/EzFD/pull/76
+[#77]: https://github.com/nreed97/EzFD/pull/77

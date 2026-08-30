@@ -95,6 +95,12 @@ jobs:
       - name: Changelog link tests
         run: node scripts/test-changelog-links.cjs
 
+      # The docs sidebar is built by reading the grouping out of the index, so
+      # a guide can now fall out of the navigation entirely — still on disk,
+      # still reachable by URL, invisible in the app.
+      - name: Docs navigation tests
+        run: node scripts/test-docs-nav.cjs
+
       # Gated now that the react-hooks backlog is worked through. Anything it
       # reports is new.
       - name: Lint
