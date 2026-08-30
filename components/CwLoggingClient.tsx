@@ -5,6 +5,7 @@ import { useStoredFlag } from '@/lib/useStoredFlag';
 import { applyQsoEvent } from '@/lib/qsoStream';
 import { useRigBridge } from '@/lib/useRigBridge';
 import { useQsoQueue } from '@/lib/useQsoQueue';
+import { transmitterCount } from '@/lib/types';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
 import QSOForm, { type QSOFormHandle } from './QSOForm';
 import CwMacroPanel, { type CwMacroPanelHandle } from './CwMacroPanel';
@@ -17,6 +18,7 @@ interface Props {
 }
 
 export default function CwLoggingClient({ event, initialQSOs, operatorCall, stationNumber }: Props) {
+  const showStation = transmitterCount(event.class) > 1 || stationNumber > 1;
   const [confirmedQSOs, setConfirmedQSOs] = useState<QSO[]>(initialQSOs);
   const [currentBand, setCurrentBand] = useState<Band>('20m');
   const [currentMode, setCurrentMode] = useState<Mode>('CW');
@@ -111,6 +113,15 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
           <span className="font-bold text-amber-400 text-sm shrink-0">{event.club_call}</span>
           <span className="text-zinc-600">|</span>
           <span className="font-mono text-xs text-zinc-300">{operatorCall}</span>
+          {/* Two radios means two of these windows, otherwise identical. The
+              station number is the only thing telling them apart. */}
+          {showStation && (
+            <span
+              title={`Station ${stationNumber}`}
+              className="rounded bg-zinc-800 px-1 font-mono text-[10px] font-semibold text-amber-400 shrink-0">
+              ST{stationNumber}
+            </span>
+          )}
           {!isOnline && (
             <span className="rounded bg-red-900/50 border border-red-700 px-1.5 py-0.5 text-[10px] font-semibold text-red-400 shrink-0">
               OFFLINE

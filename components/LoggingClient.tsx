@@ -7,7 +7,7 @@ import { calculateScore } from '@/lib/scoring';
 import { useRigBridge, rigPortForStation } from '@/lib/useRigBridge';
 import { useQsoQueue } from '@/lib/useQsoQueue';
 import { applyQsoEvent } from '@/lib/qsoStream';
-import { ARRL_SECTIONS } from '@/lib/types';
+import { ARRL_SECTIONS, transmitterCount } from '@/lib/types';
 import { bandsFor, MODES } from '@/lib/bands';
 import type { Event, QSO, Band, Mode, DisplayQSO, SesReservation } from '@/lib/types';
 import type { QSOSubmission } from './QSOForm';
@@ -96,6 +96,20 @@ export default function LoggingClient({
   const [reservationVersion, setReservationVersion] = useState(0);
 
   const isSes = event.event_type === 'SES';
+
+  // Which station this window is. An operator picks it at sign-in and, until
+  // now, nothing on the logging screen said it back to them — so a mis-click
+  // there tagged a whole shift's contacts with the wrong transmitter and the
+  // only clue was the Cabrillo export afterwards.
+  //
+  // Shown when the number can be wrong: a multi-transmitter entry, where the
+  // choice was real, or any window past the first, which is what the "+ Radio"
+  // button opens. A 1A club, or an SES on its only radio, has nothing to
+  // confuse and gets no extra chrome.
+  const showStation = transmitterCount(event.class) > 1 || stationNumber > 1;
+  const opChipTitle = showStation
+    ? `${operatorCall} at station ${stationNumber} — change operator or operating position`
+    : 'Change operator';
 
   // One bridge process per radio, each on its own port, so a second window
   // drives a second rig instead of both fighting over one connection.
@@ -334,11 +348,16 @@ export default function LoggingClient({
               sessionStorage.removeItem(`ezfd_op_${event.join_code}`);
               router.push(`/event/${event.join_code}`);
             }}
-            title="Change operator"
+            title={opChipTitle}
             className="hidden md:inline-flex items-center gap-1.5 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
           >
             <span className="text-zinc-500 light:text-zinc-400 text-[10px] font-semibold uppercase tracking-wide">Op On</span>
             <span className="font-mono font-semibold">{operatorCall}</span>
+            {showStation && (
+              <span className="rounded bg-zinc-800 px-1 font-mono text-[10px] font-semibold text-amber-400 light:bg-zinc-200 light:text-amber-700">
+                ST{stationNumber}
+              </span>
+            )}
             <span className="text-zinc-500">⇄</span>
           </button>
 
@@ -421,10 +440,16 @@ export default function LoggingClient({
                 sessionStorage.removeItem(`ezfd_op_${event.join_code}`);
                 router.push(`/event/${event.join_code}`);
               }}
+              title={opChipTitle}
               className="flex items-center gap-1.5 text-xs border border-zinc-700 rounded px-2 py-0.5 light:border-zinc-300 light:text-zinc-600"
             >
               <span className="text-zinc-500 light:text-zinc-400 text-[10px] font-semibold uppercase tracking-wide">Op On</span>
               <span className="font-mono font-semibold text-zinc-300 light:text-zinc-700">{operatorCall}</span>
+              {showStation && (
+                <span className="rounded bg-zinc-800 px-1 font-mono text-[10px] font-semibold text-amber-400 light:bg-zinc-200 light:text-amber-700">
+                  ST{stationNumber}
+                </span>
+              )}
               <span className="text-zinc-500">⇄</span>
             </button>
           </div>
