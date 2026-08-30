@@ -89,6 +89,12 @@ jobs:
       - name: Last position tests
         run: node scripts/test-last-position.cjs
 
+      # The changelog points a reader at the guide for each change. A link to a
+      # renamed section resolves to the top of the page instead — invisible in
+      # a diff, and nothing else here would catch it.
+      - name: Changelog link tests
+        run: node scripts/test-changelog-links.cjs
+
       # Gated now that the react-hooks backlog is worked through. Anything it
       # reports is new.
       - name: Lint

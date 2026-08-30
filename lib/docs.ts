@@ -95,7 +95,13 @@ export function renderMarkdown(markdown: string): string {
 function slugify(text: string): string {
   return text
     .replace(/<[^>]+>/g, '')          // heading may contain inline code
-    .replace(/&[a-z]+;/gi, '')
+    // Every entity, numeric ones included. The markdown renderer emits an
+    // apostrophe as `&#39;`, which a named-entity-only strip left behind as a
+    // literal "39" in the middle of the slug — so every heading with an
+    // apostrophe got an id GitHub would never produce, and a cross-link
+    // written for GitHub resolved here to the top of the page instead of the
+    // section. Silent by construction: the link is valid, it just lands wrong.
+    .replace(/&(?:[a-z]+|#\d+|#x[0-9a-f]+);/gi, '')
     .trim()
     .toLowerCase()
     .replace(/[^\w\s-]/g, '')
@@ -117,6 +123,14 @@ function addHeadingIds(html: string): string {
 
 function withAppLinks(html: string): string {
   return html
+    // The index is `docs/README.md` on GitHub but is served at `/docs`, not at
+    // a slug — `SLUG_RE` is lower-case only, so `/docs/README` is not a page.
+    // Without this a guide linking its own index 404s in the app while working
+    // on GitHub, which is the one direction nothing here would notice.
+    .replace(
+      /href="(?!https?:|\/|#)README\.md(#[^"]*)?"/g,
+      (_m, hash: string | undefined) => `href="/docs${hash ?? ''}"`,
+    )
     .replace(
       /href="(?!https?:|\/|#)([^"]*?)\.md(#[^"]*)?"/g,
       (_m, path: string, hash: string | undefined) => `href="/docs/${path}${hash ?? ''}"`,

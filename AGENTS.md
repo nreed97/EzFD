@@ -28,6 +28,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-log-filters.cjs` | The dashboard log view — filters combine, an empty filter restricts nothing, column defaults per event type |
 | `scripts/test-slot-board.cjs` | The operating position board — released/expired claims, station vs operator attribution, the contest band list |
 | `scripts/test-last-position.cjs` | What the position picker preselects — a claim outranks a remembered position, and a remembered one is validated against the event's bands |
+| `scripts/test-changelog-links.cjs` | Every guide and `#anchor` the changelog points at resolves — a renamed section is otherwise invisible |
 
 When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
@@ -76,6 +77,41 @@ the reader — not what it edited.** Someone reads this deciding whether to
 update their server before an event, or working out why a number moved since
 last weekend. "Corrected the bonus table" tells them nothing; the example above
 tells them whether it matters to them. An entry they cannot act on is noise.
+
+### Point the entry at its documentation
+
+**If the change touched a guide, the entry links to it** — the guide *and* the
+section, on a `Docs:` line directly under the entry:
+
+```markdown
+- **The station number in the logger header** `Display` — The station you pick
+  at sign-in is now shown beside your callsign. ([#72])
+  Docs: [Operating → Reading the header](operating.md#reading-the-header)
+```
+
+Two or more guides are comma-separated on the one line. Write them
+`[Guide title → Section](file.md#anchor)`, using the guide's own `#` title, so
+the reader knows where they are going before they click.
+
+Links are **relative and stay inside `docs/`**. `renderMarkdown()` rewrites
+`foo.md#bar` to `/docs/foo#bar`, which is what makes one link work both on
+GitHub and in the app; an absolute URL, a path with a `/` in it, or a `../`
+escape out of `docs/` all break that. `AGENTS.md` and the root `README.md` are
+outside `docs/` and cannot be linked this way — point at the guide that covers
+the same ground instead.
+
+The anchor must be a real `##`/`###`/`####` heading. `addHeadingIds()` only
+gives ids to those, so a link to a page's `#` title has nothing to land on.
+`scripts/test-changelog-links.cjs` checks every link and fails on a missing
+file or a missing anchor; run it after renaming any heading, because a renamed
+section leaves every link to it resolving silently to the top of the page.
+
+**Omit the `Docs:` line only when there is genuinely nothing to point at** — a
+test suite, a refactor, a CI gate, a change to the changelog itself. That is
+the same set as the untagged entries, and it should be a small minority. If a
+user-facing change has no guide to link, the missing documentation is the
+finding, not the missing link. The test prints how many entries carry a link
+out of how many exist, so the ratio dropping is visible.
 
 Tag an entry when it affects what a reader submits or sees. Tags are inline
 code, after the subject:
