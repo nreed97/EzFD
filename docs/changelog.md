@@ -37,6 +37,10 @@ only run events.
 
 ### Changed
 
+- **The dashboard opens on the log** `Display` — Contacts arriving is what a
+  dashboard is usually put up to show, and the log is the only view that
+  answers a question about a specific QSO. The map and rate chart are one tab
+  away. ([#70])
 - **Changelog layout** — Entries are grouped by what they did (added, fixed,
   changed, removed, security) with the subject in front, so a date's worth of
   work can be skimmed rather than read. Adds a `Setup` tag for deployment and
@@ -212,3 +216,4 @@ continuous enough to be worth summarising.
 [#67]: https://github.com/nreed97/EzFD/pull/67
 [#68]: https://github.com/nreed97/EzFD/pull/68
 [#69]: https://github.com/nreed97/EzFD/pull/69
+[#70]: https://github.com/nreed97/EzFD/pull/70

@@ -57,9 +57,12 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   const isSes = event.event_type === 'SES';
 
   const [qsos, setQSOs] = useState<QSO[]>(initialQSOs);
-  // Map, Sections and Needed all chart the contest section multiplier, which
-  // an SES doesn't have — its default view is the rate chart instead.
-  const [mainView, setMainView] = useState<MainView>(isSes ? 'rate' : 'map');
+  // The log opens first, for both event types. It is the thing a dashboard is
+  // usually put up to show — contacts arriving — and it is the only view that
+  // answers a question about a specific QSO. The section map and the rate
+  // chart are a tab away and cost nothing to reach; a log that needs a click
+  // is the wrong way round on a screen nobody is standing at.
+  const [mainView, setMainView] = useState<MainView>('log');
   const [reservations, setReservations] = useState<SesReservation[]>([]);
   const [bonuses, setBonuses] = useState<Bonuses>(event.bonuses ?? {});
   const [showSummary, setShowSummary] = useState(false);
