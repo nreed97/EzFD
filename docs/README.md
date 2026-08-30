@@ -32,7 +32,6 @@ Start with whichever describes you.
 | [Deployment](deployment.md) | One-command install on a VPS, TLS, updates |
 | [Administration](administration.md) | `ezfd-admin.sh`, backups, restores, recovery |
 | [Configuration](configuration.md) | Every environment variable |
-| [Changelog](changelog.md) | What changed, newest first — read before and after an update |
 
 ## I want to work on the code
 
@@ -43,6 +42,16 @@ Start with whichever describes you.
 | [Database](database.md) | Schema reference and the constraints that matter |
 | [HTTP API](api.md) | Every endpoint |
 
+## Keeping up
+
+| Guide | What it covers |
+|---|---|
+| [Changelog](changelog.md) | What changed, newest first, and which guide covers each change |
+
+Worth reading in both directions: before an update, to see what is about to
+change; and after one, when a score or an export has moved and you want to
+know why. Every entry links to the guide covering it.
+
 ## Reading these in the app
 
 Every guide here is also served by a running EzFD instance at **`/docs`** —
@@ -51,7 +60,11 @@ header. That matters for a field server with no internet, where the operator
 who needs the troubleshooting page is exactly the one who can't reach GitHub.
 
 The app renders the same files from this directory, so there is one copy of
-each guide and no second version to drift.
+each guide and no second version to drift. Its sidebar is grouped by the
+headings on this page and ordered by these tables, so this file decides both
+what the app lists and where — a guide moved between sections here moves in
+the app too. Each guide also carries previous and next links following the
+same order, so the whole set can be read straight through.
 
 ## Conventions used here
 

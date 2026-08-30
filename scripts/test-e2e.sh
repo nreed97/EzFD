@@ -546,6 +546,26 @@ else
   no "  a link to the docs index points at /docs, not /docs/README"
 fi
 
+# The sidebar is built by reading the groups back out of the index, so a guide
+# can fall out of the navigation while still existing on disk. The unit suite
+# asserts the shape; this asserts the server actually renders it.
+DOC_PAGE=$(req GET /docs/operating)
+if [[ "$DOC_PAGE" == *'aria-label="Documentation"'* ]] \
+   && [[ "$DOC_PAGE" == *'href="/docs/changelog"'* ]] \
+   && [[ "$DOC_PAGE" == *'I want to run an event'* ]]; then
+  ok "  the sidebar renders, grouped, with the changelog in it"
+else
+  no "  the sidebar renders, grouped, with the changelog in it"
+fi
+
+# Previous/next follow the index's order. The quick start is first, so it has a
+# next and no previous — the pair that proves the ends are handled.
+if [[ "$DOC_PAGE" == *'aria-label="More guides"'* ]]; then
+  ok "  a guide offers previous/next links"
+else
+  no "  a guide offers previous/next links"
+fi
+
 QS_DOC=$(req GET /docs/quick-start)
 if [[ "$QS_DOC" == *'id="pick-where-youre-operating"'* ]]; then
   ok "  an apostrophe in a heading slugs the way GitHub slugs it"

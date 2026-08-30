@@ -43,6 +43,18 @@ function compile(entries) {
     process.exit(1);
   }
 
+  // The output lands outside the repo, so a compiled module that imports a
+  // real dependency — `marked`, in lib/docs.ts — cannot resolve it from there.
+  // A link rather than a copy: node resolves `require('marked')` by walking up
+  // from the requiring file, and this puts the project's own modules on that
+  // walk without duplicating them. Best effort; a suite whose modules have no
+  // dependencies never needs it.
+  try {
+    fs.symlinkSync(path.join(root, 'node_modules'), path.join(outDir, 'node_modules'), 'dir');
+  } catch {
+    // Already there, or the platform refuses. The require below reports it.
+  }
+
   return {
     load: name => require(path.join(outDir, `${name}.js`)),
     cleanup: () => fs.rmSync(outDir, { recursive: true, force: true }),

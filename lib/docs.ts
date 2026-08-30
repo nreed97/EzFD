@@ -65,6 +65,72 @@ export function readIndex(): string | null {
   }
 }
 
+export interface DocGroup {
+  /** The index's own `##` heading — "I want to run an event", and so on. */
+  title: string;
+  docs: DocMeta[];
+}
+
+/** Where a guide the index forgot to mention still shows up. */
+const UNLISTED_GROUP = 'More';
+
+/**
+ * The guides grouped the way the index groups them, for the app's sidebar.
+ *
+ * The index already sorts every guide by who is reading it, in prose a human
+ * maintains. The sidebar used to ignore that and list all seventeen
+ * alphabetically, so "Administration" sat above "Architecture" above
+ * "Changelog" with nothing to say which of them an operator wanted — and the
+ * one grouping that did exist was thrown away on the way to the screen.
+ *
+ * So this reads the grouping back out of `README.md` rather than declaring a
+ * second one. A hardcoded order here would be exactly the shape this repo has
+ * been bitten by before — the section list in two components, the backup query
+ * in four — where the two copies drift and the wrong one is the one on screen.
+ *
+ * A guide the index never mentions still appears, under `UNLISTED_GROUP`.
+ * Dropping it silently would be worse: the sidebar is derived from the
+ * directory precisely so that adding a file is enough to be found, and a
+ * forgotten index row should degrade to "listed in an odd place" rather than
+ * to "invisible in the app".
+ */
+export function docsNav(): DocGroup[] {
+  const all = new Map(listDocs().map(d => [d.slug, d]));
+  const index = readIndex();
+  const groups: DocGroup[] = [];
+
+  if (index) {
+    let current: DocGroup | null = null;
+    for (const line of index.split('\n')) {
+      const heading = /^##\s+(.*)$/.exec(line);
+      if (heading) {
+        current = { title: heading[1].trim(), docs: [] };
+        groups.push(current);
+        continue;
+      }
+      // A table row naming a guide: | [Title](slug.md) | what it covers |
+      const row = /^\|\s*\[[^\]]+\]\(([a-z0-9-]+)\.md\)/.exec(line);
+      if (row && current) {
+        const doc = all.get(row[1]);
+        // `all` is the directory, so a row pointing at a guide that no longer
+        // exists is skipped rather than rendered as a link to a 404.
+        if (doc) { current.docs.push(doc); all.delete(row[1]); }
+      }
+    }
+  }
+
+  // Prose sections — "Conventions used here" — carry no guides and are not
+  // navigation.
+  const withDocs = groups.filter(g => g.docs.length > 0);
+  if (all.size > 0) withDocs.push({ title: UNLISTED_GROUP, docs: [...all.values()] });
+  return withDocs;
+}
+
+/** The nav flattened into reading order, for the previous/next links. */
+export function docsOrder(): DocMeta[] {
+  return docsNav().flatMap(g => g.docs);
+}
+
 export function readDoc(slug: string): { title: string; markdown: string } | null {
   const markdown = readRaw(slug);
   if (markdown === null) return null;

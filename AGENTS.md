@@ -29,6 +29,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-slot-board.cjs` | The operating position board — released/expired claims, station vs operator attribution, the contest band list |
 | `scripts/test-last-position.cjs` | What the position picker preselects — a claim outranks a remembered position, and a remembered one is validated against the event's bands |
 | `scripts/test-changelog-links.cjs` | Every guide and `#anchor` the changelog points at resolves — a renamed section is otherwise invisible |
+| `scripts/test-docs-nav.cjs` | The `/docs` sidebar — every guide appears exactly once, grouped and ordered by the index |
 
 When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
@@ -157,10 +158,20 @@ file is easiest to edit:
 | A headline capability | `README.md` feature list — and check the screenshot gallery still matches |
 | **Anything at all** | `docs/changelog.md` — one entry, every change, no exceptions |
 
-**Adding a guide takes two edits, not one.** The `/docs` sidebar is derived
-from the directory by `listDocs()`, so a new file appears there automatically —
-but the index table in `docs/README.md` is hand-written and will silently not
-mention it. Put it under the audience heading that fits.
+**Adding a guide takes two edits, not one.** The file, and a row in the index
+table in `docs/README.md` under the audience heading that fits.
+
+The index is not just a page: `docsNav()` reads the `##` headings and the table
+rows back out of it to build the `/docs` sidebar and the previous/next links,
+so `docs/README.md` decides what the app lists, in what groups, in what order.
+Move a guide between sections there and it moves in the app.
+
+A guide with no index row is not lost — it appears under a **More** group,
+because a forgotten row should degrade to "listed in an odd place" rather than
+to "invisible in the app". That is a fallback, not the intended shape; the row
+is still the edit to make. `scripts/test-docs-nav.cjs` asserts every guide in
+`docs/` appears in the nav exactly once, which is the failure this design can
+have and the flat alphabetical list could not.
 
 ### Screenshots and examples
 
