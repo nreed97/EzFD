@@ -107,7 +107,8 @@ score, rate, sections worked, and who is on which band.
 ![The dashboard during a Field Day event](images/dashboard.png)
 
 **Visitor mode** is the same view with no callsign and no ability to log, for
-a screen visitors can see.
+a screen visitors can see. It has no export buttons and no operator actions,
+and **← Exit** leaves for the home page rather than asking for a callsign.
 
 On a special event the dashboard gets a **Checkouts** tab instead of the
 section views: a timeline of who holds which band and mode, over a grid to

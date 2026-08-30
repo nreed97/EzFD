@@ -47,6 +47,10 @@ only run events.
   operators pick the same one. It now listens on the same live stream the
   logging screen uses. Its clock was the other half: a checkout made *this
   second* was arriving and being drawn as not yet started. ([#74])
+- **Leaving visitor mode goes home** `Display` — **← Exit** on a visitor
+  dashboard landed on the event's operator sign-in, the one screen a visitor
+  had deliberately not chosen — and if the browser still held a sign-in for
+  that event, it went straight on into a logging window. ([#75])
 
 ---
 
@@ -253,3 +257,4 @@ continuous enough to be worth summarising.
 [#72]: https://github.com/nreed97/EzFD/pull/72
 [#73]: https://github.com/nreed97/EzFD/pull/73
 [#74]: https://github.com/nreed97/EzFD/pull/74
+[#75]: https://github.com/nreed97/EzFD/pull/75

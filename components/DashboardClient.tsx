@@ -239,7 +239,16 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
               Summary
             </button>
           )}
-          <Link href={`/event/${event.join_code}`}
+          {/* An operator goes back to their logger. A visitor goes home.
+              Both used to land on the event's operator sign-in, which is the
+              one screen a visitor deliberately did not choose: they picked
+              read-only stats and got asked for a callsign. Worse, that page
+              redirects straight into the logger when the browser still holds
+              a sign-in for this event, so "exit" could drop somebody into a
+              logging window. Home offers the join-code box, which is what
+              leaving actually means here. */}
+          <Link href={isVisitor ? '/' : `/event/${event.join_code}`}
+            title={isVisitor ? 'Leave visitor mode' : 'Back to the logging screen'}
             className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
             {isVisitor ? '← Exit' : '← Logger'}
           </Link>
