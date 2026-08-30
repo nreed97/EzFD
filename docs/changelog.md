@@ -27,6 +27,11 @@ only run events.
 
 ### Added
 
+- **A `LICENSE` file** — The licence was stated in the README and nowhere a
+  tool looks, so GitHub reported the project as unlicensed and anyone checking
+  before deploying it at a club found nothing. The text is unchanged and now
+  lives in the file that governs, with CI failing if the README's copy drifts
+  from it. ([#78])
 - **Every changelog entry points at its documentation** — Each entry now names
   the guide and the section covering it, so reading about a change and reading
   how to use it is one click rather than a search. A test checks every link and
@@ -335,3 +340,4 @@ continuous enough to be worth summarising.
 [#75]: https://github.com/nreed97/EzFD/pull/75
 [#76]: https://github.com/nreed97/EzFD/pull/76
 [#77]: https://github.com/nreed97/EzFD/pull/77
+[#78]: https://github.com/nreed97/EzFD/pull/78

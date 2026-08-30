@@ -205,3 +205,10 @@ LIABILITY ARISING FROM THE SOFTWARE OR ITS USE.
 
 73 de W0NY — good luck out there.
 ```
+
+The copy above is quoted from [`LICENSE`](LICENSE) in the repository root,
+which is the one that governs. CI fails if the two drift.
+
+GLWT is not one of the licences GitHub recognises by name, so the repository
+page shows a plain **License** link rather than a badge. That is accurate: this
+is a custom licence, not a standard one.
