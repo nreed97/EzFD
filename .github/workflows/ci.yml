@@ -208,6 +208,21 @@ jobs:
           fi
           echo "rig bridge copies are identical"
 
+      # The README quotes the licence in full and LICENSE is the copy that
+      # governs. Two copies of the same text drift — the same reason the rig
+      # bridge above is checked — and a licence that says two different things
+      # is worse than one stated in only one place.
+      - name: README licence matches LICENSE
+        run: |
+          block=$(awk '/^## License$/{f=1;next} f&&/^```$/{n++;next} f&&n==1{print}' README.md)
+          if [[ "$block" != "$(cat LICENSE)" ]]; then
+            echo "The licence quoted in README.md differs from LICENSE."
+            echo "LICENSE governs — update the README block to match it."
+            diff <(echo "$block") LICENSE || true
+            exit 1
+          fi
+          echo "README licence block matches LICENSE"
+
       # Gated, at every severity. The backlog that kept this advisory is
       # cleared, so anything it reports now is new.
       - name: shellcheck
