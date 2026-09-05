@@ -220,8 +220,29 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
     />
   );
 
+  // How tall the content pane is on a phone, where the page scrolls. Three
+  // cases, and the difference is whether the view has a natural size:
+  //
+  //   * the map and the rate chart *need* a definite box — neither has an
+  //     intrinsic height, and both would collapse without one;
+  //   * the log, the operators table and the checkout board are unbounded, so
+  //     they keep their own scroll rather than turning a thousand contacts
+  //     into a 27,000px document;
+  //   * the section grids are bounded by the section list, so they simply
+  //     render, and the page scrolls past them. A 224px window onto an 812px
+  //     grid was the same peephole the sidebar used to be.
+  //
+  // On a desktop none of this applies: md:h-auto md:flex-1 md:overflow-hidden
+  // restores the fixed two-pane shell.
+  const mobilePane =
+    mainView === 'map' || mainView === 'rate'
+      ? 'h-56 overflow-hidden'
+      : mainView === 'log' || mainView === 'ops' || mainView === 'checkouts'
+        ? 'h-[70vh] overflow-hidden'
+        : 'h-auto';
+
   return (
-    <div className="flex h-screen flex-col overflow-hidden bg-zinc-950 light:bg-white">
+    <div className="flex min-h-screen flex-col bg-zinc-950 light:bg-white md:h-screen md:overflow-hidden">
       {/* Two rows on a phone, one on a desktop. Identity, clock and the menu
           share the first; the view tabs get the second to themselves and
           scroll sideways rather than wrapping.
@@ -233,7 +254,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
           rows: 199px of an 844px screen gone before the filter bar started.
           The actions are in the drawer now, which has room to say what each
           one is. */}
-      <header className="flex shrink-0 flex-col gap-2 border-b border-zinc-800 bg-zinc-900 px-4 py-2 light:border-zinc-200 light:bg-zinc-50 md:flex-row md:items-center md:justify-between md:gap-3 md:px-6 md:py-3">
+      <header className="sticky top-0 z-30 flex shrink-0 flex-col gap-2 border-b border-zinc-800 bg-zinc-900 px-4 py-2 light:border-zinc-200 light:bg-zinc-50 md:static md:flex-row md:items-center md:justify-between md:gap-3 md:px-6 md:py-3">
       {/* `md:contents` dissolves this wrapper on a desktop so identity, tabs
           and the clock/menu become three flex children of the header in
           `order` sequence. On a phone it stays a real row, holding the
@@ -285,15 +306,25 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         </div>
       </header>
 
-      <div className="flex flex-col flex-1 overflow-hidden md:flex-row">
+      {/* On a desktop this is two panes that each scroll inside a page that
+          does not. On a phone that shape produced two stacked peepholes and no
+          page scroll at all: a 413px window onto the log, and below it a
+          *194px* window onto 1170px of rate, score, bonuses, sections,
+          operators and the join code. Reading the join code meant scrolling a
+          box the size of two lines.
+
+          So the phone scrolls the page instead. The log keeps its own scroll,
+          because a table is a thing you scroll and it is unbounded — a
+          thousand-contact log rendered at natural height is a 27,000px
+          document on a handset — but everything below it is laid out in full
+          and reached by scrolling the page, which is what a thumb expects. */}
+      <div className="flex flex-1 flex-col md:flex-row md:overflow-hidden">
         {/* overflow-hidden + a definite height give the pane's child a box to
             scroll inside; without it the Checkouts board grew past the
             flex row and was silently clipped by its overflow-hidden parent.
             Checkouts is a tall interactive form, so it gets more of the
             viewport than the at-a-glance map/chart views do on mobile. */}
-        <div className={`shrink-0 overflow-hidden md:h-auto md:flex-1 ${
-          mainView === 'checkouts' || mainView === 'log' || mainView === 'ops' ? 'h-[65vh]' : 'h-56'
-        }`}>
+        <div className={`shrink-0 md:h-auto md:flex-1 md:overflow-hidden ${mobilePane}`}>
           {mainView === 'log'      && <LogView event={event} qsos={qsos} />}
           {mainView === 'map'      && <MapView workedSections={score.sections} />}
           {mainView === 'sections' && <SectionGrid workedSections={score.sections} />}
@@ -324,7 +355,10 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
           )}
         </div>
 
-        <aside className="w-full md:w-72 flex flex-col gap-3 overflow-y-auto border-t md:border-t-0 md:border-l border-zinc-800 bg-zinc-900 p-4 light:border-zinc-200 light:bg-zinc-50">
+        {/* No scroll of its own on a phone — it is part of the page there, and
+            giving it one is what made it a peephole. The desktop pane keeps
+            its own, since it sits beside the content rather than under it. */}
+        <aside className="flex w-full shrink-0 flex-col gap-3 border-t border-zinc-800 bg-zinc-900 p-4 light:border-zinc-200 light:bg-zinc-50 md:w-72 md:shrink md:overflow-y-auto md:border-t-0 md:border-l">
           <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
             <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Rate</div>
             <div className="flex items-baseline gap-1">

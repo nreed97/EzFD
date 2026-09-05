@@ -114,6 +114,13 @@ only run events.
 
 ### Fixed
 
+- **The dashboard scrolls like a page on a phone** `Display` — It was two
+  stacked panes that each scrolled inside a screen that did not: a window onto
+  the log, and under it a window about two lines tall onto the score, bonuses,
+  sections worked, operators and the join code. The page scrolls now, with the
+  view tabs pinned at the top, and only the log and the operators table keep a
+  scroll of their own. Nothing changes on a laptop. ([#88])
+  Docs: [Operating → The dashboard](operating.md#the-dashboard)
 - **Field Day says band coordination, not call checkout** `Display` — The
   logging panel was worded for a special event whatever the event was, so a
   Field Day screen offered to "check out" the callsign and reported that
@@ -487,4 +494,5 @@ continuous enough to be worth summarising.
 [#84]: https://github.com/nreed97/EzFD/pull/84
 [#86]: https://github.com/nreed97/EzFD/pull/86
 [#87]: https://github.com/nreed97/EzFD/pull/87
+[#88]: https://github.com/nreed97/EzFD/pull/88
 [#89]: https://github.com/nreed97/EzFD/pull/89
