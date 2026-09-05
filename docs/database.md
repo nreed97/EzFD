@@ -34,6 +34,7 @@ One row per event. The join code is what operators type; the UUID is internal.
 | `event_type` | `FD`, `WFD` or `SES` |
 | `class` | **Nullable.** NULL for special events |
 | `arrl_section` | **Nullable.** NULL or optional for special events |
+| `gota_call` | **Nullable.** The GOTA station's callsign. NULL turns the feature off, and it is only stored for Field Day |
 | `power` | `HIGH`, `LOW`, `QRP` — scoring multiplier, contests only |
 | `location` | Free text |
 | `qrz_username`, `qrz_password` | Password encrypted at rest, never returned by the API |
@@ -46,6 +47,14 @@ One row per event. The join code is what operators type; the UUID is internal.
 | `slot_minutes` | Default checkout length |
 | `dupe_rule` | `EVENT`, `DAY` or `NONE` |
 | `require_operator_approval` | Roster gating, default false |
+
+`qsos.is_gota` marks a contact worked at the Get On The Air station. It is a
+flag rather than a separate event because rule 4.1.1.5 makes a GOTA contact
+count **twice**: full QSO credit for the parent entry, *and* 5 bonus points
+under 7.3.13.1. A separate log would have to be merged back before the entry
+could be scored correctly. Excluding these contacts from QSO points — which is
+the intuitive reading, and what this feature's original plan proposed — costs
+a point per phone contact and two per CW or digital one.
 
 `class` and `arrl_section` became nullable when special events were added.
 Every read of them needs a null guard — `cabrillo.ts`, `adif.ts`,
@@ -63,6 +72,7 @@ Every read of them needs a null guard — `cabrillo.ts`, `adif.ts`,
 | `rcvd_class`, `rcvd_section` | The received exchange |
 | `operator_call`, `station_number` | Who logged it |
 | `is_dupe` | Computed at insert per the event's dupe rule |
+| `is_gota` | Worked at the Get On The Air station. Still counts for the entry — see below |
 | `rst_sent`, `rst_rcvd` | Special event exchange |
 | `rcvd_name`, `rcvd_qth`, `rcvd_grid`, `comment` | Special event exchange |
 | `adif_mode` | The real submode, e.g. `FT8` |

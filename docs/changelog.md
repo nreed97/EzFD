@@ -23,6 +23,74 @@ only run events.
 
 ---
 
+## 2026-09-05
+
+### Added
+
+- **One menu, behind ☰** `Display` — Everything you can *do* on the logger and
+  the dashboard now lives in a slide-out menu, grouped and with a line under
+  each entry saying what it is. The header keeps only what you read at a
+  glance. On a phone the dashboard header was four rows of buttons before the
+  filter bar even started; it is two now. ([#84])
+  Docs: [Operating → The menu](operating.md#the-menu)
+- **Who worked what** `Display` — A new **Operators** view on the dashboard,
+  reading the log you already have: contacts, points, best hour, bands,
+  sections, and which sections that operator was the first to reach. Sort by
+  any column. The totals row is meant to be checked against the scoreboard, so
+  contacts imported without an operator get their own row rather than
+  disappearing out of the count. The per-hour average stays blank until an
+  operator's contacts span an hour, since dividing by less than one projects a
+  partial hour out to a whole one. ([#82])
+  Docs: [Operating → The Operators view](operating.md#the-operators-view)
+- **A read of the log before you submit** `Scoring` `Display` — The summary
+  sheet now opens with anything worth settling first: unrecognised sections, a
+  station that sent two different exchanges, a bonus claimed that rule 7.3
+  does not list for your class, and Winter Field Day objectives the log
+  contradicts — those multiply, so a wrong tick moves the whole score. It does
+  not check callsigns against any list: Field Day brings out operators no
+  contest list has heard of, and flagging them would bury the findings that
+  are real. ([#81])
+  Docs: [Field Day → Before you submit](field-day.md#before-you-submit)
+- **The GOTA station is a real station now** `Scoring` `Exports` `Display` —
+  Set a GOTA callsign on the event and operators can sign in there; their
+  contacts are signed with that call, count for the entry as normal, and earn
+  their 5 bonus points each from the log rather than from a number somebody
+  remembers to type. There is no cap and no per-operator limit — the app used
+  to apply a 1,000-point cap that was never in the rules. ([#80], closes [#23])
+  Docs: [Field Day → The GOTA station](field-day.md#the-gota-station), [Database → qsos](database.md#qsos)
+
+### Changed
+
+- **Every control is reachable at every screen size** `Display` — Which
+  controls you got used to depend on how wide your browser was, and not on
+  purpose. The guides were reachable **only** on a phone; **Import ADIF**, both
+  exports and the second-radio window **only** at tablet width and up. If you
+  have been logging from a phone and could not find the export, that is why.
+  ([#84])
+  Docs: [Operating → The menu](operating.md#the-menu)
+- **The rate beside each operator is now their best hour** `Display` — The
+  dashboard's Operators panel divided an operator's contacts by however long
+  they had been sitting there, so a good run read lower and lower as the band
+  went quiet around it. It now shows the most they worked in any 60 minutes,
+  which is the same figure the new Operators view prints — the two would
+  otherwise have disagreed on the same screen. ([#82])
+  Docs: [Operating → The Operators view](operating.md#the-operators-view)
+
+### Fixed
+
+- **The logger kept two disagreeing copies of its own controls** — One for the
+  header and one for a phone bar, each hand-maintained, which is why the two
+  had drifted apart. There is one list now, read by both screens, and a test
+  fails if a second copy appears or an entry is added that nothing wires up.
+  ([#84])
+- **Changelog entries citing a pull request rendered as literal text** — A
+  citation like `[#80]` needs a matching definition at the foot of this file to
+  become a link; two entries were missing theirs and showed the brackets
+  instead. The link test now checks citations as well as guide anchors.
+  ([#82])
+
+---
+
 ## 2026-08-30
 
 ### Added
@@ -307,6 +375,7 @@ only run events.
 Earlier history is in the commit log. This file starts where the work became
 continuous enough to be worth summarising.
 
+[#23]: https://github.com/nreed97/EzFD/issues/23
 [#25]: https://github.com/nreed97/EzFD/pull/25
 [#26]: https://github.com/nreed97/EzFD/pull/26
 [#27]: https://github.com/nreed97/EzFD/pull/27
@@ -351,3 +420,7 @@ continuous enough to be worth summarising.
 [#77]: https://github.com/nreed97/EzFD/pull/77
 [#78]: https://github.com/nreed97/EzFD/pull/78
 [#79]: https://github.com/nreed97/EzFD/pull/79
+[#80]: https://github.com/nreed97/EzFD/pull/80
+[#81]: https://github.com/nreed97/EzFD/pull/81
+[#82]: https://github.com/nreed97/EzFD/pull/82
+[#84]: https://github.com/nreed97/EzFD/pull/84

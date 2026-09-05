@@ -67,6 +67,12 @@ export function generateCabrillo(event: Event, qsos: QSO[]): string {
     const mo    = modeToCab(q.mode);
     const date  = formatDate(q.datetime_utc);
     const time  = formatTime(q.datetime_utc);
+    // Deliberately the entry callsign, including on GOTA contacts, which are
+    // claimed by the parent entry under rule 4.1.1.5. The rules do not say
+    // what belongs in this field for a GOTA QSO, and changing a submission
+    // format on a guess is how the claimed-score header went wrong before —
+    // the ADIF export does carry the GOTA call, where the field's meaning is
+    // unambiguous. Revisit if ARRL documents an expectation.
     const myCall    = event.club_call.padEnd(13);
     const myClass   = eventClass.padEnd(6);
     const mySect    = eventSection.padEnd(6);

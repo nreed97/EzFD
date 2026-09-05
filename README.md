@@ -77,7 +77,7 @@ date-filtered ADIF slices.
 <table>
 <tr>
 <td width="50%">
-  <img src="docs/images/dashboard.png" alt="Live dashboard: section map, score, sections worked and operators"><br>
+  <img src="docs/images/dashboard.png" alt="Live dashboard: section map, view tabs and menu button, with live rate, claimed score and sections worked down the right"><br>
   <sub>Live dashboard — section map, score, and every operator's rate on a second screen</sub>
 </td>
 <td width="50%">

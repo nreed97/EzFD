@@ -17,6 +17,7 @@ export async function POST(request: Request) {
     use_call_history, use_master_callsign_file,
     starts_at, ends_at, ses_description, ses_qsl_info,
     slot_enforcement, slot_minutes, dupe_rule, require_operator_approval,
+    gota_call,
   } = body;
 
   const isSesEvent = event_type === 'SES';
@@ -80,8 +81,9 @@ export async function POST(request: Request) {
        (join_code, club_name, club_call, event_year, class, arrl_section, location,
         qrz_username, qrz_password, event_type, power, use_call_history,
         use_master_callsign_file, starts_at, ends_at, ses_description, ses_qsl_info,
-        slot_enforcement, slot_minutes, dupe_rule, require_operator_approval)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21)
+        slot_enforcement, slot_minutes, dupe_rule, require_operator_approval,
+        gota_call)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20,$21,$22)
      RETURNING id, join_code`,
     [
       join_code,
@@ -110,6 +112,11 @@ export async function POST(request: Request) {
       Number(slot_minutes) > 0 ? Math.round(Number(slot_minutes)) : 120,
       ['EVENT','DAY','NONE'].includes(dupe_rule) ? dupe_rule : (isSesEvent ? 'DAY' : 'EVENT'),
       isSesEvent && !!require_operator_approval,
+      // Field Day only. Rule 7.3.13.1 lists the GOTA bonus for classes A and
+      // F; Winter Field Day has no bonuses at all and a special event has no
+      // contest structure, so storing a GOTA call on either would offer an
+      // operator a station that can never score.
+      resolvedEventType === 'FD' ? (gota_call?.toUpperCase().trim() || null) : null,
     ]
   );
 

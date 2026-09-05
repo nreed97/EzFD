@@ -18,18 +18,72 @@ import type { Bonuses, EventType } from './types';
  * see WFD_BONUSES.
  */
 
+/**
+ * Which entry classes may claim a bonus, from rule 7.3's own eligibility
+ * column as transcribed in `docs/rules-reference.md`.
+ *
+ * `ALL_CLASSES` rather than an omitted field, so every row states its answer
+ * and `scripts/test-preflight.cjs` can check the whole table against the
+ * rules reference instead of against whichever rows someone remembered.
+ *
+ * The app still lets an operator tick any box — refusing a claim outright
+ * would be the app overruling a human about their own entry — but the
+ * pre-submission check now says so, which is what the guides used to have to
+ * tell people to do by hand.
+ */
+export const ALL_CLASSES = ['A', 'B', 'C', 'D', 'E', 'F'] as const;
+
+interface BonusDefCommon {
+  key: keyof Bonuses;
+  label: string;
+  rule?: string;
+  /** Entry class letters eligible under the rule. */
+  classes: readonly string[];
+}
+
 export type BonusDef =
   /** A single fixed award. */
-  | { key: keyof Bonuses; label: string; rule?: string; kind: 'flat'; points: number }
+  | (BonusDefCommon & { kind: 'flat'; points: number })
   /** 100 points per claimed transmitter, capped. FD rule 7.3.1. */
-  | { key: keyof Bonuses; label: string; rule?: string; kind: 'per-transmitter'; points: number; maxTransmitters: number }
+  | (BonusDefCommon & { kind: 'per-transmitter'; points: number; maxTransmitters: number })
   /** A counted bonus — n × points, optionally capped. */
-  | { key: keyof Bonuses; label: string; rule?: string; kind: 'per-unit'; points: number; max: number | null; unit: string; inputMax: number }
+  | (BonusDefCommon & { kind: 'per-unit'; points: number; max: number | null; unit: string; inputMax: number })
   ;
 
 export interface BonusContext {
   /** Transmitters claimed, i.e. the leading number of the entry class. */
   transmitters?: number;
+  /**
+   * GOTA contacts counted from the log — non-duplicate, not deleted.
+   *
+   * When the log has any, it is the claim: `gota_qsos` in the stored bonuses
+   * is a number somebody typed and can drift all weekend, and with the
+   * 1,000-point cap gone (it was never in the rules) nothing bounds how far.
+   * A club that logs its GOTA contacts elsewhere logs none here, and the
+   * typed number is used instead.
+   */
+  gotaQsos?: number;
+}
+
+/** The key whose claim can be counted from the log rather than typed. */
+const DERIVED_FROM_LOG = 'gota_qsos';
+
+/**
+ * How many units a per-unit bonus is claiming.
+ *
+ * Only GOTA is derivable today. The two sources are deliberately not summed:
+ * a club that both logs its GOTA contacts and types the total would otherwise
+ * claim every contact twice.
+ */
+function unitsClaimed(def: BonusDef, bonuses: Bonuses, ctx: BonusContext): number {
+  if (def.key === DERIVED_FROM_LOG && (ctx.gotaQsos ?? 0) > 0) return ctx.gotaQsos!;
+  const claimed = bonuses[def.key];
+  return typeof claimed === 'number' ? claimed : 0;
+}
+
+/** Whether the log is answering for this bonus rather than the operator. */
+export function isDerivedFromLog(def: BonusDef, ctx: BonusContext = {}): boolean {
+  return def.key === DERIVED_FROM_LOG && (ctx.gotaQsos ?? 0) > 0;
 }
 
 /** Re-exported so the bonus table's one caller-facing helper lives beside the
@@ -46,30 +100,30 @@ export { transmitterCount as transmittersFromClass } from './types';
 export const FD_BONUSES: BonusDef[] = [
   // 100 points per transmitter, not a doubling of the score. A 3A station
   // running 5,000 points claims 300 here, not 5,000.
-  { key: 'emergency_power',      rule: '7.3.1',  label: '100% emergency power',        kind: 'per-transmitter', points: 100, maxTransmitters: 20 },
-  { key: 'media_publicity',      rule: '7.3.2',  label: 'Media publicity',             kind: 'flat', points: 100 },
-  { key: 'public_location',      rule: '7.3.3',  label: 'Public location',             kind: 'flat', points: 100 },
-  { key: 'public_info_table',    rule: '7.3.4',  label: 'Public information table',    kind: 'flat', points: 100 },
-  { key: 'message_to_sm',        rule: '7.3.5',  label: 'Message to section manager',  kind: 'flat', points: 100 },
-  { key: 'nts_traffic',          rule: '7.3.6',  label: 'Formal messages handled',     kind: 'per-unit', points: 10, max: 100, unit: 'msgs', inputMax: 10 },
-  { key: 'satellite',            rule: '7.3.7',  label: 'Satellite QSO',               kind: 'flat', points: 100 },
-  { key: 'natural_power',        rule: '7.3.8',  label: 'Alternate power (5 QSOs)',    kind: 'flat', points: 100 },
-  { key: 'w1aw_bulletin',        rule: '7.3.9',  label: 'W1AW bulletin copied',        kind: 'flat', points: 100 },
-  { key: 'educational',          rule: '7.3.10', label: 'Educational activity',        kind: 'flat', points: 100 },
-  { key: 'elected_official',     rule: '7.3.11', label: 'Elected official visit',      kind: 'flat', points: 100 },
+  { key: 'emergency_power',      rule: '7.3.1',  label: '100% emergency power',        kind: 'per-transmitter', points: 100, maxTransmitters: 20, classes: ['A','B','C','E','F'] },
+  { key: 'media_publicity',      rule: '7.3.2',  label: 'Media publicity',             kind: 'flat', points: 100, classes: ALL_CLASSES },
+  { key: 'public_location',      rule: '7.3.3',  label: 'Public location',             kind: 'flat', points: 100, classes: ['A','B','F'] },
+  { key: 'public_info_table',    rule: '7.3.4',  label: 'Public information table',    kind: 'flat', points: 100, classes: ['A','B','F'] },
+  { key: 'message_to_sm',        rule: '7.3.5',  label: 'Message to section manager',  kind: 'flat', points: 100, classes: ALL_CLASSES },
+  { key: 'nts_traffic',          rule: '7.3.6',  label: 'Formal messages handled',     kind: 'per-unit', points: 10, max: 100, unit: 'msgs', inputMax: 10, classes: ALL_CLASSES },
+  { key: 'satellite',            rule: '7.3.7',  label: 'Satellite QSO',               kind: 'flat', points: 100, classes: ['A','B','F'] },
+  { key: 'natural_power',        rule: '7.3.8',  label: 'Alternate power (5 QSOs)',    kind: 'flat', points: 100, classes: ['A','B','E','F'] },
+  { key: 'w1aw_bulletin',        rule: '7.3.9',  label: 'W1AW bulletin copied',        kind: 'flat', points: 100, classes: ALL_CLASSES },
+  { key: 'educational',          rule: '7.3.10', label: 'Educational activity',        kind: 'flat', points: 100, classes: ['A','F','D','E'] },
+  { key: 'elected_official',     rule: '7.3.11', label: 'Elected official visit',      kind: 'flat', points: 100, classes: ALL_CLASSES },
   // 7.3.12 is a single 100-point bonus for a visit, not a per-representative
   // tally. Stored values from before this correction are numeric; any truthy
   // value claims the bonus, so a club that recorded "3 reps" still gets it.
-  { key: 'served_agency',        rule: '7.3.12', label: 'Served agency rep visit',     kind: 'flat', points: 100 },
+  { key: 'served_agency',        rule: '7.3.12', label: 'Served agency rep visit',     kind: 'flat', points: 100, classes: ALL_CLASSES },
   // Five points per GOTA contact, with no cap, and explicitly not multiplied
   // by the power multiplier (7.3.13.1) — which holds here because no bonus is.
-  { key: 'gota_qsos',            rule: '7.3.13.1', label: 'GOTA station QSOs',         kind: 'per-unit', points: 5, max: null, unit: 'QSOs', inputMax: 9999 },
-  { key: 'gota_coach',           rule: '7.3.13.2', label: 'GOTA coach',                kind: 'flat', points: 100 },
-  { key: 'web_posting',          rule: '7.3.14', label: 'Entry via ARRL web app',      kind: 'flat', points: 50 },
-  { key: 'youth_ops',            rule: '7.3.15', label: 'Youth participants (≤18)',    kind: 'per-unit', points: 20, max: 100, unit: 'ops', inputMax: 99 },
-  { key: 'social_media',         rule: '7.3.16', label: 'Social media promotion',      kind: 'flat', points: 100 },
-  { key: 'safety_officer',       rule: '7.3.17', label: 'Safety officer',              kind: 'flat', points: 100 },
-  { key: 'site_responsibilities', rule: '7.3.18', label: 'Site responsibilities',      kind: 'flat', points: 50 },
+  { key: 'gota_qsos',            rule: '7.3.13.1', label: 'GOTA station QSOs',         kind: 'per-unit', points: 5, max: null, unit: 'QSOs', inputMax: 9999, classes: ['A','F'] },
+  { key: 'gota_coach',           rule: '7.3.13.2', label: 'GOTA coach',                kind: 'flat', points: 100, classes: ['A','F'] },
+  { key: 'web_posting',          rule: '7.3.14', label: 'Entry via ARRL web app',      kind: 'flat', points: 50, classes: ALL_CLASSES },
+  { key: 'youth_ops',            rule: '7.3.15', label: 'Youth participants (≤18)',    kind: 'per-unit', points: 20, max: 100, unit: 'ops', inputMax: 99, classes: ['A','C','D','E','F'] },
+  { key: 'social_media',         rule: '7.3.16', label: 'Social media promotion',      kind: 'flat', points: 100, classes: ALL_CLASSES },
+  { key: 'safety_officer',       rule: '7.3.17', label: 'Safety officer',              kind: 'flat', points: 100, classes: ['A'] },
+  { key: 'site_responsibilities', rule: '7.3.18', label: 'Site responsibilities',      kind: 'flat', points: 50, classes: ['B','C','D','E','F'] },
 ];
 
 /**
@@ -146,18 +200,20 @@ export function bonusDefs(eventType: EventType | undefined): BonusDef[] {
  *  key — which is how the summary sheet used to list a bonus at a different
  *  number from the one that was scored. */
 export function bonusPoints(def: BonusDef, bonuses: Bonuses, ctx: BonusContext = {}): number {
-  const claimed = bonuses[def.key];
-  if (!claimed) return 0;
+  // A per-unit bonus can be claimed by the log rather than by a checkbox, so
+  // its count is resolved before the "did anyone claim this" test — otherwise
+  // GOTA contacts sitting in the log would earn nothing until somebody also
+  // remembered to type a number, which is the manual step this replaces.
+  if (def.kind === 'per-unit') {
+    const raw = unitsClaimed(def, bonuses, ctx) * def.points;
+    return def.max === null ? raw : Math.min(raw, def.max);
+  }
+  if (!bonuses[def.key]) return 0;
   switch (def.kind) {
     case 'flat':
       return def.points;
     case 'per-transmitter':
       return Math.min(ctx.transmitters ?? 1, def.maxTransmitters) * def.points;
-    case 'per-unit': {
-      const n = typeof claimed === 'number' ? claimed : 0;
-      const raw = n * def.points;
-      return def.max === null ? raw : Math.min(raw, def.max);
-    }
   }
 }
 
@@ -172,6 +228,9 @@ export function bonusRate(def: BonusDef, ctx: BonusContext = {}): string {
       return `+${def.points} × ${tx} tx`;
     }
     case 'per-unit':
+      // The GOTA line reads "from the log" once the log is answering, so the
+      // operator can tell at a glance which number the scorer is using.
+      if (isDerivedFromLog(def, ctx)) return `+${def.points} × ${ctx.gotaQsos} logged`;
       return def.max === null
         ? `+${def.points} each`
         : `+${def.points} each, max ${def.max}`;

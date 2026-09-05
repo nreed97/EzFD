@@ -1,6 +1,7 @@
 'use client';
 
-import type { Event, Score, Bonuses } from '@/lib/types';
+import { preflight, NOT_CHECKED } from '@/lib/preflight';
+import type { Event, Score, Bonuses, QSO } from '@/lib/types';
 import { bonusDefs, bonusPoints, transmittersFromClass, WFD_OBJECTIVES } from '@/lib/bonuses';
 
 interface Props {
@@ -9,6 +10,9 @@ interface Props {
   bonuses: Bonuses;
   operators: string[];
   onClose: () => void;
+  /** The log, for the pre-submission read. Findings are derived from it and
+   *  from the event's own claims — never from an outside callsign list. */
+  qsos: QSO[];
 }
 
 /**
@@ -40,13 +44,14 @@ function bonusLineItems(event: Event, bonuses: Bonuses, score: Score): { label: 
   return items;
 }
 
-export default function SummarySheet({ event, score, bonuses, operators, onClose }: Props) {
+export default function SummarySheet({ event, score, bonuses, operators, qsos, onClose }: Props) {
   // Winter Field Day multiplies QSO points by its Objective Multiplier + 1 and
   // has no bonus points, so the sheet shows a different calculation entirely.
   const isWfd = event.event_type === 'WFD';
   const bonusPoints = score.bonus_points;
   const claimedScore = score.claimed_score;
   const lineItems = bonusLineItems(event, bonuses, score);
+  const findings = preflight(qsos, event, score, bonuses);
   const now = new Date();
 
   return (
@@ -85,6 +90,58 @@ export default function SummarySheet({ event, score, bonuses, operators, onClose
             </div>
 
             <div className="p-5 flex flex-col gap-4 text-sm">
+
+              {/* Read before submitting. Hidden from the printed sheet: the
+                  sheet is what gets transcribed onto an entry, and these are
+                  notes for the person holding it, not part of the claim. */}
+              <section className="print:hidden">
+                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                  Before you submit
+                </h3>
+                {findings.length === 0 ? (
+                  <p className="rounded-lg border border-emerald-800 bg-emerald-950/30 px-3 py-2 text-xs text-emerald-300 light:border-emerald-300 light:bg-emerald-50 light:text-emerald-800">
+                    Nothing to flag in the log or the claims made about it.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-2">
+                    {findings.map(f => (
+                      <li
+                        key={f.id}
+                        className={`rounded-lg border px-3 py-2 ${
+                          f.severity === 'fix'
+                            ? 'border-red-800 bg-red-950/30 light:border-red-300 light:bg-red-50'
+                            : 'border-amber-800/70 bg-amber-950/20 light:border-amber-300 light:bg-amber-50'
+                        }`}
+                      >
+                        <div className="flex items-baseline gap-2">
+                          <span className={`shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide ${
+                            f.severity === 'fix'
+                              ? 'bg-red-900 text-red-200 light:bg-red-200 light:text-red-900'
+                              : 'bg-amber-900 text-amber-200 light:bg-amber-200 light:text-amber-900'
+                          }`}>
+                            {f.severity === 'fix' ? 'Fix' : 'Check'}
+                          </span>
+                          <span className="text-xs font-semibold text-zinc-200 light:text-zinc-800">{f.title}</span>
+                        </div>
+                        <p className="mt-1 text-[11px] leading-relaxed text-zinc-400 light:text-zinc-600">{f.detail}</p>
+                        {f.examples && f.examples.length > 0 && (
+                          <p className="mt-1 font-mono text-[11px] text-zinc-500">{f.examples.join('   ')}</p>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {/* Naming what nothing looked at, so a quiet report is not read
+                    as a clean bill of health for the whole entry. */}
+                <details className="mt-2">
+                  <summary className="cursor-pointer text-[10px] text-zinc-600 light:text-zinc-400">
+                    What this does not check
+                  </summary>
+                  <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4 text-[11px] text-zinc-500">
+                    {NOT_CHECKED.map(t => <li key={t}>{t}</li>)}
+                  </ul>
+                </details>
+              </section>
 
               {/* Club info */}
               <section>

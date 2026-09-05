@@ -3,13 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNow } from '@/lib/useNow';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { calculateScore } from '@/lib/scoring';
 import { applyQsoEvent } from '@/lib/qsoStream';
+import { operatorStats, UNATTRIBUTED } from '@/lib/opStats';
+import { toggleLightMode } from '@/lib/useLightMode';
 import type { Event, QSO, Bonuses, SesReservation } from '@/lib/types';
 import Scoreboard from './Scoreboard';
 import SectionGrid from './SectionGrid';
-import ThemeToggle from './ThemeToggle';
 import UTCClock from './UTCClock';
 import BonusTracker from './BonusTracker';
 import RateChart from './RateChart';
@@ -18,10 +18,12 @@ import SummarySheet from './SummarySheet';
 import SectionsNeeded from './SectionsNeeded';
 import CheckoutBoard from './CheckoutBoard';
 import LogView from './LogView';
+import OperatorStats from './OperatorStats';
+import NavDrawer from './NavDrawer';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
-type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed' | 'checkouts' | 'log';
+type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed' | 'checkouts' | 'log' | 'ops';
 
 interface StationPresence {
   op_call: string;
@@ -148,28 +150,25 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   const oneHourAgo = new Date(nowMs - 60 * 60 * 1000).toISOString();
   const recentQSOs = qsos.filter(q => !q.is_dupe && (typeof q.datetime_utc === 'string' ? q.datetime_utc : q.datetime_utc.toISOString()) > oneHourAgo).length;
 
-  const opStats: Record<string, { total: number; ph: number; cw: number; dig: number; first: number; last: number }> = {};
-  for (const q of qsos) {
-    if (q.is_dupe || !q.operator_call) continue;
-    const op = q.operator_call;
-    const t = new Date(q.datetime_utc).getTime();
-    if (!opStats[op]) opStats[op] = { total: 0, ph: 0, cw: 0, dig: 0, first: t, last: t };
-    const s = opStats[op];
-    s.total++;
-    if (q.mode === 'PH') s.ph++;
-    else if (q.mode === 'CW') s.cw++;
-    else s.dig++;
-    if (t < s.first) s.first = t;
-    if (t > s.last) s.last = t;
-  }
-  const operators = Object.keys(opStats).sort();
+  // One table, read by both the sidebar panel and the Operators tab. It used
+  // to be counted inline here and the panel divided by a clamped span for its
+  // rate; the tab would have been a second derivation of the same figures,
+  // which is how the section list and the bonus schedule came to disagree
+  // with themselves. lib/opStats.ts is the only place any of this is worked
+  // out now.
+  const opTable = operatorStats(qsos, event.event_type);
+  const opRows = new Map(opTable.rows.map(r => [r.call, r]));
+  const operators = opTable.rows
+    .map(r => r.call)
+    .filter((c): c is string => c !== UNATTRIBUTED)
+    .sort();
 
   const presenceByOp: Record<string, StationPresence> = {};
   for (const p of presence) presenceByOp[p.op_call] = p;
 
   // Union of ops who've logged a QSO and ops who are currently present but
   // haven't logged one yet (e.g. just signed on) — everyone gets a row.
-  const allOpCalls = Array.from(new Set([...Object.keys(opStats), ...presence.map(p => p.op_call)]));
+  const allOpCalls = Array.from(new Set([...operators, ...presence.map(p => p.op_call)]));
 
   const activeReservations = reservations.filter(r => {
     const start = new Date(r.starts_at).getTime();
@@ -182,6 +181,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         { id: 'log',       label: 'Log' },
         { id: 'rate',      label: 'Rate' },
         { id: 'bands',     label: 'Bands' },
+        { id: 'ops',       label: 'Operators' },
         { id: 'checkouts', label: 'Checkouts' },
       ]
     : [
@@ -191,37 +191,85 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         { id: 'needed',   label: 'Needed' },
         { id: 'rate',     label: 'Rate' },
         { id: 'bands',    label: 'Bands' },
+        { id: 'ops',      label: 'Operators' },
       ];
+
+  // Built once and rendered into whichever header row is visible, so there is
+  // only ever one hamburger on the page and only one set of handlers.
+  const navMenu = (
+    <NavDrawer
+      ctx={{
+        surface: 'dashboard',
+        joinCode: event.join_code,
+        eventType: event.event_type,
+        isVisitor,
+      }}
+      handlers={{
+        summary: () => setShowSummary(true),
+        toggleTheme: toggleLightMode,
+      }}
+      heading={
+        <span className="block truncate font-mono text-xs text-zinc-400 light:text-zinc-600">
+          {event.club_call} · {isSes ? 'Special Event' : `${event.class} · ${event.arrl_section}`}
+        </span>
+      }
+    />
+  );
 
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-zinc-950 light:bg-white">
-      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-6 py-3 light:border-zinc-200 light:bg-zinc-50 shrink-0 flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <span className="font-bold text-amber-400 text-xl">{event.club_call}</span>
-          <span className="text-zinc-400 text-sm light:text-zinc-600">{event.club_name}</span>
-          <span className="text-zinc-600 text-sm light:text-zinc-400">
+      {/* Two rows on a phone, one on a desktop. Identity, clock and the menu
+          share the first; the view tabs get the second to themselves and
+          scroll sideways rather than wrapping.
+
+          Six action buttons used to sit up here as well — Summary, Logger,
+          ADIF, Cabrillo, Backup and the theme toggle — mixed in with the seven
+          view tabs. Two different kinds of thing in one row gave a reader no
+          way to scan for either, and on a 390px phone the lot wrapped to four
+          rows: 199px of an 844px screen gone before the filter bar started.
+          The actions are in the drawer now, which has room to say what each
+          one is. */}
+      <header className="flex shrink-0 flex-col gap-2 border-b border-zinc-800 bg-zinc-900 px-4 py-2 light:border-zinc-200 light:bg-zinc-50 md:flex-row md:items-center md:justify-between md:gap-3 md:px-6 md:py-3">
+      {/* `md:contents` dissolves this wrapper on a desktop so identity, tabs
+          and the clock/menu become three flex children of the header in
+          `order` sequence. On a phone it stays a real row, holding the
+          identity beside the clock and the menu. Either way the drawer is
+          rendered exactly once — two instances would be two components with
+          separate state, which is the duplication this whole change removes. */}
+        <div className="flex min-w-0 items-center gap-3 md:contents">
+          <span className="shrink-0 text-xl font-bold text-amber-400 md:order-1">{event.club_call}</span>
+          <span className="truncate text-sm text-zinc-400 light:text-zinc-600 md:order-1">{event.club_name}</span>
+          <span className="hidden shrink-0 text-sm text-zinc-600 light:text-zinc-400 sm:inline md:order-1">
             {isSes ? 'Special Event Station' : `${event.class} · ${event.arrl_section}`}
           </span>
           {isVisitor && (
             <span
               title="Read-only visitor mode — no sign-in, no logging, no operator actions"
-              className="rounded border border-sky-700 bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-400"
+              className="shrink-0 rounded border border-sky-700 bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-400 md:order-1"
             >
               Visitor
             </span>
           )}
+          {/* On a phone these ride the identity line so the tab strip below
+              gets the full width to scroll in; on a desktop `order` sends them
+              to the far end of the single row. */}
+          <span className="ml-auto flex shrink-0 items-center gap-2 md:order-3 md:ml-0">
+            <UTCClock />
+            {navMenu}
+          </span>
         </div>
-        <div className="flex items-center gap-2 text-sm flex-wrap">
-          <UTCClock />
 
-          <div className="flex rounded border border-zinc-700 overflow-hidden light:border-zinc-300">
+        <div className="flex min-w-0 items-center gap-2 text-sm md:order-2">
+          {/* Seven tabs will never fit across a phone. One scrollable row
+              keeps every view one tap away without costing a second line. */}
+          <div className="ezfd-tabstrip flex min-w-0 flex-1 overflow-x-auto rounded border border-zinc-700 light:border-zinc-300 md:flex-none">
             {VIEW_TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setMainView(tab.id)}
-                className={`px-2 py-1 text-xs transition-colors ${
+                className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-xs transition-colors md:px-2 md:py-1 ${
                   mainView === tab.id
-                    ? 'bg-amber-400 text-zinc-900 font-semibold'
+                    ? 'bg-amber-400 font-semibold text-zinc-900'
                     : 'text-zinc-400 hover:bg-zinc-800 light:text-zinc-600 light:hover:bg-zinc-100'
                 }`}
               >
@@ -230,52 +278,6 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
             ))}
           </div>
 
-          {/* The summary sheet is an ARRL entry submission worksheet. */}
-          {!isSes && (
-            <button
-              onClick={() => setShowSummary(true)}
-              className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
-            >
-              Summary
-            </button>
-          )}
-          {/* An operator goes back to their logger. A visitor goes home.
-              Both used to land on the event's operator sign-in, which is the
-              one screen a visitor deliberately did not choose: they picked
-              read-only stats and got asked for a callsign. Worse, that page
-              redirects straight into the logger when the browser still holds
-              a sign-in for this event, so "exit" could drop somebody into a
-              logging window. Home offers the join-code box, which is what
-              leaving actually means here. */}
-          <Link href={isVisitor ? '/' : `/event/${event.join_code}`}
-            title={isVisitor ? 'Leave visitor mode' : 'Back to the logging screen'}
-            className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
-            {isVisitor ? '← Exit' : '← Logger'}
-          </Link>
-          {!isVisitor && (
-            <>
-              <a href={`/api/export/${event.join_code}`}
-                className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10 light:border-amber-600 light:text-amber-700">
-                ADIF
-              </a>
-              {!isSes && (
-                <a href={`/api/export/${event.join_code}?format=cabrillo`}
-                  className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10 light:border-amber-600 light:text-amber-700">
-                  Cabrillo
-                </a>
-              )}
-              {/* The whole event, not just the contacts: settings, bonuses,
-                  the SES roster and checkout history. This is what moves an
-                  event to another instance, so it's worth being able to take
-                  one without shell access on the server. */}
-              <a href={`/api/export/${event.join_code}?format=json`}
-                title="Full event backup — settings, QSOs, roster and checkout history. Restorable on any EzFD instance."
-                className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
-                Backup
-              </a>
-            </>
-          )}
-          <ThemeToggle />
         </div>
       </header>
 
@@ -286,7 +288,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
             Checkouts is a tall interactive form, so it gets more of the
             viewport than the at-a-glance map/chart views do on mobile. */}
         <div className={`shrink-0 overflow-hidden md:h-auto md:flex-1 ${
-          mainView === 'checkouts' || mainView === 'log' ? 'h-[65vh]' : 'h-56'
+          mainView === 'checkouts' || mainView === 'log' || mainView === 'ops' ? 'h-[65vh]' : 'h-56'
         }`}>
           {mainView === 'log'      && <LogView event={event} qsos={qsos} />}
           {mainView === 'map'      && <MapView workedSections={score.sections} />}
@@ -294,6 +296,14 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
           {mainView === 'needed'   && <SectionsNeeded workedSections={score.sections} unknownSections={score.unknown_sections} />}
           {mainView === 'rate'     && <RateChart qsos={qsos} />}
           {mainView === 'bands'    && <BandBreakdown score={score} />}
+          {mainView === 'ops'      && (
+            <OperatorStats
+              qsos={qsos}
+              eventType={event.event_type}
+              presence={presence}
+              nowMs={nowMs}
+            />
+          )}
           {mainView === 'checkouts' && (
             <CheckoutBoard
               eventId={event.id}
@@ -340,6 +350,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
               <Scoreboard score={score} bonusPoints={score.bonus_points} isWfd={event.event_type === 'WFD'} />
 
               <BonusTracker
+                gotaQsos={score.gota_qsos}
                 joinCode={event.join_code}
                 initialBonuses={bonuses}
                 eventType={event.event_type}
@@ -390,13 +401,25 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
 
           {allOpCalls.length > 0 && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
-              <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Operators</div>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <span className="text-xs text-zinc-500 uppercase tracking-wider">Operators</span>
+                <button
+                  onClick={() => setMainView('ops')}
+                  className="text-[10px] text-zinc-500 underline decoration-dotted underline-offset-2 hover:text-amber-400 light:hover:text-amber-700"
+                >
+                  Details
+                </button>
+              </div>
               {allOpCalls
-                .map(op => ({ op, s: opStats[op] ?? { total: 0, ph: 0, cw: 0, dig: 0, first: 0, last: 0 } }))
-                .sort((a, b) => b.s.total - a.s.total)
+                .map(op => ({ op, s: opRows.get(op) }))
+                .sort((a, b) => (b.s?.qsos ?? 0) - (a.s?.qsos ?? 0))
                 .map(({ op, s }) => {
-                  const windowHours = Math.max((s.last - s.first) / 3_600_000, 1);
-                  const qhr = s.total > 0 ? Math.round(s.total / windowHours) : 0;
+                  // The panel's rate is the operator's best hour, the same
+                  // figure the Operators tab prints. It used to be their
+                  // total divided by however long they had been sitting
+                  // there, clamped to an hour — which reads a 60-in-the-first
+                  // -hour run as 15/hr once the band goes quiet, and would
+                  // have disagreed with the tab on the same screen.
                   const p = presenceByOp[op];
                   const active = p ? (nowMs - new Date(p.updated_at).getTime()) <= INACTIVE_MS : false;
                   return (
@@ -408,7 +431,12 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
                           )}
                           <span className="font-mono text-xs font-bold text-zinc-200 light:text-zinc-800 truncate">{op}</span>
                         </span>
-                        <span className="font-mono text-xs text-zinc-400 light:text-zinc-500 shrink-0">{s.total} Q · {qhr}/hr</span>
+                        <span
+                          title="Contacts logged, and the most this operator worked in any 60 minutes"
+                          className="font-mono text-xs text-zinc-400 light:text-zinc-500 shrink-0"
+                        >
+                          {s?.qsos ?? 0} Q · {s?.bestHour ?? 0}/hr
+                        </span>
                       </div>
                       <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
                         {p && (
@@ -417,9 +445,9 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
                             <span className={MODE_COLORS[p.mode] ?? 'text-zinc-400'}>{p.mode}</span>
                           </span>
                         )}
-                        {s.ph > 0 && <span className="text-[10px] text-blue-400 light:text-blue-600">{s.ph} PH</span>}
-                        {s.cw > 0 && <span className="text-[10px] text-yellow-400 light:text-yellow-600">{s.cw} CW</span>}
-                        {s.dig > 0 && <span className="text-[10px] text-green-400 light:text-green-600">{s.dig} DIG</span>}
+                        {(s?.ph ?? 0) > 0 && <span className="text-[10px] text-blue-400 light:text-blue-600">{s!.ph} PH</span>}
+                        {(s?.cw ?? 0) > 0 && <span className="text-[10px] text-yellow-400 light:text-yellow-600">{s!.cw} CW</span>}
+                        {(s?.dig ?? 0) > 0 && <span className="text-[10px] text-green-400 light:text-green-600">{s!.dig} DIG</span>}
                       </div>
                     </div>
                   );
@@ -439,6 +467,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         <SummarySheet
           event={event}
           score={score}
+          qsos={qsos}
           bonuses={bonuses}
           operators={operators}
           onClose={() => setShowSummary(false)}

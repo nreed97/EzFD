@@ -180,24 +180,59 @@ toggle and persists across sessions.
 | Amber number | Score before bonuses (contest events only) |
 | `OFFLINE` | The browser has lost connectivity |
 | `3 pending ↑` | QSOs queued locally, click to retry |
-| `● RIG 14.250` | A radio is connected; click for details |
-| `⚡ CW` | The rig supports CAT keying; opens the macro window |
-| `Op On W0NY` | Who this window logs as; click to sign in as someone else, or to move position |
-| `ST2` | Which station this window is |
+| `● RIG 14.250` | A radio is connected, and what it is tuned to |
+| `☰` | The menu — everything you can *do* |
 
 A special event shows only the QSO count — there is no contest score.
 
-`ST2` appears only where the number can be wrong: a multi-transmitter entry,
-where you chose it at sign-in, or any window opened with **+ Radio**. A 1A club
-on its only radio has nothing to confuse and does not see it. Check it before
-you start a shift — every contact you log carries that transmitter number into
-the Cabrillo export, and the export is where a wrong one used to first show up.
-The CW keying window shows the same badge, which is what tells two of them
-apart when you are running two radios.
+The header is deliberately all **status**: things you read at a glance without
+acting on them. Anything you click to make something happen is in the menu.
+
+Which station this window is appears at the top of the menu, beside your
+callsign, and only where the number can be wrong: a multi-transmitter entry,
+where you chose it at sign-in, or any window opened with **Open station 2**. A
+1A club on its only radio has nothing to confuse and does not see it. Check it
+before you start a shift — every contact you log carries that transmitter
+number into the Cabrillo export, and the export is where a wrong one used to
+first show up. The CW keying window shows the same badge, which is what tells
+two of them apart when you are running two radios.
+
+## The menu
+
+![The menu open over the logging screen, with entries grouped under Go to, This event, Export, Display and Help, each with a line explaining what it does](images/menu.png)
+
+Everything you can *do* is behind **☰** in the top right, on the logger and the
+dashboard alike, at every screen size. Each entry says what it is, because
+"ADIF" and "Backup" both look like a download until something tells you which
+is which.
+
+| Group | Holds |
+|---|---|
+| **Go to** | The dashboard, or back to the logger |
+| **This event** | Switch operator, open a second station, the CW window, rig details, Import ADIF |
+| **Export** | ADIF for uploading, Cabrillo for submitting, and the full event backup |
+| **Display** | Light/dark, and night mode |
+| **Help** | These guides, in a new tab |
+
+Entries appear based on what your event and your radio actually are, never on
+the size of your screen. A special event is offered no Cabrillo file and no
+ARRL summary sheet, because neither exists for one. The CW window appears only
+when a rig that can key CW is connected. A read-only visitor is offered no
+files at all.
+
+**Escape closes it**, and the whole menu is reachable by keyboard: Tab moves
+through it, Enter opens an entry, and focus returns to **☰** when it closes.
+
+> **This used to be split across two rows of buttons that disagreed with each
+> other.** Which controls you got depended on how wide your browser was, and
+> not on purpose: the guides were reachable *only* on a phone, while Import
+> ADIF, both exports and the second-radio window were reachable only at tablet
+> width and up. If you have been logging from a phone and could not find the
+> export, that is why — it is in the menu now.
 
 ## The dashboard
 
-![The dashboard: section map, live score, sections worked and operators](images/dashboard.png)
+![The dashboard on the Map tab: sections worked plotted across North America, with the view tabs and the menu button in the header, and live rate, claimed score and the sections list down the right](images/dashboard.png)
 
 A separate read-only view for a second screen. It opens on the **Log**:
 
@@ -206,7 +241,7 @@ A separate read-only view for a second screen. It opens on the **Log**:
 - **Sections** / **Needed** — grid of sections worked and the hunt list
 - **Rate** — QSOs per hour, with gaps visible
 - **Bands** — band × mode matrix
-- **Operators** — per-operator totals, rate, and current band/mode
+- **Operators** — who worked what: contacts, rate, bands and sections
 - **Summary** — printable ARRL-style worksheet
 
 Special events show Log, Rate, Bands, Operators and a live **On The Air**
@@ -252,3 +287,65 @@ entirely for anyone whose system asks for reduced motion.
 
 The view is read-only. Editing and deleting stay in the logging screen, along
 with the audit trail that records them.
+
+### The Operators view
+
+![The Operators view: a row per operator with contacts, points, best hour, average per hour, bands, sections, sections first worked, duplicates, time on and current band and mode, over a totals row](images/operators.png)
+
+Who worked what, over the log you already have. Nothing here is recorded
+separately or has to be turned on — every figure is read back out of the
+contacts.
+
+| Column | Is |
+|---|---|
+| **Q** | Scoring contacts. Duplicates are not in it |
+| **Pts** | QSO points those contacts are worth — 1 a phone contact, 2 a CW or digital one |
+| **Best hr** | The most contacts this operator made in any 60 minutes |
+| **Avg/hr** | Contacts per hour from their first to their last. Blank until those span an hour |
+| **Bands** | Every band they worked, and the modes |
+| **Sect** | Sections they worked |
+| **New** | Sections *nobody had reached yet* when they worked them |
+| **Dupe** | Duplicates they logged. Not in Q, not in Pts |
+| **On** | First and last contact, UTC |
+| **On air** | Where their logging window says they are now, if they are signed in |
+
+Click any heading to sort by it. A special event has no sections, so those two
+columns are not shown on one.
+
+**Best hr and Avg/hr are different questions and often different numbers.** An
+operator who takes 60 in their first hour and then holds a quiet band for three
+more has a best hour of 60 and an average of 15. The first describes the run,
+the second describes the shift; neither is wrong, and the sidebar's Operators
+panel shows the best hour.
+
+**Avg/hr stays blank for the first hour.** A figure per hour needs an hour to
+average over: divide two contacts by the four seconds between them and you get
+1,800 an hour, which is not a rate anybody worked — it is a fraction of a
+minute projected out to sixty. Best hr has no such problem, because it counts
+what happened rather than extrapolating from it, and it is the number to read
+early in a shift.
+
+**New** is the column that says who *brought something in* rather than who did
+the most. A section belongs to whoever reached it first, so every section in
+your log is somebody's — the column adds up to the sections-worked total.
+
+#### Reading the totals row
+
+The row at the bottom is there to be checked. Its contacts and points should
+match the scoreboard, and two things would otherwise stop them:
+
+- **Contacts with no operator** get a row labelled `no operator` rather than
+  being dropped. Those come from an ADIF import, which carries no operator
+  callsign. It sorts last whatever you sort by, because it is a pile of
+  contacts and not a person — and it is not counted in the operator count.
+- **Duplicates** are counted, in their own column, and left out of everything
+  else. Hiding them entirely would make an operator's row disagree with what
+  the Log view shows for the same operator.
+
+**Pts is not a score.** It is QSO points before anything is done to them. The
+power multiplier is a property of your entry and a bonus is earned by the club,
+so neither is split between people — adding the column up will not give you the
+claimed score, and is not meant to.
+
+Somebody signed in who has not logged anything yet gets a row saying so, so the
+table shows everyone at the site rather than only the ones with contacts.

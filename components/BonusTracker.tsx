@@ -3,7 +3,7 @@
 import { useState, useCallback, useRef } from 'react';
 import type { Bonuses, EventType } from '@/lib/types';
 import { calculateBonusPoints } from '@/lib/scoring';
-import { bonusDefs, bonusRate, transmittersFromClass, WFD_OBJECTIVES, objectiveMultiplier, WFD_MAX_MULTIPLIER } from '@/lib/bonuses';
+import { bonusDefs, bonusRate, isDerivedFromLog, transmittersFromClass, WFD_OBJECTIVES, objectiveMultiplier, WFD_MAX_MULTIPLIER } from '@/lib/bonuses';
 
 interface Props {
   joinCode: string;
@@ -12,12 +12,15 @@ interface Props {
   /** The entry class, e.g. "3A" — the emergency power bonus pays per
    *  transmitter, so the panel needs it to show what the box is worth. */
   entryClass: string | null;
+  /** GOTA contacts counted from the log. When there are any, they are the
+   *  claim and the typed field stands down — see `isDerivedFromLog`. */
+  gotaQsos?: number;
   onBonusesChange?: (b: Bonuses) => void;
   readOnly?: boolean;
 }
 
 export default function BonusTracker({
-  joinCode, initialBonuses, eventType, entryClass, onBonusesChange, readOnly = false,
+  joinCode, initialBonuses, eventType, entryClass, gotaQsos = 0, onBonusesChange, readOnly = false,
 }: Props) {
   const [bonuses, setBonuses] = useState<Bonuses>(initialBonuses);
   const [saving, setSaving] = useState(false);
@@ -57,7 +60,7 @@ export default function BonusTracker({
   // lib/bonuses.ts, so the number beside a checkbox is the number the scorer
   // adds. They used to be separate transcriptions of the rules and disagreed.
   const defs = bonusDefs(eventType);
-  const ctx = { transmitters: transmittersFromClass(entryClass) };
+  const ctx = { transmitters: transmittersFromClass(entryClass), gotaQsos };
   const bonusPoints = calculateBonusPoints(bonuses, eventType, ctx);
 
   // Winter Field Day has objectives, not bonuses: each carries an Objective
@@ -122,7 +125,19 @@ export default function BonusTracker({
           {defs.map(def => (
             <div key={def.key} className="flex items-center justify-between gap-2">
               <div className="flex items-center gap-1.5 min-w-0">
-                {def.kind === 'per-unit' ? (
+                {/* Counted from the log rather than typed: the field would be
+                    a second, drifting copy of a number the log already knows,
+                    and with no cap on this bonus nothing bounds how far apart
+                    they get. A club logging GOTA elsewhere logs none here and
+                    the field comes back. */}
+                {def.kind === 'per-unit' && isDerivedFromLog(def, ctx) ? (
+                  <span
+                    title="Counted from the contacts flagged as GOTA in the log"
+                    className="w-12 shrink-0 rounded border border-emerald-700 bg-emerald-900/20 px-1 py-0.5 text-center font-mono text-xs font-semibold text-emerald-400 light:border-emerald-600 light:bg-emerald-50 light:text-emerald-700"
+                  >
+                    {gotaQsos}
+                  </span>
+                ) : def.kind === 'per-unit' ? (
                   <input
                     type="number"
                     min={0}

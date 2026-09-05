@@ -14,6 +14,8 @@ import { rememberPosition } from '@/lib/lastPosition';
 import type { Event, QSO, Band, Mode, DisplayQSO, SesReservation } from '@/lib/types';
 import type { QSOSubmission } from './QSOForm';
 import QSOForm from './QSOForm';
+import NavDrawer, { type NavHandlers } from './NavDrawer';
+import { toggleLightMode } from '@/lib/useLightMode';
 import SesCoordination from './SesCoordination';
 import QSOTable from './QSOTable';
 import Scoreboard from './Scoreboard';
@@ -24,13 +26,15 @@ import AdifImport from './AdifImport';
 import WsjtxSetupHelp from './WsjtxSetupHelp';
 import RigControlHelp from './RigControlHelp';
 import SectionsNeeded from './SectionsNeeded';
-import ThemeToggle from './ThemeToggle';
 
 interface Props {
   event: Event;
   initialQSOs: QSO[];
   operatorCall: string;
   stationNumber: number;
+  /** This window is logging at the GOTA station (#23). Every contact it takes
+   *  carries the flag, and the header signs the GOTA call. */
+  isGota?: boolean;
   /** SES with roster approval on, and this operator isn't approved yet.
    *  The server rejects their QSOs; this is the up-front warning. */
   approvalPending?: boolean;
@@ -43,7 +47,7 @@ interface Props {
 }
 
 export default function LoggingClient({
-  event, initialQSOs, operatorCall, stationNumber, approvalPending = false,
+  event, initialQSOs, operatorCall, stationNumber, isGota = false, approvalPending = false,
   initialBand, initialMode,
 }: Props) {
   const router = useRouter();
@@ -55,6 +59,7 @@ export default function LoggingClient({
     sentSection: event.arrl_section,
     operatorCall,
     stationNumber,
+    isGota,
   });
   // Destructured rather than used as `queue.x`: the callbacks are
   // useCallback-stable, so effects and memoized props can depend on them
@@ -109,9 +114,6 @@ export default function LoggingClient({
   // button opens. A 1A club, or an SES on its only radio, has nothing to
   // confuse and gets no extra chrome.
   const showStation = transmitterCount(event.class) > 1 || stationNumber > 1;
-  const opChipTitle = showStation
-    ? `${operatorCall} at station ${stationNumber} — change operator or operating position`
-    : 'Change operator';
 
   // One bridge process per radio, each on its own port, so a second window
   // drives a second rig instead of both fighting over one connection.
@@ -139,6 +141,33 @@ export default function LoggingClient({
   function toggleNight() {
     setNightMode(prev => !prev);
   }
+
+  // Every action the drawer offers for this surface. `NavHandlers` is keyed by
+  // the action ids in lib/nav.ts, so adding an entry there without wiring it
+  // here is a type error rather than a menu item that does nothing.
+  const navHandlers: NavHandlers = {
+    switchOperator: () => {
+      sessionStorage.removeItem(`ezfd_op_${event.join_code}`);
+      router.push(`/event/${event.join_code}`);
+    },
+    // A second radio is a second full logging window at the next station
+    // number, with its own bridge on its own port (#30). Named so the two
+    // windows land on the same tab if reopened rather than stacking.
+    secondRadio: () => window.open(
+      `/event/${event.join_code}/log?op=${encodeURIComponent(operatorCall)}&station=${stationNumber + 1}`,
+      `ezfd_radio_${event.join_code}_${stationNumber + 1}`,
+      'width=1100,height=900,noopener',
+    ),
+    cwWindow: () => window.open(
+      `/event/${event.join_code}/cw?op=${encodeURIComponent(operatorCall)}&station=${stationNumber}`,
+      `ezfd_cw_${event.join_code}`,
+      'width=520,height=880,noopener',
+    ),
+    rigDetails: () => setShowRigHelp(true),
+    importAdif: () => setShowAdifImport(true),
+    toggleTheme: toggleLightMode,
+    toggleNight,
+  };
 
   // SSE subscription for real-time QSO updates
   useEffect(() => {
@@ -286,7 +315,20 @@ export default function LoggingClient({
     <div data-night={nightMode ? 'true' : undefined} className="night-scope flex h-screen flex-col overflow-hidden bg-zinc-950 light:bg-white">
       <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-2 flex-shrink-0 light:border-zinc-200 light:bg-zinc-50">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="font-bold text-amber-400 text-lg shrink-0">{event.club_call}</span>
+          {/* The call actually being signed. A GOTA operator working under a
+              different callsign needs that on screen — it is what they say on
+              the air, and it is what their contacts export as. */}
+          <span className="font-bold text-amber-400 text-lg shrink-0">
+            {isGota && event.gota_call ? event.gota_call : event.club_call}
+          </span>
+          {isGota && event.gota_call && (
+            <span
+              title={`Get On The Air station — contacts count for ${event.club_call} and earn 5 bonus points each`}
+              className="hidden sm:inline-flex shrink-0 rounded border border-sky-700 bg-sky-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-400"
+            >
+              GOTA
+            </span>
+          )}
           <span className="text-zinc-600 hidden sm:inline">|</span>
           <span className="text-zinc-300 text-sm shrink-0 hidden sm:inline">
             {isSes ? 'Special Event' : `${event.class} · ${event.arrl_section}`}
@@ -297,12 +339,16 @@ export default function LoggingClient({
         </div>
 
         <div className="flex items-center gap-2 text-sm flex-shrink-0">
+          {/* What is left in the header is *status* — things an operator reads
+              without acting on. Everything actionable moved into the drawer,
+              which is why this row no longer has to choose what to drop at
+              each breakpoint. */}
           <UTCClock />
+
           {rigConnected && (
-            <button
-              onClick={() => setShowRigHelp(true)}
-              title="Rig control active — click for details"
-              className="hidden sm:inline-flex items-center gap-1.5 rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-400 hover:bg-green-900/50 transition-colors">
+            <span
+              title={`Rig control active${rigFreq ? ` — ${(rigFreq / 1e6).toFixed(3)} MHz` : ''}`}
+              className="hidden sm:inline-flex items-center gap-1.5 rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-400">
               <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
               <span className="uppercase tracking-wide">RIG</span>
               {rigFreq && (
@@ -310,42 +356,19 @@ export default function LoggingClient({
                   {(rigFreq / 1e6).toFixed(3)}
                 </span>
               )}
-            </button>
+            </span>
           )}
-          {/* Running two radios at once is one operator in two windows, each on
-              its own station number — the shape settled in #30. The second
-              window is a full logger, so it needs no new UI of its own. */}
-          <button
-            onClick={() => window.open(
-              `/event/${event.join_code}/log?op=${encodeURIComponent(operatorCall)}&station=${stationNumber + 1}`,
-              `ezfd_radio_${event.join_code}_${stationNumber + 1}`,
-              'width=1100,height=900,noopener'
-            )}
-            title={`Open a second logging window as station ${stationNumber + 1}, for a second radio. Its rig bridge listens on port ${rigPortForStation(stationNumber + 1)}.`}
-            className="hidden sm:inline-flex items-center gap-1 rounded border border-zinc-700 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-zinc-400 hover:bg-zinc-800 transition-colors light:border-zinc-300 light:text-zinc-600">
-            + Radio {stationNumber + 1}
-          </button>
-          {rigConnected && rig.canCw && (
-            <button
-              onClick={() => window.open(
-                `/event/${event.join_code}/cw?op=${encodeURIComponent(operatorCall)}&station=${stationNumber}`,
-                `ezfd_cw_${event.join_code}`,
-                'width=520,height=880,noopener'
-              )}
-              title="Open the CW macro + keying window"
-              className="hidden sm:inline-flex items-center gap-1 rounded border border-amber-700 bg-amber-900/20 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-400 hover:bg-amber-900/40 transition-colors">
-              ⚡ CW
-            </button>
-          )}
-          <span className="text-zinc-600 hidden sm:inline">|</span>
-          {/* A special event station has no contest score — just a QSO count. */}
-          <span className="text-zinc-400 hidden sm:inline light:text-zinc-500">
+
+          {/* The score reads on every width now. It is the number an operator
+              glances at most and it used to vanish below 640px, where a second
+              copy in a separate bar took over. */}
+          <span className="text-zinc-400 light:text-zinc-500">
             <span className="text-zinc-200 font-mono font-bold light:text-zinc-800">{score.valid_qsos}</span>
             <span className="text-zinc-600 mx-1">Q</span>
             {!isSes && (
               <>
                 <span className="text-zinc-200 font-mono font-bold light:text-zinc-800">{score.sections_worked}</span>
-                <span className="text-zinc-600 mx-1">×</span>
+                <span className="text-zinc-600 mx-1">\u00d7</span>
                 <span className="text-amber-400 font-mono font-bold">{score.total_score.toLocaleString()}</span>
               </>
             )}
@@ -358,122 +381,43 @@ export default function LoggingClient({
           )}
           {pendingCount > 0 && (
             <button onClick={flushQueue}
+              title="Contacts waiting to reach the server. They send themselves; this retries now."
               className="rounded bg-yellow-900/50 border border-yellow-700 px-2 py-0.5 text-xs text-yellow-400 hover:bg-yellow-900">
-              {pendingCount} pending{isOnline ? ' ↑' : ''}
+              {pendingCount} pending{isOnline ? ' \u2191' : ''}
             </button>
           )}
 
-          <button
-            onClick={() => {
-              sessionStorage.removeItem(`ezfd_op_${event.join_code}`);
-              router.push(`/event/${event.join_code}`);
+          <NavDrawer
+            ctx={{
+              surface: 'logger',
+              joinCode: event.join_code,
+              eventType: event.event_type,
+              stationNumber,
+              operatorCall,
+              rigConnected,
+              canCw: rig.canCw,
             }}
-            title={opChipTitle}
-            className="hidden md:inline-flex items-center gap-1.5 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
-          >
-            <span className="text-zinc-500 light:text-zinc-400 text-[10px] font-semibold uppercase tracking-wide">Op On</span>
-            <span className="font-mono font-semibold">{operatorCall}</span>
-            {showStation && (
-              <span className="rounded bg-zinc-800 px-1 font-mono text-[10px] font-semibold text-amber-400 light:bg-zinc-200 light:text-amber-700">
-                ST{stationNumber}
+            handlers={navHandlers}
+            heading={
+              <span className="block truncate font-mono text-xs text-zinc-400 light:text-zinc-600">
+                {operatorCall}{showStation ? ` \u00b7 station ${stationNumber}` : ''}
               </span>
-            )}
-            <span className="text-zinc-500">⇄</span>
-          </button>
-
-          {/* ThemeToggle hidden on mobile — moved to mobile tab bar */}
-          <span className="hidden sm:contents"><ThemeToggle /></span>
-
-          <button onClick={toggleNight}
-            title={nightMode ? 'Exit night mode' : 'Enter night mode (preserves dark adaptation)'}
-            className={`rounded border px-2 py-1 text-xs transition-colors ${
-              nightMode
-                ? 'border-red-800 bg-red-900/40 text-red-400 hover:bg-red-900/60'
-                : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800'
-            }`}>
-            {nightMode ? '☀ Day' : '☾ Night'}
-          </button>
-
-          <button onClick={() => router.push(`/event/${event.join_code}/dashboard`)}
-            className="hidden sm:block rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
-            Dashboard
-          </button>
-
-          <div className="hidden sm:flex gap-1">
-            <button
-              onClick={() => setShowAdifImport(true)}
-              className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800"
-              title="Import QSOs from WSJT-X / JTDX ADIF file"
-            >
-              Import ADIF
-            </button>
-            <a href={`/api/export/${event.join_code}`}
-              className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
-              ADIF
-            </a>
-            {/* Cabrillo is a contest submission format — nothing to submit for an SES. */}
-            {!isSes && (
-              <a href={`/api/export/${event.join_code}?format=cabrillo`}
-                className="rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-300 hover:bg-zinc-800">
-                Cabrillo
-              </a>
-            )}
-          </div>
+            }
+          />
         </div>
       </header>
 
-      {/* Mobile tab bar */}
+      {/* The Log QSO / QSOs switcher. This is a *view* switcher, so it stays
+          on screen: flipping between the entry form and the list is the loop
+          an operator repeats all night, and it is only needed where the two
+          panes cannot sit side by side.
+
+          Everything else that used to live in this bar — a second copy of the
+          score, the theme toggle, Dashboard, Docs and the operator chip — is
+          in the drawer now. That copy was the drift: it carried a Docs link
+          the desktop header never had, and lacked the exports the desktop
+          header did. */}
       <div className="shrink-0 border-b border-zinc-800 bg-zinc-900 md:hidden light:border-zinc-200 light:bg-zinc-50">
-        <div className="flex items-center justify-between px-3 py-1 border-b border-zinc-800/50 light:border-zinc-200">
-          <span className="font-mono text-xs text-zinc-400 light:text-zinc-600">
-            <span className="text-zinc-200 font-bold light:text-zinc-800">{score.valid_qsos}</span>
-            <span className="text-zinc-600 mx-1">Q</span>
-            {!isSes && (
-              <>
-                <span className="text-zinc-200 font-bold light:text-zinc-800">{score.sections_worked}</span>
-                <span className="text-zinc-600 mx-1">×</span>
-                <span className="text-amber-400 font-bold">{score.total_score.toLocaleString()}</span>
-              </>
-            )}
-          </span>
-          <div className="flex items-center gap-2">
-            <ThemeToggle />
-            <button
-              onClick={() => router.push(`/event/${event.join_code}/dashboard`)}
-              className="rounded border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600"
-            >
-              Dashboard
-            </button>
-            {/* Opened in its own tab so a mid-event lookup never costs the
-                operator their logging window. */}
-            <a
-              href="/docs"
-              target="_blank"
-              rel="noopener noreferrer"
-              title="Open the EzFD guides"
-              className="rounded border border-zinc-700 px-2 py-0.5 text-xs text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600"
-            >
-              Docs
-            </a>
-            <button
-              onClick={() => {
-                sessionStorage.removeItem(`ezfd_op_${event.join_code}`);
-                router.push(`/event/${event.join_code}`);
-              }}
-              title={opChipTitle}
-              className="flex items-center gap-1.5 text-xs border border-zinc-700 rounded px-2 py-0.5 light:border-zinc-300 light:text-zinc-600"
-            >
-              <span className="text-zinc-500 light:text-zinc-400 text-[10px] font-semibold uppercase tracking-wide">Op On</span>
-              <span className="font-mono font-semibold text-zinc-300 light:text-zinc-700">{operatorCall}</span>
-              {showStation && (
-                <span className="rounded bg-zinc-800 px-1 font-mono text-[10px] font-semibold text-amber-400 light:bg-zinc-200 light:text-amber-700">
-                  ST{stationNumber}
-                </span>
-              )}
-              <span className="text-zinc-500">⇄</span>
-            </button>
-          </div>
-        </div>
         <div className="flex">
           <button
             onClick={() => setMobileTab('log')}

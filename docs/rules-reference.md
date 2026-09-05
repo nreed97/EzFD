@@ -77,8 +77,13 @@ explicitly for GOTA contacts, and it holds for all of them.
 | 7.3.17 | Safety officer | 100 | **A only** |
 | 7.3.18 | Site responsibilities | 50 | B, C, D, E, F |
 
-The app does **not** enforce the class-eligibility column. It will let you tick
-any box; read the rule before claiming one.
+The app will let you tick any box — refusing a claim would be the app
+overruling a human about their own entry — but the **Before you submit** panel
+on the summary sheet now says when a claimed bonus is not listed for your
+class, and names the rule. `scripts/test-preflight.cjs` reads the Classes
+column above back out of this file and fails if `lib/bonuses.ts` has drifted
+from it, so the check is against this transcription rather than against the
+code.
 
 Bonuses that do **not** exist, and which this app awarded for several releases:
 a Worked All Sections bonus, and an "all attendees licensed" bonus.

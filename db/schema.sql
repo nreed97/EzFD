@@ -51,6 +51,20 @@ CREATE TABLE IF NOT EXISTS qsos (
 --
 -- updated_by/deleted_by record who *claimed* to be editing, not a verified
 -- identity. Useful; not evidence.
+-- Get On The Air (rule 7.3.13.1). A GOTA station signs a different callsign
+-- from the parent and its contacts earn 5 bonus points each, with no cap and
+-- no per-operator limit — both were removed from the rules, and the 1,000
+-- point cap this app used to apply was never in them at all.
+--
+-- Flagged on the contact rather than split into a separate event, because
+-- rule 4.1.1.5 says a GOTA QSO counts *twice*: full QSO credit for the parent
+-- entry AND the bonus. A separate log would have to be merged back to score
+-- correctly, and excluding these from qso_points — which the original plan
+-- for this proposed — deflates the claimed score by a point per phone contact
+-- and two per CW or digital one.
+ALTER TABLE events ADD COLUMN IF NOT EXISTS gota_call TEXT;
+ALTER TABLE qsos   ADD COLUMN IF NOT EXISTS is_gota BOOLEAN NOT NULL DEFAULT FALSE;
+
 ALTER TABLE qsos ADD COLUMN IF NOT EXISTS updated_at TIMESTAMPTZ;
 ALTER TABLE qsos ADD COLUMN IF NOT EXISTS updated_by TEXT;
 ALTER TABLE qsos ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
@@ -406,6 +420,7 @@ AS $$
       e.bonuses, e.created_at,
       e.starts_at, e.ends_at, e.ses_description, e.ses_qsl_info,
       e.slot_enforcement, e.slot_minutes, e.dupe_rule, e.require_operator_approval,
+      e.gota_call,
       (SELECT COUNT(*) FROM qsos q WHERE q.event_id = e.id AND NOT q.is_dupe AND q.deleted_at IS NULL) AS qso_count,
       (SELECT COUNT(*) FROM qsos q WHERE q.event_id = e.id AND     q.is_dupe AND q.deleted_at IS NULL) AS dupe_count,
       (SELECT jsonb_agg(DISTINCT q.operator_call)
@@ -480,7 +495,8 @@ BEGIN
     INSERT INTO events (id, join_code, club_name, club_call, event_year, class, arrl_section,
                         location, bonuses, event_type, power, created_at,
                         starts_at, ends_at, ses_description, ses_qsl_info,
-                        slot_enforcement, slot_minutes, dupe_rule, require_operator_approval)
+                        slot_enforcement, slot_minutes, dupe_rule, require_operator_approval,
+                        gota_call)
     VALUES (
       v_new_id, v_new_code,
       COALESCE(ev->>'club_name',''), COALESCE(ev->>'club_call',''),
@@ -500,7 +516,8 @@ BEGIN
       COALESCE(ev->>'slot_enforcement','SOFT'),
       COALESCE((ev->>'slot_minutes')::int, 120),
       COALESCE(ev->>'dupe_rule','EVENT'),
-      COALESCE((ev->>'require_operator_approval')::boolean, false)
+      COALESCE((ev->>'require_operator_approval')::boolean, false),
+      ev->>'gota_call'
     );
 
     n := 0;
@@ -510,7 +527,7 @@ BEGIN
                         rcvd_class, rcvd_section, operator_call, station_number, is_dupe, created_at,
                         rst_sent, rst_rcvd, rcvd_name, rcvd_qth, rcvd_grid, comment,
                         adif_mode, freq_khz,
-                        updated_at, updated_by, deleted_at, deleted_by)
+                        updated_at, updated_by, deleted_at, deleted_by, is_gota)
       VALUES (
         gen_random_uuid(), v_new_id,
         qso->>'callsign', qso->>'band', qso->>'mode',
@@ -524,7 +541,8 @@ BEGIN
         qso->>'rcvd_qth', qso->>'rcvd_grid', qso->>'comment',
         qso->>'adif_mode', NULLIF(qso->>'freq_khz','')::int,
         NULLIF(qso->>'updated_at','')::timestamptz, qso->>'updated_by',
-        NULLIF(qso->>'deleted_at','')::timestamptz, qso->>'deleted_by'
+        NULLIF(qso->>'deleted_at','')::timestamptz, qso->>'deleted_by',
+        COALESCE((qso->>'is_gota')::boolean, false)
       );
       n := n + 1;
     END LOOP;

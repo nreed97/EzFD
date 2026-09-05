@@ -190,7 +190,13 @@ export function generateADIF(
 
         // STATION_CALLSIGN is the call that was signed on the air — the club
         // or special event call. OPERATOR is the individual at the key.
-        adifField('STATION_CALLSIGN', event.club_call),
+        //
+        // A GOTA contact was signed with the GOTA station's own call, and this
+        // field means exactly that, so it gets it. It matters beyond tidiness:
+        // LoTW signs by station callsign, and uploading a GOTA contact under
+        // the parent call is a contact the other station cannot confirm.
+        adifField('STATION_CALLSIGN',
+                  q.is_gota && event.gota_call ? event.gota_call : event.club_call),
         q.operator_call ? adifField('OPERATOR', q.operator_call) : '',
 
         loc?.grid   ? adifField('MY_GRIDSQUARE', loc.grid)          : '',

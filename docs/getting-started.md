@@ -108,7 +108,7 @@ score, rate, sections worked, and who is on which band.
 
 **Visitor mode** is the same view with no callsign and no ability to log, for
 a screen visitors can see. It has no export buttons and no operator actions,
-and **← Exit** leaves for the home page rather than asking for a callsign.
+and **Leave** in the ☰ menu goes to the home page rather than asking for a callsign.
 
 On a special event the dashboard gets a **Checkouts** tab instead of the
 section views: a timeline of who holds which band and mode, over a grid to
@@ -129,9 +129,9 @@ just the total.
 
 ![The Field Day summary sheet](images/summary-sheet.png)
 
-Then back the event up before you tear anything down. **Backup** on the
-dashboard downloads the whole event as one JSON file — every contact, the
-roster, the checkouts, and the deleted contacts too — and it restores into any
+Then back the event up before you tear anything down. **Full event backup**, in
+the dashboard's ☰ menu, downloads the whole event as one JSON file — every
+contact, the roster, the checkouts, and the deleted contacts too — and it restores into any
 EzFD instance from the home page. That is also how you move an event off a
 field server.
 

@@ -97,6 +97,58 @@ Bonuses are added **after** the power multiplier is applied, so a QRP entry's
 bonuses are worth exactly the same as a high-power entry's. Rule 7.3.13.1 says
 so explicitly for GOTA contacts, and it holds for all of them.
 
+### Before you submit
+
+Open **Summary** on the dashboard and the sheet opens with a short read of the
+log: unrecognised sections, a station that sent two different exchanges, a
+class or callsign that cannot be one, contacts on a band the entry cannot
+score, and any bonus claimed that rule 7.3 does not list for your class.
+
+Two levels, and the difference matters:
+
+| | Means |
+|---|---|
+| **Fix** | The log contradicts the claim. A Winter Field Day objective you have ticked that the log shows you did not meet — those multiply, so one wrong tick moves the whole score |
+| **Check** | Worth your eye. It may be perfectly correct; the app cannot tell |
+
+It does **not** check callsigns against a list of known stations. Field Day
+exists to bring out operators who never enter contests, so the Super Check
+Partial file simply does not contain many good Field Day callsigns — and it is
+downloaded best-effort, so a field server with no internet has none of it at
+all. Flagging every such contact would bury the findings that are real. The
+panel names what it did not look at for the same reason.
+
+Nothing here is refused or corrected for you. It is your entry.
+
+### The GOTA station
+
+Set a **GOTA callsign** when you create the event and operators can sign in at
+the Get On The Air station: tick *I'm at the GOTA station* on the sign-in
+screen. Their contacts are signed with that callsign, and the logger's header
+shows it so there is no doubt what to say on the air.
+
+A GOTA contact counts **twice**, which is rule 4.1.1.5:
+
+> QSOs made by this station may be claimed for credit by its primary Field Day
+> operation. In addition, bonus points may be earned by this station under
+> rule 7.3.13.
+
+So each one scores its normal QSO points *and* 5 bonus points. **There is no
+cap** on the bonus and **no limit** on how many contacts a single GOTA operator
+may make — both restrictions existed once and neither is in the current rules.
+This app applied a 1,000-point cap for several releases that was never in them
+at all.
+
+Because the contacts are logged, the bonus is **counted rather than typed**:
+the bonus panel shows the figure in green and the number field stands down. If
+your club logs GOTA somewhere else, log none here and type the total instead —
+the two are never added together.
+
+Exported ADIF gives those contacts the GOTA callsign as `STATION_CALLSIGN`,
+which is what LoTW signs by. Cabrillo keeps the entry callsign on every line:
+the rules do not say what belongs there for a GOTA contact, so it was left as
+it was rather than changed on a guess.
+
 ### Winter Field Day
 
 Winter Field Day is run by the Winter Field Day Association, not the ARRL, and
