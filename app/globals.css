@@ -76,3 +76,16 @@
 @media (prefers-reduced-motion: reduce) {
   .qso-arrived { animation: none; }
 }
+
+/* The dashboard's view-tab strip scrolls sideways on a phone rather than
+   wrapping. The scrollbar itself is hidden because the strip is one row of
+   tabs an operator swipes, and a visible bar under it reads as a divider
+   between the tabs and the content. Scrolling still works by touch, wheel and
+   keyboard; only the indicator is suppressed. */
+.ezfd-tabstrip {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.ezfd-tabstrip::-webkit-scrollbar {
+  display: none;
+}

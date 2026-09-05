@@ -3,14 +3,13 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNow } from '@/lib/useNow';
 import dynamic from 'next/dynamic';
-import Link from 'next/link';
 import { calculateScore } from '@/lib/scoring';
 import { applyQsoEvent } from '@/lib/qsoStream';
 import { operatorStats, UNATTRIBUTED } from '@/lib/opStats';
+import { toggleLightMode } from '@/lib/useLightMode';
 import type { Event, QSO, Bonuses, SesReservation } from '@/lib/types';
 import Scoreboard from './Scoreboard';
 import SectionGrid from './SectionGrid';
-import ThemeToggle from './ThemeToggle';
 import UTCClock from './UTCClock';
 import BonusTracker from './BonusTracker';
 import RateChart from './RateChart';
@@ -20,6 +19,7 @@ import SectionsNeeded from './SectionsNeeded';
 import CheckoutBoard from './CheckoutBoard';
 import LogView from './LogView';
 import OperatorStats from './OperatorStats';
+import NavDrawer from './NavDrawer';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
@@ -194,35 +194,82 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         { id: 'ops',      label: 'Operators' },
       ];
 
+  // Built once and rendered into whichever header row is visible, so there is
+  // only ever one hamburger on the page and only one set of handlers.
+  const navMenu = (
+    <NavDrawer
+      ctx={{
+        surface: 'dashboard',
+        joinCode: event.join_code,
+        eventType: event.event_type,
+        isVisitor,
+      }}
+      handlers={{
+        summary: () => setShowSummary(true),
+        toggleTheme: toggleLightMode,
+      }}
+      heading={
+        <span className="block truncate font-mono text-xs text-zinc-400 light:text-zinc-600">
+          {event.club_call} · {isSes ? 'Special Event' : `${event.class} · ${event.arrl_section}`}
+        </span>
+      }
+    />
+  );
+
   return (
     <div className="flex h-screen flex-col overflow-hidden bg-zinc-950 light:bg-white">
-      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-6 py-3 light:border-zinc-200 light:bg-zinc-50 shrink-0 flex-wrap gap-2">
-        <div className="flex items-center gap-3">
-          <span className="font-bold text-amber-400 text-xl">{event.club_call}</span>
-          <span className="text-zinc-400 text-sm light:text-zinc-600">{event.club_name}</span>
-          <span className="text-zinc-600 text-sm light:text-zinc-400">
+      {/* Two rows on a phone, one on a desktop. Identity, clock and the menu
+          share the first; the view tabs get the second to themselves and
+          scroll sideways rather than wrapping.
+
+          Six action buttons used to sit up here as well — Summary, Logger,
+          ADIF, Cabrillo, Backup and the theme toggle — mixed in with the seven
+          view tabs. Two different kinds of thing in one row gave a reader no
+          way to scan for either, and on a 390px phone the lot wrapped to four
+          rows: 199px of an 844px screen gone before the filter bar started.
+          The actions are in the drawer now, which has room to say what each
+          one is. */}
+      <header className="flex shrink-0 flex-col gap-2 border-b border-zinc-800 bg-zinc-900 px-4 py-2 light:border-zinc-200 light:bg-zinc-50 md:flex-row md:items-center md:justify-between md:gap-3 md:px-6 md:py-3">
+      {/* `md:contents` dissolves this wrapper on a desktop so identity, tabs
+          and the clock/menu become three flex children of the header in
+          `order` sequence. On a phone it stays a real row, holding the
+          identity beside the clock and the menu. Either way the drawer is
+          rendered exactly once — two instances would be two components with
+          separate state, which is the duplication this whole change removes. */}
+        <div className="flex min-w-0 items-center gap-3 md:contents">
+          <span className="shrink-0 text-xl font-bold text-amber-400 md:order-1">{event.club_call}</span>
+          <span className="truncate text-sm text-zinc-400 light:text-zinc-600 md:order-1">{event.club_name}</span>
+          <span className="hidden shrink-0 text-sm text-zinc-600 light:text-zinc-400 sm:inline md:order-1">
             {isSes ? 'Special Event Station' : `${event.class} · ${event.arrl_section}`}
           </span>
           {isVisitor && (
             <span
               title="Read-only visitor mode — no sign-in, no logging, no operator actions"
-              className="rounded border border-sky-700 bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-400"
+              className="shrink-0 rounded border border-sky-700 bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-400 md:order-1"
             >
               Visitor
             </span>
           )}
+          {/* On a phone these ride the identity line so the tab strip below
+              gets the full width to scroll in; on a desktop `order` sends them
+              to the far end of the single row. */}
+          <span className="ml-auto flex shrink-0 items-center gap-2 md:order-3 md:ml-0">
+            <UTCClock />
+            {navMenu}
+          </span>
         </div>
-        <div className="flex items-center gap-2 text-sm flex-wrap">
-          <UTCClock />
 
-          <div className="flex rounded border border-zinc-700 overflow-hidden light:border-zinc-300">
+        <div className="flex min-w-0 items-center gap-2 text-sm md:order-2">
+          {/* Seven tabs will never fit across a phone. One scrollable row
+              keeps every view one tap away without costing a second line. */}
+          <div className="ezfd-tabstrip flex min-w-0 flex-1 overflow-x-auto rounded border border-zinc-700 light:border-zinc-300 md:flex-none">
             {VIEW_TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setMainView(tab.id)}
-                className={`px-2 py-1 text-xs transition-colors ${
+                className={`shrink-0 whitespace-nowrap px-3 py-1.5 text-xs transition-colors md:px-2 md:py-1 ${
                   mainView === tab.id
-                    ? 'bg-amber-400 text-zinc-900 font-semibold'
+                    ? 'bg-amber-400 font-semibold text-zinc-900'
                     : 'text-zinc-400 hover:bg-zinc-800 light:text-zinc-600 light:hover:bg-zinc-100'
                 }`}
               >
@@ -231,52 +278,6 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
             ))}
           </div>
 
-          {/* The summary sheet is an ARRL entry submission worksheet. */}
-          {!isSes && (
-            <button
-              onClick={() => setShowSummary(true)}
-              className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
-            >
-              Summary
-            </button>
-          )}
-          {/* An operator goes back to their logger. A visitor goes home.
-              Both used to land on the event's operator sign-in, which is the
-              one screen a visitor deliberately did not choose: they picked
-              read-only stats and got asked for a callsign. Worse, that page
-              redirects straight into the logger when the browser still holds
-              a sign-in for this event, so "exit" could drop somebody into a
-              logging window. Home offers the join-code box, which is what
-              leaving actually means here. */}
-          <Link href={isVisitor ? '/' : `/event/${event.join_code}`}
-            title={isVisitor ? 'Leave visitor mode' : 'Back to the logging screen'}
-            className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
-            {isVisitor ? '← Exit' : '← Logger'}
-          </Link>
-          {!isVisitor && (
-            <>
-              <a href={`/api/export/${event.join_code}`}
-                className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10 light:border-amber-600 light:text-amber-700">
-                ADIF
-              </a>
-              {!isSes && (
-                <a href={`/api/export/${event.join_code}?format=cabrillo`}
-                  className="rounded border border-amber-700 px-3 py-1.5 text-amber-400 hover:bg-amber-400/10 light:border-amber-600 light:text-amber-700">
-                  Cabrillo
-                </a>
-              )}
-              {/* The whole event, not just the contacts: settings, bonuses,
-                  the SES roster and checkout history. This is what moves an
-                  event to another instance, so it's worth being able to take
-                  one without shell access on the server. */}
-              <a href={`/api/export/${event.join_code}?format=json`}
-                title="Full event backup — settings, QSOs, roster and checkout history. Restorable on any EzFD instance."
-                className="rounded border border-zinc-700 px-3 py-1.5 text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100">
-                Backup
-              </a>
-            </>
-          )}
-          <ThemeToggle />
         </div>
       </header>
 
