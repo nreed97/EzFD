@@ -5,6 +5,7 @@ import type { Band, Event, Mode, SesReservation } from '@/lib/types';
 import { bandsFor, MODES } from '@/lib/bands';
 import { buildSlotBoard, countOpen, slotKey, type PresenceRow, type SlotInfo } from '@/lib/slotBoard';
 import { NO_POSITION, positionKey, suggestPosition, validPosition, type StoredPosition } from '@/lib/lastPosition';
+import { slotWords } from '@/lib/slotWords';
 import { useStoredJson } from '@/lib/useStoredJson';
 import { useNow } from '@/lib/useNow';
 
@@ -20,6 +21,11 @@ import { useNow } from '@/lib/useNow';
  * Claiming is optional here on purpose. A contest club that never uses the
  * schedule should be able to pick a band and go; a special event, where the
  * checkout is the point, gets the claim offered on the same screen.
+ *
+ * The two readings are worded differently — a contest coordinates the
+ * transmitter, a special event checks out the callsign — and both come from
+ * `lib/slotWords.ts` so this screen and the logging panel two steps later
+ * cannot describe the same claim as two different things.
  */
 
 const MODE_LABEL: Record<Mode, string> = { PH: 'Phone', CW: 'CW', DIG: 'Digital' };
@@ -60,6 +66,7 @@ interface Props {
 
 export default function OperatingPosition({ event, opCall, station, onStart, onDashboard, onBack }: Props) {
   const isSes = event.event_type === 'SES';
+  const words = slotWords(event.event_type);
   const nowMs = useNow(CLOCK_MS);
 
   const [reservations, setReservations] = useState<SesReservation[]>([]);
@@ -173,7 +180,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
       const body = await res?.json().catch(() => ({})) as { error?: string };
       // A 409 means somebody claimed it between the board loading and this
       // click. Refresh so the operator sees who, rather than a bare error.
-      setClaimError(body.error ?? 'Could not check out that band and mode.');
+      setClaimError(body.error ?? words.claimFailed);
       void load();
       return;
     }
@@ -187,9 +194,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
         <span className="font-mono text-xs text-zinc-500">{open} of {total} free</span>
       </div>
       <p className="mb-4 text-xs text-zinc-500">
-        {isSes
-          ? 'Pick a band and mode, then check it out so nobody else signs the callsign there at the same time.'
-          : 'Pick where you are starting. Checking out is optional on a contest — it warns the next station that this band and mode is taken.'}
+        {words.pickHint}
       </p>
 
       <div className="flex flex-col gap-3">
@@ -278,7 +283,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
                 disabled={claiming}
                 className="rounded-lg bg-amber-400 px-3 py-1.5 text-sm font-semibold text-zinc-900 hover:bg-amber-300 disabled:opacity-60"
               >
-                {claiming ? 'Checking out…' : 'Check out and start logging'}
+                {claiming ? words.claiming : words.claimAndStart}
               </button>
             )}
             <button
@@ -286,15 +291,13 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
               onClick={() => onStart(active.band, active.mode)}
               className="rounded-lg border border-zinc-700 px-3 py-1.5 text-sm text-zinc-300 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-700 light:hover:bg-zinc-100"
             >
-              {takenByOther ? 'Start here anyway' : 'Start without checking out'}
+              {takenByOther ? 'Start here anyway' : words.startWithout}
             </button>
           </div>
 
           {takenByOther && (
             <p className="mt-2 text-2xs text-zinc-500">
-              {isSes
-                ? 'Two signals on one band and mode under the same callsign is what the checkout exists to prevent — but a contact that already happened still needs logging, so this is a warning, not a block.'
-                : 'One transmitted signal per band and mode is a contest rule. Starting here anyway is allowed; the log will warn on each contact.'}
+              {words.overrideHint}
             </p>
           )}
         </div>

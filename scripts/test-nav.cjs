@@ -37,6 +37,12 @@ const truthy = (v, m) => (v ? ok(m) : no(m));
 
 const root = path.join(__dirname, '..');
 const read = f => fs.readFileSync(path.join(root, f), 'utf8');
+/** Source with comments removed. Several guards below look for a string a
+ *  component must not *render*; the comment explaining why it must not is not
+ *  that string, and matching it would make the explanation the violation. */
+const readCode = f => read(f)
+  .replace(/\/\*[\s\S]*?\*\//g, '')
+  .replace(/(^|[^:])\/\/.*$/gm, '$1');
 
 const base = { joinCode: 'ABC123', eventType: 'FD' };
 const logger = (o = {}) => ({ surface: 'logger', ...base, stationNumber: 1, operatorCall: 'W0AAA', ...o });
@@ -238,6 +244,35 @@ console.log('\n-- the drawer itself lists nothing of its own --');
     .filter(l => new RegExp(`>${l}<|'${l}'|"${l}"`).test(src));
   if (leaked.length === 0) ok('no menu label is written into the drawer markup');
   else no('no menu label is written into the drawer markup', leaked.join(', '));
+}
+
+console.log('\n-- slot wording is not written into a component --');
+{
+  // A special event checks out the shared *callsign*; Field Day and WFD
+  // coordinate the *transmitter* on a band and mode, where nothing about the
+  // call is in question. The logging panel shipped the SES wording to both,
+  // so a Field Day operator opened a panel called "Call Checkout" that told
+  // them "Nobody has the call checked out" about a callsign nobody was
+  // competing for. The strings live in lib/slotWords.ts; a literal in a
+  // component is how the two readings drift apart again.
+  const SURFACES = [
+    'components/SlotCoordination.tsx',
+    'components/OperatingPosition.tsx',
+    'components/DashboardClient.tsx',
+  ];
+  for (const file of SURFACES) {
+    truthy(read(file).includes("from '@/lib/slotWords'"),
+      `${path.basename(file)} reads the wording table`);
+  }
+  const LEAKS = [/Call Checkout/i, /has the call checked out/i, /Band coordination/i,
+                 /Claimed now/i, /Check(ing)? out and start|Start without check/i];
+  const offenders = [];
+  for (const file of SURFACES) {
+    const src = readCode(file);
+    if (LEAKS.some(re => re.test(src))) offenders.push(path.basename(file));
+  }
+  if (offenders.length === 0) ok('no surface writes a panel heading or empty-state of its own');
+  else no('no surface writes a panel heading or empty-state of its own', offenders.join(', '));
 }
 
 console.log('\n-- no source file carries a literal unicode escape --');

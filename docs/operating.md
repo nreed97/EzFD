@@ -114,12 +114,31 @@ mode, and time since their last QSO.
   a busy club does not push the rest of the panel off the bottom of the
   screen. You are always the first row.
 
-This panel is supplemented by **Call Checkout**, which is authoritative about
-who may transmit. On a special event a slot is held by an *operator* — see
-[Special event stations](special-events.md). On Field Day it is held by a
-*station*, because station 2 holds 20m phone whoever is sitting at it; claiming
-is optional there, so a club that never opens the panel is never warned. Either
-way the rule is the same one the rules impose: one signal per band and mode.
+### Claiming a band and mode
+
+Below the Operators panel is a second one that records *intent* rather than
+presence — somebody saying "this band and mode is mine for the next two hours"
+before anyone is sitting on it. What it is called, and what it means, depends
+on the event:
+
+| | Field Day and Winter Field Day | Special event |
+|---|---|---|
+| Panel | **Band coordination** | **Call checkout** |
+| What is held | A transmitter | The shared callsign |
+| Held by | **Station 2**, whoever is sitting at it | The **operator**, by callsign |
+| Do I have to? | No — it is optional | Yes, it is how the station runs |
+
+On a contest nothing about the callsign is in question: every station sends
+the club's call all weekend and no operator needs anyone's permission to use
+it. What is being coordinated is the transmitter, because one signal per band
+and mode is a rule (Field Day 6.9, and the same in WFD). Claiming is opt-in,
+so a club that never opens the panel is never warned — the Operators panel
+above already answers "is anyone on 20m phone?" from live presence, with no
+discipline required.
+
+On a special event the callsign *is* what is being handed around, often
+between operators in different places, so checking it out is the point rather
+than an option — see [Special event stations](special-events.md).
 
 ## Working offline
 

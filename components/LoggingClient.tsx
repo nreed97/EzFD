@@ -17,7 +17,7 @@ import QSOForm from './QSOForm';
 import NavDrawer, { type NavHandlers } from './NavDrawer';
 import { hasNavItem, type NavContext } from '@/lib/nav';
 import { toggleLightMode } from '@/lib/useLightMode';
-import SesCoordination from './SesCoordination';
+import SlotCoordination from './SlotCoordination';
 import QSOTable from './QSOTable';
 import Scoreboard from './Scoreboard';
 import BandActivity from './BandActivity';
@@ -99,7 +99,7 @@ export default function LoggingClient({
   // hasn't checked out. Under SOFT enforcement the QSO is still logged.
   const [slotWarning, setSlotWarning] = useState<string | null>(null);
   const [holdsSlot, setHoldsSlot] = useState(false);
-  // Bumped on each SSE reservation event so SesCoordination refetches without
+  // Bumped on each SSE reservation event so SlotCoordination refetches without
   // opening a second EventSource for the same event.
   const [reservationVersion, setReservationVersion] = useState(0);
 
@@ -316,7 +316,7 @@ export default function LoggingClient({
   ];
   const score = calculateScore(confirmedQSOs, {}, event.power, { eventType: event.event_type, entryClass: event.class });
 
-  // Most recent confirmed QSO by this operator — SesCoordination auto-extends
+  // Most recent confirmed QSO by this operator — SlotCoordination auto-extends
   // a slot only for someone actually working the band.
   const myLastQsoAt = confirmedQSOs.reduce<string | null>((latest, q) => {
     if (q.operator_call !== operatorCall) return latest;
@@ -529,17 +529,19 @@ export default function LoggingClient({
             existingQSOs={confirmedQSOs}
             bandOccupancy={bandOccupancy}
           />
-          {/* Contests get the same panel. Field Day has the same
-              one-signal-per-band-per-mode rule and a multi-transmitter club
-              has exactly this coordination problem — the difference is that
-              the holder is the station rather than the operator, so it reads
-              as a station schedule rather than a call checkout. */}
+          {/* Contests get the same panel and a different vocabulary. Field
+              Day and WFD impose the same one-signal-per-band-mode rule, so a
+              multi-transmitter club has exactly this coordination problem —
+              but nothing about the *call* is in question there, and the
+              holder is the transmitter rather than the person. All of the
+              wording comes from `lib/slotWords.ts`; see that file. */}
           {/* Folded by default on a contest, where claiming a band and mode is
               opt-in; open on a special event, where it is how the station is
               run. */}
-          <SesCoordination
+          <SlotCoordination
             startFolded={!isSes}
             eventId={event.id}
+            eventType={event.event_type}
             myOpCall={operatorCall}
             stationNumber={isSes ? null : stationNumber}
             myStation={stationNumber}

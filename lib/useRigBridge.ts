@@ -34,7 +34,7 @@ export function useRigBridge({ onBand, onMode, port = RIG_WS_DEFAULT_PORT }: Opt
   // ever completing its interval.
   //
   // The assignment belongs in an effect rather than in the render body — the
-  // same shape SesCoordination already uses for activeRef. Writing a ref
+  // same shape SlotCoordination already uses for activeRef. Writing a ref
   // during render is what `react-hooks/refs` objects to, and it makes the
   // render non-idempotent under StrictMode's double-invoke.
   const onBandRef = useRef(onBand);
