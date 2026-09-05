@@ -22,6 +22,8 @@ export default function EventJoinPage() {
   const [opGrid, setOpGrid] = useState('');
   const [opState, setOpState] = useState('');
   const [station, setStation] = useState(1);
+  // Operating the Get On The Air station rather than a numbered transmitter.
+  const [atGota, setAtGota] = useState(false);
   // Signing in and choosing where to sit are two questions, asked in that
   // order. Previously only the first was asked and the logger opened on a
   // hard-coded 20m phone, which on a busy site is a guess.
@@ -47,10 +49,10 @@ export default function EventJoinPage() {
         // fallback band rather than where they are actually sitting.
         const saved = sessionStorage.getItem(`ezfd_op_${code}`);
         if (saved) {
-          const { call, station: savedStation, band, mode } = JSON.parse(saved);
+          const { call, station: savedStation, band, mode, gota } = JSON.parse(saved);
           if (call) {
             const slot = band && mode ? `&band=${band}&mode=${mode}` : '';
-            router.replace(`/event/${code}/log?op=${call}&station=${savedStation ?? 1}${slot}`);
+            router.replace(`/event/${code}/log?op=${call}&station=${savedStation ?? 1}${slot}${gota ? '&gota=1' : ''}`);
           }
         }
       });
@@ -86,12 +88,12 @@ export default function EventJoinPage() {
     // Remembered alongside the callsign so returning to the event comes back
     // to the same position rather than the fallback.
     sessionStorage.setItem(`ezfd_op_${code}`,
-      JSON.stringify({ call: opCall, station, band, mode }));
+      JSON.stringify({ call: opCall, station, band, mode, gota: atGota }));
     // And again outside the session, so the next operator at this radio is
     // offered the band it is already on. Signing out clears the record above;
     // this one is about the laptop, not the person sitting at it.
     rememberPosition(code, station, band, mode);
-    router.push(`/event/${code}/log?op=${opCall}&station=${station}&band=${band}&mode=${mode}`);
+    router.push(`/event/${code}/log?op=${opCall}&station=${station}&band=${band}&mode=${mode}${atGota ? '&gota=1' : ''}`);
   };
 
   if (loading) return <div className="flex min-h-screen items-center justify-center text-zinc-400">Loading...</div>;
@@ -151,6 +153,30 @@ export default function EventJoinPage() {
                     <option key={n} value={n}>Station {n}</option>
                   ))}
                 </select>
+              </label>
+            )}
+            {/* Only offered when the club actually runs one. GOTA is a station
+                in its own right — a different callsign, and contacts worth a
+                bonus on top of their QSO credit — so it is chosen here rather
+                than ticked per contact under a pileup. */}
+            {event.gota_call && (
+              <label className="flex items-start gap-2 rounded-lg border border-zinc-800 bg-zinc-950/50 p-2.5 light:border-zinc-200 light:bg-white">
+                <input
+                  type="checkbox"
+                  checked={atGota}
+                  onChange={e => setAtGota(e.target.checked)}
+                  className="mt-0.5 accent-amber-400"
+                />
+                <span className="min-w-0">
+                  <span className="text-sm text-zinc-200 light:text-zinc-800">
+                    I&apos;m at the GOTA station
+                    <span className="ml-1.5 font-mono text-amber-400">{event.gota_call}</span>
+                  </span>
+                  <span className="block text-xs text-zinc-500">
+                    Your contacts are signed with that call and earn 5 bonus points
+                    each, on top of counting for {event.club_call} as normal.
+                  </span>
+                </span>
               </label>
             )}
             {event.event_type === 'SES' && (

@@ -8,10 +8,10 @@ export default async function LogPage({
   searchParams,
 }: {
   params: Promise<{ code: string }>;
-  searchParams: Promise<{ op?: string; station?: string; band?: string; mode?: string }>;
+  searchParams: Promise<{ op?: string; station?: string; band?: string; mode?: string; gota?: string }>;
 }) {
   const { code } = await params;
-  const { op, station, band, mode } = await searchParams;
+  const { op, station, band, mode, gota } = await searchParams;
   const stationNumber = Math.max(1, parseInt(station ?? '1', 10) || 1);
   const pool = getPool();
 
@@ -45,6 +45,10 @@ export default async function LogPage({
       operatorCall={op.toUpperCase()}
       stationNumber={stationNumber}
       approvalPending={approvalPending}
+      // Resolved against the event, not taken from the URL: a stale bookmark
+      // must not flag contacts for a GOTA station this event does not run,
+      // which would claim a bonus out of nothing.
+      isGota={gota === '1' && evRows[0].event_type === 'FD' && !!evRows[0].gota_call}
       initialBand={band}
       initialMode={mode}
     />

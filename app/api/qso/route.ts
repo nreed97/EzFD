@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   const body = await request.json();
   const {
     event_id, join_code, callsign, band, mode, rcvd_class, rcvd_section,
-    operator_call, station_number,
+    operator_call, station_number, is_gota,
     rst_sent, rst_rcvd, rcvd_name, rcvd_qth, rcvd_grid, comment, adif_mode, freq_khz,
     replay,
   } = body;
@@ -91,8 +91,9 @@ export async function POST(request: Request) {
     `INSERT INTO qsos
        (event_id, callsign, band, mode, datetime_utc, sent_class, sent_section,
         rcvd_class, rcvd_section, operator_call, station_number, is_dupe,
-        rst_sent, rst_rcvd, rcvd_name, rcvd_qth, rcvd_grid, comment, adif_mode, freq_khz)
-     VALUES ($1,$2,$3,$4,NOW(),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
+        rst_sent, rst_rcvd, rcvd_name, rcvd_qth, rcvd_grid, comment, adif_mode, freq_khz,
+        is_gota)
+     VALUES ($1,$2,$3,$4,NOW(),$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19,$20)
      RETURNING *`,
     [
       resolvedEventId,
@@ -118,6 +119,11 @@ export async function POST(request: Request) {
       comment?.trim() || null,
       adif_mode?.toUpperCase().trim() || null,
       Number.isFinite(Number(freq_khz)) && freq_khz ? Math.round(Number(freq_khz)) : null,
+      // Only a Field Day entry has a GOTA station (rule 7.3.13.1 lists it for
+      // classes A and F). A flag arriving on an SES or WFD contact is ignored
+      // rather than stored, so a stale bookmark cannot invent a bonus that
+      // does not exist for that event type.
+      event.event_type === 'FD' ? is_gota === true : false,
     ]
   );
 

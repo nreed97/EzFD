@@ -30,6 +30,37 @@ export type BonusDef =
 export interface BonusContext {
   /** Transmitters claimed, i.e. the leading number of the entry class. */
   transmitters?: number;
+  /**
+   * GOTA contacts counted from the log — non-duplicate, not deleted.
+   *
+   * When the log has any, it is the claim: `gota_qsos` in the stored bonuses
+   * is a number somebody typed and can drift all weekend, and with the
+   * 1,000-point cap gone (it was never in the rules) nothing bounds how far.
+   * A club that logs its GOTA contacts elsewhere logs none here, and the
+   * typed number is used instead.
+   */
+  gotaQsos?: number;
+}
+
+/** The key whose claim can be counted from the log rather than typed. */
+const DERIVED_FROM_LOG = 'gota_qsos';
+
+/**
+ * How many units a per-unit bonus is claiming.
+ *
+ * Only GOTA is derivable today. The two sources are deliberately not summed:
+ * a club that both logs its GOTA contacts and types the total would otherwise
+ * claim every contact twice.
+ */
+function unitsClaimed(def: BonusDef, bonuses: Bonuses, ctx: BonusContext): number {
+  if (def.key === DERIVED_FROM_LOG && (ctx.gotaQsos ?? 0) > 0) return ctx.gotaQsos!;
+  const claimed = bonuses[def.key];
+  return typeof claimed === 'number' ? claimed : 0;
+}
+
+/** Whether the log is answering for this bonus rather than the operator. */
+export function isDerivedFromLog(def: BonusDef, ctx: BonusContext = {}): boolean {
+  return def.key === DERIVED_FROM_LOG && (ctx.gotaQsos ?? 0) > 0;
 }
 
 /** Re-exported so the bonus table's one caller-facing helper lives beside the
@@ -146,18 +177,20 @@ export function bonusDefs(eventType: EventType | undefined): BonusDef[] {
  *  key — which is how the summary sheet used to list a bonus at a different
  *  number from the one that was scored. */
 export function bonusPoints(def: BonusDef, bonuses: Bonuses, ctx: BonusContext = {}): number {
-  const claimed = bonuses[def.key];
-  if (!claimed) return 0;
+  // A per-unit bonus can be claimed by the log rather than by a checkbox, so
+  // its count is resolved before the "did anyone claim this" test — otherwise
+  // GOTA contacts sitting in the log would earn nothing until somebody also
+  // remembered to type a number, which is the manual step this replaces.
+  if (def.kind === 'per-unit') {
+    const raw = unitsClaimed(def, bonuses, ctx) * def.points;
+    return def.max === null ? raw : Math.min(raw, def.max);
+  }
+  if (!bonuses[def.key]) return 0;
   switch (def.kind) {
     case 'flat':
       return def.points;
     case 'per-transmitter':
       return Math.min(ctx.transmitters ?? 1, def.maxTransmitters) * def.points;
-    case 'per-unit': {
-      const n = typeof claimed === 'number' ? claimed : 0;
-      const raw = n * def.points;
-      return def.max === null ? raw : Math.min(raw, def.max);
-    }
   }
 }
 
@@ -172,6 +205,9 @@ export function bonusRate(def: BonusDef, ctx: BonusContext = {}): string {
       return `+${def.points} × ${tx} tx`;
     }
     case 'per-unit':
+      // The GOTA line reads "from the log" once the log is answering, so the
+      // operator can tell at a glance which number the scorer is using.
+      if (isDerivedFromLog(def, ctx)) return `+${def.points} × ${ctx.gotaQsos} logged`;
       return def.max === null
         ? `+${def.points} each`
         : `+${def.points} each, max ${def.max}`;

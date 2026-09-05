@@ -30,6 +30,9 @@ interface Props {
   initialQSOs: QSO[];
   operatorCall: string;
   stationNumber: number;
+  /** This window is logging at the GOTA station (#23). Every contact it takes
+   *  carries the flag, and the header signs the GOTA call. */
+  isGota?: boolean;
   /** SES with roster approval on, and this operator isn't approved yet.
    *  The server rejects their QSOs; this is the up-front warning. */
   approvalPending?: boolean;
@@ -42,7 +45,7 @@ interface Props {
 }
 
 export default function LoggingClient({
-  event, initialQSOs, operatorCall, stationNumber, approvalPending = false,
+  event, initialQSOs, operatorCall, stationNumber, isGota = false, approvalPending = false,
   initialBand, initialMode,
 }: Props) {
   const router = useRouter();
@@ -54,6 +57,7 @@ export default function LoggingClient({
     sentSection: event.arrl_section,
     operatorCall,
     stationNumber,
+    isGota,
   });
   // Destructured rather than used as `queue.x`: the callbacks are
   // useCallback-stable, so effects and memoized props can depend on them
@@ -272,7 +276,20 @@ export default function LoggingClient({
     <div data-night={nightMode ? 'true' : undefined} className="night-scope flex h-screen flex-col overflow-hidden bg-zinc-950 light:bg-white">
       <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-2 flex-shrink-0 light:border-zinc-200 light:bg-zinc-50">
         <div className="flex items-center gap-3 min-w-0">
-          <span className="font-bold text-amber-400 text-lg shrink-0">{event.club_call}</span>
+          {/* The call actually being signed. A GOTA operator working under a
+              different callsign needs that on screen — it is what they say on
+              the air, and it is what their contacts export as. */}
+          <span className="font-bold text-amber-400 text-lg shrink-0">
+            {isGota && event.gota_call ? event.gota_call : event.club_call}
+          </span>
+          {isGota && event.gota_call && (
+            <span
+              title={`Get On The Air station — contacts count for ${event.club_call} and earn 5 bonus points each`}
+              className="hidden sm:inline-flex shrink-0 rounded border border-sky-700 bg-sky-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-400"
+            >
+              GOTA
+            </span>
+          )}
           <span className="text-zinc-600 hidden sm:inline">|</span>
           <span className="text-zinc-300 text-sm shrink-0 hidden sm:inline">
             {isSes ? 'Special Event' : `${event.class} · ${event.arrl_section}`}

@@ -55,6 +55,7 @@ async function submitQSOToServer(
         rcvd_section: pending.rcvd_section,
         operator_call: pending.operator_call,
         station_number: pending.station_number,
+        is_gota: pending.is_gota ?? false,
         rst_sent: pending.rst_sent,
         rst_rcvd: pending.rst_rcvd,
         rcvd_name: pending.rcvd_name,
@@ -100,6 +101,7 @@ function pendingToDisplay(
     operator_call: p.operator_call,
     station_number: p.station_number,
     is_dupe: false,
+    is_gota: p.is_gota ?? false,
     created_at: p.submitted_at,
     rst_sent: p.rst_sent ?? null,
     rst_rcvd: p.rst_rcvd ?? null,
@@ -121,6 +123,11 @@ export interface UseQsoQueueOptions {
   sentSection: string | null;
   operatorCall: string;
   stationNumber: number;
+  /** This window is logging at the GOTA station, so every contact it takes
+   *  carries the flag. Set once at sign-in rather than per contact: an
+   *  operator sits at GOTA for a stretch, and a per-QSO checkbox is one more
+   *  thing to forget under a pileup. */
+  isGota?: boolean;
 }
 
 export interface QsoQueue {
@@ -147,7 +154,7 @@ export interface QsoQueue {
 }
 
 export function useQsoQueue(
-  { eventId, sentClass, sentSection, operatorCall, stationNumber }: UseQsoQueueOptions
+  { eventId, sentClass, sentSection, operatorCall, stationNumber, isGota = false }: UseQsoQueueOptions
 ): QsoQueue {
   const [pending, setPending] = useState<DisplayQSO[]>([]);
   const [pendingCount, setPendingCount] = useState(0);
@@ -242,6 +249,7 @@ export function useQsoQueue(
       ...data,
       operator_call: operatorCall,
       station_number: stationNumber,
+      is_gota: isGota,
     });
     const display = pendingToDisplay(queued, sentClass, sentSection);
     setPending(prev => [display, ...prev]);
@@ -256,7 +264,7 @@ export function useQsoQueue(
       setPendingCount(prev => Math.max(0, prev - 1));
     }
     return { ...result, queued: display };
-  }, [eventId, sentClass, sentSection, operatorCall, stationNumber]);
+  }, [eventId, sentClass, sentSection, operatorCall, stationNumber, isGota]);
 
   const drop = useCallback((localId: string) => {
     dequeue(eventId, localId);

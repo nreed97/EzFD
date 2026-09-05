@@ -38,6 +38,7 @@ export default function NewEventPage() {
     club_call: '',
     event_year: new Date().getFullYear(),
     arrl_section: 'MN',
+    gota_call: '',
     location: '',
     qrz_username: '',
     qrz_password: '',
@@ -295,6 +296,31 @@ export default function NewEventPage() {
                 </select>
               </label>
             </div>
+
+            {/* Field Day only — rule 7.3.13.1 lists the GOTA bonus for classes
+                A and F, and neither Winter Field Day nor a special event has
+                anywhere for it to score. Leaving it blank turns the whole
+                thing off, which is what most entries want. */}
+            {eventType === 'FD' && (
+              <label className="flex flex-col gap-1">
+                <span className="text-sm text-zinc-400">
+                  GOTA callsign <span className="text-zinc-600">— optional</span>
+                </span>
+                <input
+                  value={form.gota_call}
+                  onChange={e => set('gota_call', e.target.value.toUpperCase())}
+                  placeholder="W0GOTA"
+                  className="input font-mono"
+                  maxLength={16}
+                />
+                <span className="text-xs text-zinc-500">
+                  Set this and operators can sign in at the Get On The Air station.
+                  Its contacts count for the entry like any other and earn 5 bonus
+                  points each — no cap, and no limit per operator. Leave blank if
+                  you are not running one.
+                </span>
+              </label>
+            )}
             </>
             )}
             {/* Power category only affects the ARRL score multiplier. */}

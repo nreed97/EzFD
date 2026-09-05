@@ -64,10 +64,17 @@ export function calculateScore(
   let cwQSOs    = 0;
   let digitalQSOs = 0;
   let qsoPoints   = 0;
+  let gotaQSOs    = 0;
 
   for (const qso of validQSOs) {
     const pts = MODE_POINTS[qso.mode] ?? 1;
+    // A GOTA contact counts here as well as earning its bonus. Rule 4.1.1.5:
+    // "QSOs made by this station may be claimed for credit by its primary
+    // Field Day operation. In addition, bonus points may be earned by this
+    // station under rule 7.3.13." Excluding them — which this feature's
+    // original plan proposed — would quietly deflate the claimed score.
     qsoPoints += pts;
+    if (qso.is_gota) gotaQSOs++;
 
     if (qso.mode === 'PH')  phoneQSOs++;
     else if (qso.mode === 'CW')  cwQSOs++;
@@ -110,10 +117,12 @@ export function calculateScore(
   // no bonus points at all, so bonusDefs returns nothing for it.
   const bonusTotal = calculateBonusPoints(bonuses, entry.eventType, {
     transmitters: transmitterCount(entry.entryClass),
+    gotaQsos: gotaQSOs,
   });
 
   return {
     total_qsos:      qsos.length,
+    gota_qsos:       gotaQSOs,
     valid_qsos:      validQSOs.length,
     phone_qsos:      phoneQSOs,
     cw_qsos:         cwQSOs,

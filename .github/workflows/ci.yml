@@ -60,6 +60,12 @@ jobs:
       - name: Scoring tests
         run: node scripts/test-scoring.cjs
 
+      # GOTA scores twice — full QSO credit under 4.1.1.5 plus the 7.3.13.1
+      # bonus — and the intuitive reading (exclude it from QSO points) is the
+      # one that silently deflates a claimed score.
+      - name: GOTA tests
+        run: node scripts/test-gota.cjs
+
       # ADIF and Cabrillo are what a log looks like once it leaves this app —
       # the file uploaded to LoTW and the one submitted to the ARRL. Both were
       # covered only by substring checks in the end-to-end suite, which can't
