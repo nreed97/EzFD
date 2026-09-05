@@ -326,13 +326,13 @@ function QSOForm({
         <div className="mb-1 flex items-center justify-between">
           <label className="block text-xs text-zinc-400 light:text-zinc-600">Callsign</label>
           {isSes && (
-            <label className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700">
+            <label className="flex items-center gap-1 text-2xs text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700">
               <input type="checkbox" checked={quickLog} onChange={toggleQuickLog} tabIndex={-1} className="h-3 w-3" />
               Quick Log
               <span
                 tabIndex={0}
                 title="Log on Enter straight from the callsign field. Special events only — a contest exchange has to be collected per contact."
-                className="ml-0.5 flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border border-zinc-600 text-[9px] leading-none text-zinc-500 hover:border-zinc-400 hover:text-zinc-300"
+                className="ml-0.5 flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border border-zinc-600 text-2xs leading-none text-zinc-500 hover:border-zinc-400 hover:text-zinc-300"
               >
                 ?
               </span>
@@ -581,7 +581,7 @@ function QSOForm({
               {lastLogged.band} · {lastLogged.mode}
             </span>
           </div>
-          <p className={`text-[11px] mt-0.5 ${
+          <p className={`text-2xs mt-0.5 ${
             lastLogged.is_dupe ? 'text-yellow-600' : lastLogged._pending ? 'text-zinc-500' : 'text-green-600'
           }`}>
             {lastLogged.is_dupe ? 'Logged as dupe' : lastLogged._pending ? 'Queued — syncing…' : 'Logged ✓'}

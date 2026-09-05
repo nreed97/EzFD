@@ -195,7 +195,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
       <div className="flex flex-col gap-3">
         {MODES.map(mode => (
           <div key={mode}>
-            <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+            <div className="mb-1 text-2xs font-semibold uppercase tracking-wider text-zinc-500">
               {MODE_LABEL[mode]}
             </div>
             <div className="flex flex-wrap gap-1">
@@ -231,7 +231,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
       {/* Swatches are styled boxes rather than a box-drawing character: a real
           element renders sharply at any size and does not depend on the
           reader's font having the glyph. */}
-      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-[10px] text-zinc-500">
+      <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-2xs text-zinc-500">
         {([
           ['border-zinc-600 light:border-zinc-400', 'open'],
           ['border-amber-500/60 bg-amber-500/20', 'someone on air, not checked out'],
@@ -259,7 +259,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
               no explanation reads as a bug, and an operator who disagrees with
               the guess needs to know what it was guessing from. */}
           {!picked && suggestion && (
-            <p className="mt-1 text-[11px] text-zinc-500">
+            <p className="mt-1 text-2xs text-zinc-500">
               {suggestion.reason === 'held'
                 ? 'Picked for you — you have this checked out. Choose another band to change it.'
                 : 'Picked for you — this radio was last on it. Choose another band to change it.'}
@@ -291,7 +291,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
           </div>
 
           {takenByOther && (
-            <p className="mt-2 text-[11px] text-zinc-500">
+            <p className="mt-2 text-2xs text-zinc-500">
               {isSes
                 ? 'Two signals on one band and mode under the same callsign is what the checkout exists to prevent — but a contact that already happened still needs logging, so this is a warning, not a block.'
                 : 'One transmitted signal per band and mode is a contest rule. Starting here anyway is allowed; the log will warn on each contact.'}

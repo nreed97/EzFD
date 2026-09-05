@@ -118,12 +118,12 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
           {showStation && (
             <span
               title={`Station ${stationNumber}`}
-              className="rounded bg-zinc-800 px-1 font-mono text-[10px] font-semibold text-amber-400 shrink-0">
+              className="rounded bg-zinc-800 px-1 font-mono text-2xs font-semibold text-amber-400 shrink-0">
               ST{stationNumber}
             </span>
           )}
           {!isOnline && (
-            <span className="rounded bg-red-900/50 border border-red-700 px-1.5 py-0.5 text-[10px] font-semibold text-red-400 shrink-0">
+            <span className="rounded bg-red-900/50 border border-red-700 px-1.5 py-0.5 text-2xs font-semibold text-red-400 shrink-0">
               OFFLINE
             </span>
           )}
@@ -133,14 +133,14 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
             <button
               type="button"
               onClick={flushQueue}
-              className="rounded bg-yellow-900/50 border border-yellow-700 px-1.5 py-0.5 text-[10px] font-semibold text-yellow-400 hover:bg-yellow-900 shrink-0"
+              className="rounded bg-yellow-900/50 border border-yellow-700 px-1.5 py-0.5 text-2xs font-semibold text-yellow-400 hover:bg-yellow-900 shrink-0"
             >
               {pendingCount} pending{isOnline ? ' ↑' : ''}
             </button>
           )}
         </div>
         {rig.connected ? (
-          <span className="inline-flex items-center gap-1.5 rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-400">
+          <span className="inline-flex items-center gap-1.5 rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-2xs font-semibold text-green-400">
             <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
             RIG
             {rig.freq && (
@@ -148,7 +148,7 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
             )}
           </span>
         ) : (
-          <span className="rounded border border-zinc-700 px-2 py-0.5 text-[10px] font-semibold text-zinc-500">RIG OFFLINE</span>
+          <span className="rounded border border-zinc-700 px-2 py-0.5 text-2xs font-semibold text-zinc-500">RIG OFFLINE</span>
         )}
       </header>
 

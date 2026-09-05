@@ -110,6 +110,9 @@ mode, and time since their last QSO.
   conflicts, so a forgotten tab doesn't permanently block a band.
 - **Go QRT** removes you from the list immediately rather than waiting for the
   timeout. Use it when you step away.
+- The list shows about five at a time and scrolls inside itself past that, so
+  a busy club does not push the rest of the panel off the bottom of the
+  screen. You are always the first row.
 
 This panel is supplemented by **Call Checkout**, which is authoritative about
 who may transmit. On a special event a slot is held by an *operator* — see

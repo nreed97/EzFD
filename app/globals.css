@@ -1,5 +1,36 @@
 @import "tailwindcss";
 
+/* ── Type scale ────────────────────────────────────────────────────────────
+   This app is read outdoors, overnight, by people who have been awake too
+   long, on whatever laptop was in the car. It had grown twenty-one distinct
+   size/weight pairs, five of them at 11px or below — 9, 10, 10.5 and 11 sat
+   within two pixels of each other, which is noise rather than hierarchy, and
+   1141 elements sat at 12px.
+
+   So: one small step instead of four, and everything up one notch. Sizes are
+   in rem so a reader who has raised their browser's default text size still
+   gets it. Line heights are set alongside, because Tailwind v4 ties each to
+   its own size and overriding the size alone leaves the old leading behind.
+
+   Anything larger than `sm` is left as it was — those are the score and rate
+   readouts, which are display numbers rather than text and are already sized
+   for a glance across a tent. */
+@theme {
+  /* 11px — the one small size. Replaces text-2xs, text-2xs and
+     text-2xs, which no reader could have told apart anyway. */
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: calc(1 / 0.6875);
+
+  /* 13px, was 12px — the body size, and most of the interface. */
+  --text-xs: 0.8125rem;
+  --text-xs--line-height: calc(1.125 / 0.8125);
+
+  /* 15px, was 14px — headings, buttons and the entry form. */
+  --text-sm: 0.9375rem;
+  --text-sm--line-height: calc(1.375 / 0.9375);
+}
+
+
 /* light: prefix activates when html.light is set */
 @custom-variant light (&:where(.light, .light *));
 
@@ -7,6 +38,32 @@
   .input {
     @apply rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-zinc-100 placeholder-zinc-600 focus:border-amber-400 focus:outline-none transition-colors text-sm;
     @apply light:border-zinc-300 light:bg-white light:text-zinc-900 light:placeholder-zinc-300;
+  }
+}
+
+/* ── Touch targets ─────────────────────────────────────────────────────────
+   The logging screen is deliberately dense on a laptop — an operator wants as
+   much log on screen as they can get, and a mouse can hit a 24px button. A
+   thumb cannot, and eleven of the controls on a phone were under 44px, some
+   as small as 15px tall.
+
+   So the comfortable size is applied only where the pointer is coarse. A
+   laptop keeps every pixel it had; a phone gets targets you can hit without
+   looking, which on a phone is most of the time. `pointer: coarse` rather
+   than a width breakpoint because it asks the real question — what is the
+   person touching this with — and a touchscreen laptop gets the right answer
+   either way. */
+@media (pointer: coarse) {
+  .tap {
+    min-height: 44px;
+    min-width: 44px;
+  }
+
+  /* Every entry field too. These are the controls an operator actually uses
+     on a phone, and a 36px box is a miss waiting to happen with one thumb
+     while holding a radio in the other hand. */
+  .input {
+    min-height: 44px;
   }
 }
 

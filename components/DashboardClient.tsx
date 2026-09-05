@@ -245,7 +245,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
           {isVisitor && (
             <span
               title="Read-only visitor mode — no sign-in, no logging, no operator actions"
-              className="shrink-0 rounded border border-sky-700 bg-sky-900/30 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-400 md:order-1"
+              className="shrink-0 rounded border border-sky-700 bg-sky-900/30 px-2 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-400 md:order-1"
             >
               Visitor
             </span>
@@ -339,7 +339,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
                 <span className="text-3xl font-bold font-mono text-amber-400">{score.valid_qsos}</span>
                 <span className="text-zinc-400 text-sm light:text-zinc-600">QSOs</span>
               </div>
-              <div className="mt-1 flex items-center gap-2 text-[11px]">
+              <div className="mt-1 flex items-center gap-2 text-2xs">
                 {score.phone_qsos > 0 && <span className="text-blue-400 light:text-blue-600">{score.phone_qsos} PH</span>}
                 {score.cw_qsos > 0 && <span className="text-yellow-400 light:text-yellow-600">{score.cw_qsos} CW</span>}
                 {score.digital_qsos > 0 && <span className="text-green-400 light:text-green-600">{score.digital_qsos} DIG</span>}
@@ -366,14 +366,14 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
             <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
               <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">On The Air</div>
               {activeReservations.length === 0 ? (
-                <p className="text-[11px] text-zinc-600 light:text-zinc-400">
+                <p className="text-2xs text-zinc-600 light:text-zinc-400">
                   Nobody has the call checked out.
                 </p>
               ) : (
                 activeReservations.map(r => (
                   <div key={r.id} className="flex items-baseline justify-between gap-2 py-1 border-b border-zinc-800/50 last:border-0 light:border-zinc-200">
                     <span className="font-mono text-xs font-bold text-zinc-200 light:text-zinc-800">{r.op_call}</span>
-                    <span className="flex items-center gap-1.5 font-mono text-[11px]">
+                    <span className="flex items-center gap-1.5 font-mono text-2xs">
                       <span className="text-amber-400 light:text-amber-700">{r.band}</span>
                       <span className={MODE_COLORS[r.mode] ?? 'text-zinc-400'}>{r.mode}</span>
                       <span className="text-zinc-500">{formatUntil(r.ends_at)}</span>
@@ -405,7 +405,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
                 <span className="text-xs text-zinc-500 uppercase tracking-wider">Operators</span>
                 <button
                   onClick={() => setMainView('ops')}
-                  className="text-[10px] text-zinc-500 underline decoration-dotted underline-offset-2 hover:text-amber-400 light:hover:text-amber-700"
+                  className="text-2xs text-zinc-500 underline decoration-dotted underline-offset-2 hover:text-amber-400 light:hover:text-amber-700"
                 >
                   Details
                 </button>
@@ -440,14 +440,14 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
                       </div>
                       <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
                         {p && (
-                          <span className="flex items-center gap-1 text-[10px] font-mono">
+                          <span className="flex items-center gap-1 text-2xs font-mono">
                             <span className="text-amber-400 light:text-amber-700">{p.band}</span>
                             <span className={MODE_COLORS[p.mode] ?? 'text-zinc-400'}>{p.mode}</span>
                           </span>
                         )}
-                        {(s?.ph ?? 0) > 0 && <span className="text-[10px] text-blue-400 light:text-blue-600">{s!.ph} PH</span>}
-                        {(s?.cw ?? 0) > 0 && <span className="text-[10px] text-yellow-400 light:text-yellow-600">{s!.cw} CW</span>}
-                        {(s?.dig ?? 0) > 0 && <span className="text-[10px] text-green-400 light:text-green-600">{s!.dig} DIG</span>}
+                        {(s?.ph ?? 0) > 0 && <span className="text-2xs text-blue-400 light:text-blue-600">{s!.ph} PH</span>}
+                        {(s?.cw ?? 0) > 0 && <span className="text-2xs text-yellow-400 light:text-yellow-600">{s!.cw} CW</span>}
+                        {(s?.dig ?? 0) > 0 && <span className="text-2xs text-green-400 light:text-green-600">{s!.dig} DIG</span>}
                       </div>
                     </div>
                   );

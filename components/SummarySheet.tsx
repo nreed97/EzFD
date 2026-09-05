@@ -95,7 +95,7 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
                   sheet is what gets transcribed onto an entry, and these are
                   notes for the person holding it, not part of the claim. */}
               <section className="print:hidden">
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                <h3 className="text-2xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
                   Before you submit
                 </h3>
                 {findings.length === 0 ? (
@@ -114,7 +114,7 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
                         }`}
                       >
                         <div className="flex items-baseline gap-2">
-                          <span className={`shrink-0 rounded px-1 text-[9px] font-bold uppercase tracking-wide ${
+                          <span className={`shrink-0 rounded px-1 text-2xs font-bold uppercase tracking-wide ${
                             f.severity === 'fix'
                               ? 'bg-red-900 text-red-200 light:bg-red-200 light:text-red-900'
                               : 'bg-amber-900 text-amber-200 light:bg-amber-200 light:text-amber-900'
@@ -123,9 +123,9 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
                           </span>
                           <span className="text-xs font-semibold text-zinc-200 light:text-zinc-800">{f.title}</span>
                         </div>
-                        <p className="mt-1 text-[11px] leading-relaxed text-zinc-400 light:text-zinc-600">{f.detail}</p>
+                        <p className="mt-1 text-2xs leading-relaxed text-zinc-400 light:text-zinc-600">{f.detail}</p>
                         {f.examples && f.examples.length > 0 && (
-                          <p className="mt-1 font-mono text-[11px] text-zinc-500">{f.examples.join('   ')}</p>
+                          <p className="mt-1 font-mono text-2xs text-zinc-500">{f.examples.join('   ')}</p>
                         )}
                       </li>
                     ))}
@@ -134,10 +134,10 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
                 {/* Naming what nothing looked at, so a quiet report is not read
                     as a clean bill of health for the whole entry. */}
                 <details className="mt-2">
-                  <summary className="cursor-pointer text-[10px] text-zinc-600 light:text-zinc-400">
+                  <summary className="cursor-pointer text-2xs text-zinc-600 light:text-zinc-400">
                     What this does not check
                   </summary>
-                  <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4 text-[11px] text-zinc-500">
+                  <ul className="mt-1 flex list-disc flex-col gap-0.5 pl-4 text-2xs text-zinc-500">
                     {NOT_CHECKED.map(t => <li key={t}>{t}</li>)}
                   </ul>
                 </details>
@@ -145,7 +145,7 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
 
               {/* Club info */}
               <section>
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">Station Information</h3>
+                <h3 className="text-2xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Station Information</h3>
                 <div className="grid grid-cols-2 gap-x-6 gap-y-1">
                   <Row label="Club name"    value={event.club_name} />
                   <Row label="Callsign"     value={event.club_call} />
@@ -160,10 +160,10 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
 
               {/* QSO breakdown */}
               <section>
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">QSO Summary</h3>
+                <h3 className="text-2xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">QSO Summary</h3>
                 <table className="w-full text-xs font-mono">
                   <thead>
-                    <tr className="text-zinc-500 text-[10px]">
+                    <tr className="text-zinc-500 text-2xs">
                       <th className="text-left pb-1">Mode</th>
                       <th className="text-right pb-1">QSOs</th>
                       <th className="text-right pb-1">Pts/QSO</th>
@@ -186,7 +186,7 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
 
               {/* Score calculation */}
               <section>
-                <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">Score Calculation</h3>
+                <h3 className="text-2xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">Score Calculation</h3>
                 <div className="flex flex-col gap-1 font-mono text-xs">
                   <ScoreRow label="QSO points" value={score.qso_points} />
                   {isWfd ? (
@@ -198,7 +198,7 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
 
                   {lineItems.length > 0 && (
                     <>
-                      <div className="mt-1 text-[10px] uppercase tracking-wider text-zinc-600 light:text-zinc-400">Bonus points</div>
+                      <div className="mt-1 text-2xs uppercase tracking-wider text-zinc-600 light:text-zinc-400">Bonus points</div>
                       {lineItems.map(item => (
                         <ScoreRow key={item.label} label={item.label} value={item.pts} op="+" indent />
                       ))}
@@ -218,7 +218,7 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
                   so the sheet shows how the multiplier was arrived at. */}
               {isWfd && (
                 <section>
-                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                  <h3 className="text-2xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
                     Objectives ({WFD_OBJECTIVES.filter(o => bonuses[o.key]).length} of {WFD_OBJECTIVES.length})
                   </h3>
                   <div className="flex flex-col gap-0.5 font-mono text-xs">
@@ -239,7 +239,7 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
               {/* Sections worked */}
               {score.sections.length > 0 && (
                 <section>
-                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                  <h3 className="text-2xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
                     Sections Worked ({score.sections.length})
                   </h3>
                   <div className="flex flex-wrap gap-1">
@@ -255,7 +255,7 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
               {/* Operators */}
               {operators.length > 0 && (
                 <section>
-                  <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-2">
+                  <h3 className="text-2xs font-semibold uppercase tracking-wider text-zinc-500 mb-2">
                     Operators ({operators.length})
                   </h3>
                   <p className="font-mono text-xs text-zinc-300 light:text-zinc-700">{operators.join(' · ')}</p>
@@ -264,7 +264,7 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
 
               <hr className="border-zinc-800 light:border-zinc-200" />
 
-              <div className="flex items-center justify-between text-[10px] text-zinc-600 light:text-zinc-400">
+              <div className="flex items-center justify-between text-2xs text-zinc-600 light:text-zinc-400">
                 <span>Generated by EzFD · {event.club_call} · {event.event_year}</span>
                 <span>{now.toUTCString().replace(' GMT', 'Z')}</span>
               </div>

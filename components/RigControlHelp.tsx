@@ -28,7 +28,7 @@ interface Props {
 
 function Code({ children }: { children: React.ReactNode }) {
   return (
-    <code className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-[11px] text-zinc-200 light:bg-zinc-100 light:text-zinc-800">
+    <code className="rounded bg-zinc-800 px-1.5 py-0.5 font-mono text-2xs text-zinc-200 light:bg-zinc-100 light:text-zinc-800">
       {children}
     </code>
   );
@@ -72,7 +72,7 @@ export default function RigControlHelp({ rigConnected, canCw, serial, onClose }:
           <button
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
+            className="tap shrink-0 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
           >
             Close
           </button>
@@ -172,7 +172,7 @@ export default function RigControlHelp({ rigConnected, canCw, serial, onClose }:
                 Answer the radio model and port prompts once — it remembers them.
               </li>
             </ol>
-            <p className="mt-2 text-[11px] text-zinc-500">
+            <p className="mt-2 text-2xs text-zinc-500">
               It installs Hamlib if you need it. <Doc to="#setup">Full setup</Doc>
               {' · '}<Doc to="#options">Options</Doc>
             </p>
@@ -180,7 +180,7 @@ export default function RigControlHelp({ rigConnected, canCw, serial, onClose }:
 
           {/* ── Where to read more ─────────────────────────────────────── */}
           <div className="border-t border-zinc-800 pt-3 light:border-zinc-200">
-            <p className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+            <p className="flex flex-wrap gap-x-3 gap-y-1 text-2xs text-zinc-500">
               <Doc to="#cw-keying">CW keying and macros</Doc>
               <Doc to="#radio-specific-notes">Radio-specific notes</Doc>
               <Doc to="#troubleshooting">Troubleshooting</Doc>

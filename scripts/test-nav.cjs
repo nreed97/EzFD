@@ -1,5 +1,7 @@
 #!/usr/bin/env node
-// Unit tests for lib/nav.ts — the menu behind the hamburger.
+// Unit tests for lib/nav.ts, and the source-level hygiene checks for the app's
+// chrome that have nowhere better to live — the JSX escape guard and the type
+// scale below both cover every component, not just the menu.
 //
 // This module exists because the logger kept two hand-written copies of its
 // controls, one for the header and one for a mobile bar, and they drifted:
@@ -267,6 +269,39 @@ console.log('\n-- no source file carries a literal unicode escape --');
   for (const d of dirs) walk(d);
   if (offenders.length === 0) ok('no \\uXXXX escape is written into a component or library');
   else no('no \\uXXXX escape is written into a component or library', offenders.join(', '));
+}
+
+console.log('\n-- the type scale stays collapsed --');
+{
+  // The interface had grown thirteen distinct font sizes, four of them within
+  // two pixels of each other below 12px, which is noise rather than
+  // hierarchy. They are now three tokens — text-2xs, text-xs, text-sm — plus
+  // the display sizes for the score and rate readouts. An arbitrary
+  // `text-[10px]` dropped into a component re-opens the drift, and it is the
+  // easy thing to reach for.
+  const offenders = [];
+  const walk = dir => {
+    for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(rel);
+      else if (/\.tsx?$/.test(entry.name)) {
+        const src = fs.readFileSync(path.join(root, rel), 'utf8');
+        for (const m of src.matchAll(/text-\[[0-9.]+(?:px|rem)\]/g)) offenders.push(`${rel}: ${m[0]}`);
+      }
+    }
+  };
+  for (const d of ['components', 'lib', 'app']) walk(d);
+  if (offenders.length === 0) ok('no component sets an arbitrary font size');
+  else no('no component sets an arbitrary font size', offenders.join(', '));
+
+  // And the tokens themselves are defined, or every text-2xs renders at the
+  // browser default and the whole interface quietly grows.
+  const css = fs.readFileSync(path.join(root, 'app/globals.css'), 'utf8');
+  for (const token of ['--text-2xs', '--text-xs', '--text-sm']) {
+    truthy(new RegExp(`${token}:`).test(css), `${token} is defined in the theme`);
+    truthy(new RegExp(`${token}--line-height:`).test(css),
+      `${token} sets its line height too — Tailwind ties each to its own size`);
+  }
 }
 
 console.log('\n-- the drawer is reachable and dismissable by keyboard --');

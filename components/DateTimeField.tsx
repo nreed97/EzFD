@@ -34,7 +34,7 @@ export default function DateTimeField({
   }
 
   const dateClass = compact
-    ? 'w-full rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700'
+    ? 'w-full rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-2xs font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700'
     : 'input w-full';
 
   return (

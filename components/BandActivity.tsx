@@ -167,7 +167,7 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 light:border-zinc-200 light:bg-zinc-100/50">
       <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+        <h3 className="text-2xs font-semibold uppercase tracking-wider text-zinc-500">
           Operators
         </h3>
         <div className="flex items-center gap-1.5">
@@ -179,14 +179,14 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
           {isQRT ? (
             <button
               onClick={goOnAir}
-              className="text-[10px] font-semibold uppercase tracking-wide rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-green-400 hover:bg-green-900/50 transition-colors"
+              className="tap text-2xs font-semibold uppercase tracking-wide rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-green-400 hover:bg-green-900/50 transition-colors"
             >
               Back on Air
             </button>
           ) : (
             <button
               onClick={goQRT}
-              className="text-[10px] font-semibold uppercase tracking-wide rounded border border-zinc-700 px-2 py-0.5 text-zinc-500 hover:border-red-700 hover:bg-red-900/30 hover:text-red-400 transition-colors"
+              className="tap text-2xs font-semibold uppercase tracking-wide rounded border border-zinc-700 px-2 py-0.5 text-zinc-500 hover:border-red-700 hover:bg-red-900/30 hover:text-red-400 transition-colors"
             >
               Go QRT
             </button>
@@ -195,14 +195,21 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
       </div>
 
       {isQRT && (
-        <div className="mb-2 rounded border border-red-800 bg-red-900/20 px-2 py-1 text-[11px] text-red-400">
+        <div className="mb-2 rounded border border-red-800 bg-red-900/20 px-2 py-1 text-2xs text-red-400">
           You are QRT — not shown to other operators
         </div>
       )}
 
-      <div className="flex flex-col gap-1">
+      {/* Bounded, and scrolls inside itself past about five operators.
+          A club with ten people signed in is an ordinary Field Day, and an
+          unbounded list pushed the whole side panel past the bottom of the
+          screen — 368px of operators on a 900px display, which is the
+          scrollbar this pane is supposed to not have. The operator running
+          this window sorts to the top, so the row that matters most is the
+          one always in view. */}
+      <div className="flex max-h-40 flex-col gap-1 overflow-y-auto">
         {allOps.length === 0 && (
-          <p className="text-[11px] text-zinc-600 light:text-zinc-400">No operators online yet.</p>
+          <p className="text-2xs text-zinc-600 light:text-zinc-400">No operators online yet.</p>
         )}
         {allOps
           .sort((a, b) => {
@@ -238,7 +245,7 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
                 <span className="flex items-center gap-2">
                   <span className="font-mono text-zinc-300 light:text-zinc-700">{s.band}</span>
                   <span className={`font-mono font-bold ${MODE_COLORS[s.mode] ?? 'text-zinc-300 light:text-zinc-700'}`}>{s.mode}</span>
-                  <span className={`font-mono text-[10px] ${inactive && !isMe ? 'text-zinc-600 light:text-zinc-400' : 'text-zinc-500 light:text-zinc-500'}`}>
+                  <span className={`font-mono text-2xs ${inactive && !isMe ? 'text-zinc-600 light:text-zinc-400' : 'text-zinc-500 light:text-zinc-500'}`}>
                     {lastQSO ? timeSince(lastQSO) : '—'}
                   </span>
                 </span>

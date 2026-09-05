@@ -96,7 +96,7 @@ export default function NavDrawer({ ctx, handlers, heading }: Props) {
         aria-haspopup="dialog"
         aria-label="Menu"
         title="Menu"
-        className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-zinc-700 text-zinc-300 transition-colors hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
+        className="tap inline-flex h-8 w-8 shrink-0 items-center justify-center rounded border border-zinc-700 text-zinc-300 transition-colors hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
       >
         {/* Drawn rather than an emoji: the three bars are the one icon every
             operator already reads as "menu", and a font substitution on a
@@ -139,7 +139,7 @@ export default function NavDrawer({ ctx, handlers, heading }: Props) {
             <button
               onClick={() => setOpen(false)}
               aria-label="Close menu"
-              className="shrink-0 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
+              className="tap shrink-0 rounded border border-zinc-700 px-2 py-1 text-xs text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
             >
               Close
             </button>
@@ -148,7 +148,7 @@ export default function NavDrawer({ ctx, handlers, heading }: Props) {
           <nav className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
             {groups.map(({ group, items }) => (
               <div key={group} className="mb-3 last:mb-0">
-                <div className="px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600 light:text-zinc-400">
+                <div className="px-3 py-1 text-2xs font-semibold uppercase tracking-wider text-zinc-600 light:text-zinc-400">
                   {group}
                 </div>
                 {items.map(item => {
@@ -156,12 +156,12 @@ export default function NavDrawer({ ctx, handlers, heading }: Props) {
                     <>
                       <span className="block text-sm font-medium text-zinc-200 light:text-zinc-800">
                         {item.label}
-                        {item.newTab && <span className="ml-1 text-[10px] text-zinc-500">↗</span>}
+                        {item.newTab && <span className="ml-1 text-2xs text-zinc-500">↗</span>}
                       </span>
                       {/* The hint is why the drawer is easier to read than the
                           old header: "ADIF" and "Backup" both looked like a
                           download, and nothing on screen said which was which. */}
-                      <span className="mt-0.5 block text-[11px] leading-snug text-zinc-500 light:text-zinc-500">
+                      <span className="mt-0.5 block text-2xs leading-snug text-zinc-500 light:text-zinc-500">
                         {item.hint}
                       </span>
                     </>

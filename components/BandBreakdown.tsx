@@ -41,11 +41,11 @@ export default function BandBreakdown({ score }: Props) {
         <table className="w-full text-xs font-mono border-collapse">
           <thead>
             <tr className="border-b border-zinc-800 light:border-zinc-200">
-              <th className="pb-1.5 text-left text-[10px] uppercase tracking-wider text-zinc-500 pr-4">Band</th>
-              <th className="pb-1.5 text-right text-[10px] uppercase tracking-wider text-blue-400 light:text-blue-700 w-14">PH</th>
-              <th className="pb-1.5 text-right text-[10px] uppercase tracking-wider text-yellow-400 light:text-yellow-700 w-14">CW</th>
-              <th className="pb-1.5 text-right text-[10px] uppercase tracking-wider text-green-400 light:text-green-700 w-14">DIG</th>
-              <th className="pb-1.5 text-right text-[10px] uppercase tracking-wider text-amber-400 light:text-amber-700 w-16">Pts</th>
+              <th className="pb-1.5 text-left text-2xs uppercase tracking-wider text-zinc-500 pr-4">Band</th>
+              <th className="pb-1.5 text-right text-2xs uppercase tracking-wider text-blue-400 light:text-blue-700 w-14">PH</th>
+              <th className="pb-1.5 text-right text-2xs uppercase tracking-wider text-yellow-400 light:text-yellow-700 w-14">CW</th>
+              <th className="pb-1.5 text-right text-2xs uppercase tracking-wider text-green-400 light:text-green-700 w-14">DIG</th>
+              <th className="pb-1.5 text-right text-2xs uppercase tracking-wider text-amber-400 light:text-amber-700 w-16">Pts</th>
             </tr>
           </thead>
           <tbody>
@@ -77,7 +77,7 @@ export default function BandBreakdown({ score }: Props) {
         </table>
       </div>
 
-      <p className="mt-3 text-[10px] text-zinc-600 light:text-zinc-400">
+      <p className="mt-3 text-2xs text-zinc-600 light:text-zinc-400">
         CW &amp; DIG = 2 pts/QSO · PH = 1 pt/QSO · sorted by points
       </p>
     </div>

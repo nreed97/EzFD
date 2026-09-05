@@ -50,7 +50,7 @@ export default function RateChart({ qsos }: Props) {
       <div className="flex flex-col gap-1 min-w-0">
         {bars.map(({ label, count }) => (
           <div key={label} className="flex items-center gap-2 min-w-0">
-            <span className="w-9 shrink-0 text-right font-mono text-[11px] text-zinc-500 light:text-zinc-400">
+            <span className="w-9 shrink-0 text-right font-mono text-2xs text-zinc-500 light:text-zinc-400">
               {label}
             </span>
             <div className="flex-1 min-w-0 h-5 flex items-center">
@@ -60,21 +60,21 @@ export default function RateChart({ qsos }: Props) {
                   style={{ width: `${Math.max((count / maxCount) * 100, 2)}%` }}
                 >
                   {count >= 3 && (
-                    <span className="text-[10px] font-mono font-bold text-zinc-900">{count}</span>
+                    <span className="text-2xs font-mono font-bold text-zinc-900">{count}</span>
                   )}
                 </div>
               ) : (
                 <div className="h-px w-full bg-zinc-800 light:bg-zinc-200" />
               )}
               {count > 0 && count < 3 && (
-                <span className="ml-1 text-[10px] font-mono text-zinc-400">{count}</span>
+                <span className="ml-1 text-2xs font-mono text-zinc-400">{count}</span>
               )}
             </div>
           </div>
         ))}
       </div>
 
-      <div className="mt-3 text-[10px] text-zinc-600 light:text-zinc-400">
+      <div className="mt-3 text-2xs text-zinc-600 light:text-zinc-400">
         Peak: {maxCount} QSOs/hr &nbsp;·&nbsp; {bars.length} hour{bars.length !== 1 ? 's' : ''} of operation
       </div>
     </div>

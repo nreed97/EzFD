@@ -67,6 +67,16 @@ only run events.
 
 ### Changed
 
+- **Text is a size larger, and the small sizes are one size** `Display` — The
+  body of the interface goes from 12px to 13px and headings from 14 to 15,
+  while the four near-identical sizes below 12px — 9, 10, 10.5 and 11 —
+  become one. Thirteen distinct sizes, nine now. Easier to read outdoors at
+  two in the morning, and the side panel still fits a 1366x768 laptop without
+  a scrollbar. ([#87])
+- **Every control on a phone is thumb-sized** `Display` — Eleven were under
+  44px, some as small as 15px tall. They are all at least 44px now on a
+  touchscreen, and unchanged on a laptop, where a logger wants the density and
+  a mouse can hit a small button. ([#87])
 - **The logging screen's side panel fits without scrolling** `Display` — On a
   1366x768 laptop it ran 307px past the bottom of the screen. The score panel
   now shows the mode split and the score, with the full breakdown on the
@@ -104,6 +114,12 @@ only run events.
 
 ### Fixed
 
+- **A busy club no longer pushes the logging panel off the screen** `Display` —
+  The Operators list grew with the roster: ten people signed in made it 368px
+  tall and ran the side panel 143px past the bottom of a 900px display. It
+  shows five at a time and scrolls inside itself now, with you on top.
+  ([#87])
+  Docs: [Operating → Who else is on](operating.md#who-else-is-on)
 - **The CW keying button came back to the header** `Display` — Opening the
   keying window is something you do at the start of a CW shift, so putting it
   in the menu made it look as though it had been removed. It is a button again,
@@ -460,3 +476,4 @@ continuous enough to be worth summarising.
 [#82]: https://github.com/nreed97/EzFD/pull/82
 [#84]: https://github.com/nreed97/EzFD/pull/84
 [#86]: https://github.com/nreed97/EzFD/pull/86
+[#87]: https://github.com/nreed97/EzFD/pull/87

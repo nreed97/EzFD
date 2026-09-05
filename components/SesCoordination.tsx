@@ -327,7 +327,7 @@ export default function SesCoordination({
           type="button"
           onClick={() => setOpen(o => !o)}
           aria-expanded={open}
-          className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700"
+          className="tap flex items-center gap-1 text-2xs font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700"
         >
           <span className={`inline-block transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}>›</span>
           Call Checkout
@@ -335,7 +335,7 @@ export default function SesCoordination({
         {/* Stays visible folded: a live claim is the one thing here an
             operator must not be able to lose track of. */}
         {mySlot && (
-          <span className="rounded border border-green-700 bg-green-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-400">
+          <span className="rounded border border-green-700 bg-green-900/30 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-green-400">
             You hold {mySlot.band} {mySlot.mode}
           </span>
         )}
@@ -345,7 +345,7 @@ export default function SesCoordination({
       <div className="mt-2">
 
       {/* Status for the band/mode the form is currently set to */}
-      <div className={`mb-2 rounded border px-2 py-1.5 text-[11px] ${
+      <div className={`mb-2 rounded border px-2 py-1.5 text-2xs ${
         iHoldHere
           ? 'border-green-800 bg-green-900/20 text-green-400'
           : hereHolder
@@ -366,7 +366,7 @@ export default function SesCoordination({
         const nearExpiry = !!mySlot && remaining !== null && remaining > 0 && remaining <= EXTEND_THRESHOLD_MS;
         if (notice) {
           return (
-            <div className="mb-2 flex items-center justify-between gap-2 rounded border border-amber-700 bg-amber-900/20 px-2 py-1.5 text-[11px] text-amber-400 light:border-amber-500 light:bg-amber-50 light:text-amber-700">
+            <div className="mb-2 flex items-center justify-between gap-2 rounded border border-amber-700 bg-amber-900/20 px-2 py-1.5 text-2xs text-amber-400 light:border-amber-500 light:bg-amber-50 light:text-amber-700">
               <span>{notice}</span>
               <button type="button" onClick={() => setNotice(null)} className="shrink-0 hover:opacity-70">&times;</button>
             </div>
@@ -374,7 +374,7 @@ export default function SesCoordination({
         }
         if (nearExpiry) {
           return (
-            <div className="mb-2 flex items-center justify-between gap-2 rounded border border-amber-700 bg-amber-900/20 px-2 py-1.5 text-[11px] text-amber-400 light:border-amber-500 light:bg-amber-50 light:text-amber-700">
+            <div className="mb-2 flex items-center justify-between gap-2 rounded border border-amber-700 bg-amber-900/20 px-2 py-1.5 text-2xs text-amber-400 light:border-amber-500 light:bg-amber-50 light:text-amber-700">
               <span>Your {mySlot!.band} {mySlot!.mode} hold expires in {Math.max(1, Math.round(remaining! / 60_000))}m.</span>
               <button
                 type="button"
@@ -391,7 +391,7 @@ export default function SesCoordination({
       })()}
 
       {error && (
-        <div className="mb-2 rounded border border-red-800 bg-red-900/25 px-2 py-1 text-[11px] text-red-400">
+        <div className="mb-2 rounded border border-red-800 bg-red-900/25 px-2 py-1 text-2xs text-red-400">
           {error}
         </div>
       )}
@@ -403,7 +403,7 @@ export default function SesCoordination({
             type="button"
             disabled={busy}
             onClick={() => patchSlot(hereHolder.id, 'extend')}
-            className="flex-1 rounded border border-zinc-700 py-1.5 text-[11px] font-semibold text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800 disabled:opacity-50 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
+            className="flex-1 rounded border border-zinc-700 py-1.5 text-2xs font-semibold text-zinc-300 hover:border-zinc-500 hover:bg-zinc-800 disabled:opacity-50 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
           >
             +{EXTEND_MINUTES} min
           </button>
@@ -411,7 +411,7 @@ export default function SesCoordination({
             type="button"
             disabled={busy}
             onClick={() => patchSlot(hereHolder.id, 'release')}
-            className="flex-1 rounded border border-red-800 py-1.5 text-[11px] font-semibold text-red-400 hover:bg-red-900/30 disabled:opacity-50"
+            className="flex-1 rounded border border-red-800 py-1.5 text-2xs font-semibold text-red-400 hover:bg-red-900/30 disabled:opacity-50"
           >
             Release
           </button>
@@ -421,7 +421,7 @@ export default function SesCoordination({
           <select
             value={minutes}
             onChange={e => setMinutes(Number(e.target.value))}
-            className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1.5 text-[11px] text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
+            className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1.5 text-2xs text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
           >
             {[30, 60, 120, 180, 240].map(m => (
               <option key={m} value={m}>{m >= 60 ? `${m / 60}h` : `${m}m`}</option>
@@ -432,7 +432,7 @@ export default function SesCoordination({
             disabled={busy || !!hereHolder}
             onClick={checkOut}
             title={hereHolder ? `${holderLabel(hereHolder)} already holds this band/mode` : undefined}
-            className="flex-1 rounded bg-amber-400 py-1.5 text-[11px] font-bold text-zinc-900 hover:bg-amber-300 disabled:opacity-40 disabled:hover:bg-amber-400"
+            className="flex-1 rounded bg-amber-400 py-1.5 text-2xs font-bold text-zinc-900 hover:bg-amber-300 disabled:opacity-40 disabled:hover:bg-amber-400"
           >
             Check out {currentBand} {currentMode}
           </button>
@@ -444,7 +444,7 @@ export default function SesCoordination({
         <button
           type="button"
           onClick={() => setShowSchedule(v => !v)}
-          className="w-full rounded border border-zinc-700 py-1 text-[10px] font-semibold uppercase tracking-wide text-zinc-500 hover:border-zinc-500 hover:text-zinc-300 light:border-zinc-300 light:text-zinc-500 light:hover:text-zinc-700"
+          className="w-full rounded border border-zinc-700 py-1 text-2xs font-semibold uppercase tracking-wide text-zinc-500 hover:border-zinc-500 hover:text-zinc-300 light:border-zinc-300 light:text-zinc-500 light:hover:text-zinc-700"
         >
           {showSchedule ? '\u25b2 Close' : '\u25bc Schedule ahead'}
         </button>
@@ -455,21 +455,21 @@ export default function SesCoordination({
               <select
                 value={planBand}
                 onChange={e => setPlanBand(e.target.value as Band)}
-                className="flex-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
+                className="flex-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-2xs font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
               >
                 {BANDS.map(b => <option key={b} value={b}>{b}</option>)}
               </select>
               <select
                 value={planMode}
                 onChange={e => setPlanMode(e.target.value as Mode)}
-                className="flex-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
+                className="flex-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-2xs font-mono text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
               >
                 {MODES.map(m => <option key={m} value={m}>{m}</option>)}
               </select>
               <select
                 value={planMinutes}
                 onChange={e => setPlanMinutes(Number(e.target.value))}
-                className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
+                className="rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-2xs text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
               >
                 {[30, 60, 120, 180, 240].map(m => (
                   <option key={m} value={m}>{m >= 60 ? `${m / 60}h` : `${m}m`}</option>
@@ -488,11 +488,11 @@ export default function SesCoordination({
               type="button"
               disabled={busy}
               onClick={schedule}
-              className="rounded border border-amber-700 bg-amber-400/10 py-1.5 text-[11px] font-semibold text-amber-400 hover:bg-amber-400/20 disabled:opacity-50 light:border-amber-600 light:text-amber-700"
+              className="rounded border border-amber-700 bg-amber-400/10 py-1.5 text-2xs font-semibold text-amber-400 hover:bg-amber-400/20 disabled:opacity-50 light:border-amber-600 light:text-amber-700"
             >
               Book {planBand} {planMode} (UTC)
             </button>
-            <p className="text-[10px] text-zinc-600 light:text-zinc-500">
+            <p className="text-2xs text-zinc-600 light:text-zinc-500">
               Times are UTC. Overlapping a slot someone already holds is refused.
             </p>
           </div>
@@ -501,11 +501,11 @@ export default function SesCoordination({
 
       {/* Who has what right now */}
       <div className="mt-2.5">
-        <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">
+        <div className="text-2xs font-semibold uppercase tracking-wider text-zinc-500 mb-1">
           On the air ({active.length})
         </div>
         {active.length === 0 && (
-          <p className="text-[11px] text-zinc-600 light:text-zinc-400">Nobody has the call checked out.</p>
+          <p className="text-2xs text-zinc-600 light:text-zinc-400">Nobody has the call checked out.</p>
         )}
         <div className="flex flex-col gap-1">
           {active.map(r => {
@@ -528,9 +528,9 @@ export default function SesCoordination({
                   <span className="font-mono text-zinc-300 light:text-zinc-700">{r.band}</span>
                   <span className={`font-mono font-bold ${MODE_COLORS[r.mode] ?? 'text-zinc-300'}`}>{r.mode}</span>
                   {r.planned_freq && (
-                    <span className="font-mono text-[10px] text-zinc-500">{r.planned_freq}</span>
+                    <span className="font-mono text-2xs text-zinc-500">{r.planned_freq}</span>
                   )}
-                  <span className="font-mono text-[10px] text-zinc-500">
+                  <span className="font-mono text-2xs text-zinc-500">
                     {left !== null && left < 60 ? `${left}m left` : clockUTC(r.ends_at)}
                   </span>
                 </span>
@@ -542,23 +542,23 @@ export default function SesCoordination({
 
       {upcoming.length > 0 && (
         <div className="mt-2.5">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500 mb-1">
+          <div className="text-2xs font-semibold uppercase tracking-wider text-zinc-500 mb-1">
             Scheduled ({upcoming.length})
           </div>
           <div className="flex flex-col gap-1">
             {upcoming.slice(0, 8).map(r => (
-              <div key={r.id} className="flex items-center justify-between rounded px-2 py-0.5 text-[11px] text-zinc-500">
+              <div key={r.id} className="flex items-center justify-between rounded px-2 py-0.5 text-2xs text-zinc-500">
                 <span className="font-mono">{holderLabel(r)}</span>
                 <span className="flex items-center gap-2">
                   <span className="font-mono">{r.band} {r.mode}</span>
-                  <span className="font-mono text-[10px]">{dayClockUTC(r.starts_at)}</span>
+                  <span className="font-mono text-2xs">{dayClockUTC(r.starts_at)}</span>
                   {r.op_call === myOpCall && (
                     <button
                       type="button"
                       disabled={busy}
                       onClick={() => patchSlot(r.id, 'release')}
                       title="Cancel this booking"
-                      className="text-[10px] text-zinc-600 hover:text-red-400 disabled:opacity-50"
+                      className="text-2xs text-zinc-600 hover:text-red-400 disabled:opacity-50"
                     >
                       &times;
                     </button>

@@ -35,6 +35,30 @@ $ npm run build
 
 Both must be clean. This is the gate `AGENTS.md` sets and CI enforces.
 
+## Type scale and touch targets
+
+Font sizes come from three tokens defined in `app/globals.css`, not from
+arbitrary values:
+
+| Token | Size | Use |
+|---|---|---|
+| `text-2xs` | 11px | Labels, badges, secondary detail |
+| `text-xs` | 13px | Body — most of the interface |
+| `text-sm` | 15px | Headings, buttons, the entry form |
+
+Anything larger (`text-lg` up) is a display number — a score or a rate, sized
+to be read across a tent — and is left alone.
+
+There used to be thirteen distinct sizes, four of them within two pixels of
+each other below 12px. `scripts/test-nav.cjs` fails on a `text-[13px]`-style
+arbitrary value, and on a token defined without its matching
+`--text-*--line-height`, because Tailwind v4 ties each line height to its own
+size and overriding the size alone leaves the old leading behind.
+
+The `.tap` class raises a control to 44px **only under `pointer: coarse`**. A
+laptop keeps the density a logger wants; a phone gets targets a thumb can hit.
+Reach for it on any new control small enough to miss.
+
 ## Tests
 
 Eighteen suites, all run by CI. They come in two kinds, and the split is worth
