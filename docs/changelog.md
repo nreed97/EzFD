@@ -31,7 +31,7 @@ only run events.
   the dashboard now lives in a slide-out menu, grouped and with a line under
   each entry saying what it is. The header keeps only what you read at a
   glance. On a phone the dashboard header was four rows of buttons before the
-  filter bar even started; it is two now. ([#83])
+  filter bar even started; it is two now. ([#84])
   Docs: [Operating → The menu](operating.md#the-menu)
 - **Who worked what** `Display` — A new **Operators** view on the dashboard,
   reading the log you already have: contacts, points, best hour, bands,
@@ -66,7 +66,7 @@ only run events.
   purpose. The guides were reachable **only** on a phone; **Import ADIF**, both
   exports and the second-radio window **only** at tablet width and up. If you
   have been logging from a phone and could not find the export, that is why.
-  ([#83])
+  ([#84])
   Docs: [Operating → The menu](operating.md#the-menu)
 - **The rate beside each operator is now their best hour** `Display` — The
   dashboard's Operators panel divided an operator's contacts by however long
@@ -82,7 +82,7 @@ only run events.
   header and one for a phone bar, each hand-maintained, which is why the two
   had drifted apart. There is one list now, read by both screens, and a test
   fails if a second copy appears or an entry is added that nothing wires up.
-  ([#83])
+  ([#84])
 - **Changelog entries citing a pull request rendered as literal text** — A
   citation like `[#80]` needs a matching definition at the foot of this file to
   become a link; two entries were missing theirs and showed the brackets
@@ -413,4 +413,4 @@ continuous enough to be worth summarising.
 [#80]: https://github.com/nreed97/EzFD/pull/80
 [#81]: https://github.com/nreed97/EzFD/pull/81
 [#82]: https://github.com/nreed97/EzFD/pull/82
-[#83]: https://github.com/nreed97/EzFD/pull/83
+[#84]: https://github.com/nreed97/EzFD/pull/84
