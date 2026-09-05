@@ -15,6 +15,7 @@ import type { Event, QSO, Band, Mode, DisplayQSO, SesReservation } from '@/lib/t
 import type { QSOSubmission } from './QSOForm';
 import QSOForm from './QSOForm';
 import NavDrawer, { type NavHandlers } from './NavDrawer';
+import { hasNavItem, type NavContext } from '@/lib/nav';
 import { toggleLightMode } from '@/lib/useLightMode';
 import SesCoordination from './SesCoordination';
 import QSOTable from './QSOTable';
@@ -145,6 +146,18 @@ export default function LoggingClient({
   // Every action the drawer offers for this surface. `NavHandlers` is keyed by
   // the action ids in lib/nav.ts, so adding an entry there without wiring it
   // here is a type error rather than a menu item that does nothing.
+  // One context object, so the header's live controls and the menu answer to
+  // the same rules about what this event and this radio can do.
+  const navCtx: NavContext = {
+    surface: 'logger',
+    joinCode: event.join_code,
+    eventType: event.event_type,
+    stationNumber,
+    operatorCall,
+    rigConnected,
+    canCw: rig.canCw,
+  };
+
   const navHandlers: NavHandlers = {
     switchOperator: () => {
       sessionStorage.removeItem(`ezfd_op_${event.join_code}`);
@@ -345,18 +358,47 @@ export default function LoggingClient({
               each breakpoint. */}
           <UTCClock />
 
-          {rigConnected && (
-            <span
-              title={`Rig control active${rigFreq ? ` — ${(rigFreq / 1e6).toFixed(3)} MHz` : ''}`}
-              className="hidden sm:inline-flex items-center gap-1.5 rounded border border-green-700 bg-green-900/30 px-2 py-0.5 text-[10px] font-semibold text-green-400">
-              <span className="h-1.5 w-1.5 rounded-full bg-green-400 animate-pulse shrink-0" />
-              <span className="uppercase tracking-wide">RIG</span>
-              {rigFreq && (
-                <span className="font-mono font-normal text-green-300 tracking-tight">
-                  {(rigFreq / 1e6).toFixed(3)}
-                </span>
-              )}
-            </span>
+          {/* Rig control is a button, and it is here whether or not a radio is
+              attached. It used to be a status chip that appeared only once
+              something was already connected, which left the panel you connect
+              *from* reachable only through the band panel further down — the
+              one place an operator looking for "how do I hook up my radio"
+              would not think to look. Connecting and reading the state are the
+              same affordance now. */}
+          <button
+            onClick={() => setShowRigHelp(true)}
+            title={rigConnected
+              ? `Rig control active${rigFreq ? ` — ${(rigFreq / 1e6).toFixed(3)} MHz` : ''}. Click for details.`
+              : 'Connect a radio — Web Serial in Chrome, or the bridge for other browsers'}
+            className={`inline-flex shrink-0 items-center gap-1.5 rounded border px-2 py-1 text-[10px] font-semibold transition-colors ${
+              rigConnected
+                ? 'border-green-700 bg-green-900/30 text-green-400 hover:bg-green-900/50'
+                : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100'
+            }`}
+          >
+            {rigConnected && <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-green-400 animate-pulse" />}
+            <span className="uppercase tracking-wide">Rig</span>
+            {rigConnected
+              ? rigFreq
+                ? <span className="font-mono font-normal tracking-tight text-green-300">{(rigFreq / 1e6).toFixed(3)}</span>
+                : null
+              : <span className="font-normal normal-case text-zinc-500">off</span>}
+          </button>
+
+          {/* Opening the keying window is something an operator does at the
+              start of a CW shift, not once a weekend, so it is a button and
+              not a menu row — moving it into the menu made it look as though
+              it had been removed. Whether it is offered comes from the same
+              table the menu reads, so the two cannot disagree: a rig that
+              cannot key CW gets neither. */}
+          {hasNavItem(navCtx, 'cwWindow') && (
+            <button
+              onClick={navHandlers.cwWindow}
+              title="Open the CW macro and keying window"
+              className="inline-flex shrink-0 items-center gap-1 rounded border border-amber-700 bg-amber-900/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-400 transition-colors hover:bg-amber-900/40"
+            >
+              CW
+            </button>
           )}
 
           {/* The score reads on every width now. It is the number an operator
@@ -368,7 +410,7 @@ export default function LoggingClient({
             {!isSes && (
               <>
                 <span className="text-zinc-200 font-mono font-bold light:text-zinc-800">{score.sections_worked}</span>
-                <span className="text-zinc-600 mx-1">\u00d7</span>
+                <span className="text-zinc-600 mx-1">×</span>
                 <span className="text-amber-400 font-mono font-bold">{score.total_score.toLocaleString()}</span>
               </>
             )}
@@ -388,19 +430,11 @@ export default function LoggingClient({
           )}
 
           <NavDrawer
-            ctx={{
-              surface: 'logger',
-              joinCode: event.join_code,
-              eventType: event.event_type,
-              stationNumber,
-              operatorCall,
-              rigConnected,
-              canCw: rig.canCw,
-            }}
+            ctx={navCtx}
             handlers={navHandlers}
             heading={
               <span className="block truncate font-mono text-xs text-zinc-400 light:text-zinc-600">
-                {operatorCall}{showStation ? ` \u00b7 station ${stationNumber}` : ''}
+                {operatorCall}{showStation ? ` · station ${stationNumber}` : ''}
               </span>
             }
           />
@@ -500,7 +534,11 @@ export default function LoggingClient({
               has exactly this coordination problem — the difference is that
               the holder is the station rather than the operator, so it reads
               as a station schedule rather than a call checkout. */}
+          {/* Folded by default on a contest, where claiming a band and mode is
+              opt-in; open on a special event, where it is how the station is
+              run. */}
           <SesCoordination
+            startFolded={!isSes}
             eventId={event.id}
             myOpCall={operatorCall}
             stationNumber={isSes ? null : stationNumber}
@@ -523,13 +561,11 @@ export default function LoggingClient({
             qsos={displayQSOs}
             onConflict={setBandConflict}
             onBandOccupancy={setBandOccupancy}
-            rigConnected={rigConnected}
-            onRigHelp={() => setShowRigHelp(true)}
           />
           {/* Contest scoring and section chasing don't apply to an SES. */}
           {!isSes && (
             <>
-              <Scoreboard score={score} />
+              <Scoreboard score={score} compact />
               <button
                 type="button"
                 onClick={() => setShowNeeds(true)}

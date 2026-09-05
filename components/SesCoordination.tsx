@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNow } from '@/lib/useNow';
 import type { Band, Mode, SesReservation } from '@/lib/types';
+import { useStoredFlag } from '@/lib/useStoredFlag';
 import { BANDS, MODES } from '@/lib/types';
 import DateTimeField from './DateTimeField';
 
@@ -22,6 +23,13 @@ interface Props {
   currentMode: Mode;
   /** Default checkout length for this event, in minutes. */
   slotMinutes: number;
+  /** Start folded. Claiming a band and mode is how a special event runs, so
+   *  the panel is open there; on a contest it is opt-in and many clubs never
+   *  use it, and 196px of an always-open panel is what pushed the logging
+   *  pane past the bottom of a 768-tall laptop. Either way the operator's
+   *  choice is remembered, and the "you hold" badge stays visible folded so a
+   *  live claim is never hidden. */
+  startFolded?: boolean;
   /** The event's own window — scheduling ahead can only pick a date inside it. */
   eventStartsAt: string | Date | null;
   eventEndsAt: string | Date | null;
@@ -79,7 +87,9 @@ function minutesUntil(iso: string | null): number | null {
 export default function SesCoordination({
   eventId, myOpCall, stationNumber = null, myStation, currentBand, currentMode, slotMinutes,
   eventStartsAt, eventEndsAt, refreshToken, lastQsoAt, onHoldingChange,
+  startFolded = false,
 }: Props) {
+  const [open, setOpen] = useStoredFlag('ezfd_checkout_open', !startFolded);
   const [reservations, setReservations] = useState<SesReservation[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -312,16 +322,27 @@ export default function SesCoordination({
 
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 light:border-zinc-200 light:bg-zinc-100/50">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+      <div className="flex items-center justify-between gap-2">
+        <button
+          type="button"
+          onClick={() => setOpen(o => !o)}
+          aria-expanded={open}
+          className="flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700"
+        >
+          <span className={`inline-block transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}>›</span>
           Call Checkout
-        </h3>
+        </button>
+        {/* Stays visible folded: a live claim is the one thing here an
+            operator must not be able to lose track of. */}
         {mySlot && (
           <span className="rounded border border-green-700 bg-green-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-green-400">
             You hold {mySlot.band} {mySlot.mode}
           </span>
         )}
       </div>
+
+      {open && (
+      <div className="mt-2">
 
       {/* Status for the band/mode the form is currently set to */}
       <div className={`mb-2 rounded border px-2 py-1.5 text-[11px] ${
@@ -547,6 +568,8 @@ export default function SesCoordination({
             ))}
           </div>
         </div>
+      )}
+      </div>
       )}
     </div>
   );

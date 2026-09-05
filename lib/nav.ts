@@ -147,15 +147,20 @@ export function navItems(ctx: NavContext): NavItem[] {
         action: 'cwWindow',
       });
     }
-    if (ctx.rigConnected) {
-      items.push({
-        id: 'rigDetails',
-        label: 'Rig control',
-        hint: 'What the bridge is reporting, and how it is set up',
-        group: 'This event',
-        action: 'rigDetails',
-      });
-    }
+    // Offered whether or not a radio is attached: this panel is where an
+    // operator connects one — a Web Serial port in Chrome, or the bridge
+    // download for every other browser. Gating it on being connected already
+    // made the way in reachable only from the band panel further down, which
+    // is not where somebody looks for "how do I hook up my radio".
+    items.push({
+      id: 'rigDetails',
+      label: 'Rig control',
+      hint: ctx.rigConnected
+        ? 'What the radio is reporting, and how it is set up'
+        : 'Connect a radio over Web Serial, or set up the bridge',
+      group: 'This event',
+      action: 'rigDetails',
+    });
     items.push({
       id: 'importAdif',
       label: 'Import ADIF',
@@ -251,4 +256,18 @@ export function actionsFor(ctx: NavContext): NavActionId[] {
   const seen = new Set<NavActionId>();
   for (const item of navItems(ctx)) if (item.action) seen.add(item.action);
   return [...seen];
+}
+
+/**
+ * Is this entry offered in the given context?
+ *
+ * The logging screen shows a couple of these as header buttons as well —
+ * rig control and the CW window are live operating controls, reached mid-run
+ * rather than once a weekend, and a menu is the wrong home for them. Those
+ * buttons ask this rather than re-deriving the condition, so the header and
+ * the menu can never disagree about whether a thing is available. Which is
+ * the whole point of the table: two renderings, one rule.
+ */
+export function hasNavItem(ctx: NavContext, id: string): boolean {
+  return navItems(ctx).some(item => item.id === id);
 }

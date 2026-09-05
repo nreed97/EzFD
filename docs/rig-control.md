@@ -51,8 +51,9 @@ has no direct equivalent here, so the macro window still needs the bridge.
 
 ## Setup
 
-Download `ezfd-rig-bridge.py` from the logger (the **Rig** button in the
-Operators panel links to it), connect the radio by USB or serial, and run:
+Download `ezfd-rig-bridge.py` from the logger — the **Rig** button in the
+header opens the panel it is linked from — connect the radio by USB or
+serial, and run:
 
 ```bash
 $ python3 ezfd-rig-bridge.py
@@ -66,7 +67,9 @@ The script will:
 3. Probe whether the rig supports CAT CW keying.
 4. Open the WebSocket the browser connects to.
 
-Open EzFD and the header shows `● RIG` with the live frequency.
+Open EzFD and the header's **Rig** button turns green and shows the live
+frequency. It is there whether or not a radio is attached: with none, it reads
+`Rig off` and opens the panel you connect from.
 
 ### Options
 
@@ -142,7 +145,7 @@ there permanently offsets every later frequency reading by one field.
 
 ## Troubleshooting
 
-**No `● RIG` in the header.** Check the bridge is running and shows no errors.
+**The header's Rig button still reads `off`.** Check the bridge is running and shows no errors.
 The browser connects to `localhost`, so the bridge must be on the same machine
 as the browser, not the server.
 

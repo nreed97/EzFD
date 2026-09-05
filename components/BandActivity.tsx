@@ -21,8 +21,6 @@ interface Props {
   qsos: DisplayQSO[];
   onConflict?: (conflicting: boolean) => void;
   onBandOccupancy?: (occupied: Partial<Record<Band, string[]>>) => void;
-  rigConnected?: boolean;
-  onRigHelp?: () => void;
 }
 
 const MODE_COLORS: Record<Mode, string> = {
@@ -42,7 +40,7 @@ function timeSince(iso: string): string {
   return `${Math.floor(s / 3600)}h`;
 }
 
-export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos, onConflict, onBandOccupancy, rigConnected, onRigHelp }: Props) {
+export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos, onConflict, onBandOccupancy }: Props) {
   const [stations, setStations] = useState<StationPresence[]>([]);
   const [isQRT, setIsQRT] = useState(false);
   const lastBandRef = useRef<Band | null>(null);
@@ -173,19 +171,10 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
           Operators
         </h3>
         <div className="flex items-center gap-1.5">
-          {/* Rig control button */}
-          <button
-            onClick={onRigHelp}
-            title={rigConnected ? 'Rig control active — click for details' : 'Set up rig control'}
-            className={`text-[10px] font-semibold uppercase tracking-wide rounded border px-2 py-0.5 transition-colors ${
-              rigConnected
-                ? 'border-green-700 bg-green-900/20 text-green-400 hover:bg-green-900/40'
-                : 'border-zinc-700 text-zinc-600 hover:border-zinc-500 hover:text-zinc-400'
-            }`}
-          >
-            {rigConnected ? '● RIG' : 'Rig'}
-          </button>
-
+          {/* Rig control moved to the header, where it is always visible and
+              carries the live frequency. A second copy here was the same
+              control with a different look and a different rule for when it
+              appears. */}
           {/* QRT toggle */}
           {isQRT ? (
             <button

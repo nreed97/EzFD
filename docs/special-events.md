@@ -101,6 +101,23 @@ operator who has logged a QSO in the last 15 minutes. Without that condition a
 forgotten browser tab would hold the callsign indefinitely and nobody else
 could check it out.
 
+## Quick Log
+
+A special event has no contest exchange to collect, so there is a **Quick Log**
+tick beside the callsign box: with it on, Enter logs the contact straight from
+the callsign field without moving through the other boxes. For a pile-up where
+you are recording little more than who you worked, that is the whole entry.
+
+Anything you *have* filled in still goes with the contact — RST, name, grid —
+so it is a shortcut past the fields you are leaving empty, not a different
+kind of log entry.
+
+**It is offered on special events only.** Field Day and Winter Field Day
+require a class and a section from every station, per contact, and those *are*
+the exchange: logging from the callsign field would file whatever happened to
+be left in the boxes. The setting is remembered per browser, so it is switched
+off on a contest even if you turned it on at a special event.
+
 ## Running two radios at once
 
 One operator on two rigs — 20m phone on one, 40m CW on the other — is a normal

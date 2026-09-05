@@ -38,7 +38,7 @@ you started. Change band from the **QSY** drawer once you're in.
 
 ## The entry form
 
-![The logging screen: entry form, QSY drawer, operators, score and QSO log](images/logging-screen.png)
+![The logging screen: entry form and QSY drawer down the left with a folded call checkout, the operators list and the score; the Rig button, score and menu in the header; the QSO log filling the rest](images/logging-screen.png)
 
 Focus starts in the callsign field and returns there after every logged QSO.
 The keyboard path is designed so a run never requires the mouse:
@@ -180,8 +180,10 @@ toggle and persists across sessions.
 | Amber number | Score before bonuses (contest events only) |
 | `OFFLINE` | The browser has lost connectivity |
 | `3 pending ↑` | QSOs queued locally, click to retry |
-| `● RIG 14.250` | A radio is connected, and what it is tuned to |
-| `☰` | The menu — everything you can *do* |
+| `Rig off` | No radio connected. Click to connect one |
+| `● Rig 14.250` | A radio is connected, and what it is tuned to |
+| `CW` | The rig can key CW — opens the macro and keying window |
+| `☰` | The menu — everything else you can *do* |
 
 A special event shows only the QSO count — there is no contest score.
 
