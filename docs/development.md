@@ -85,7 +85,7 @@ $ node scripts/test-docs-nav.cjs        # the /docs sidebar and its reading orde
 $ node scripts/test-cat-protocol.cjs    # Kenwood CAT decoding for native rig control
 ```
 
-**Four need a database, or a running server:**
+**Five need a database, or a running server:**
 
 ```bash
 # The SES overlap guarantee lives in a database constraint,
@@ -97,6 +97,9 @@ $ DATABASE_URL=postgres://localhost/ezfd node scripts/test-queries.cjs
 
 # ezfd-admin.sh backup/restore, round-tripped for SES, FD and empty events
 $ PSQL="psql -h localhost -U postgres" bash scripts/test-restore.sh
+
+# Merging two instances of one event back into a single log
+$ DATABASE_URL=postgres://localhost/ezfd node scripts/test-merge.cjs
 
 # The API end to end, against a running server
 $ BASE_URL=http://localhost:3000 bash scripts/test-e2e.sh
@@ -121,6 +124,21 @@ definitions rather than a copy — the same ones the HTTP API and the console
 call. It used to carry its own third variant of the backup query, and so
 round-tripped a shape the console's menu action never produced, staying green
 while that action silently dropped the SES roster.
+
+**`scripts/test-merge.cjs`** covers `ezfd_merge_event()` and
+`ezfd_recompute_dupes()` — reconciling an event that ran in two places at once
+into one log. Every case that matters is a way to silently change what a club
+submits: a contact counted twice or dropped where the copies overlap, dupe
+flags left as each instance computed them (both wrong for the union), a
+deletion undone by the other copy, two unrelated events merged because nothing
+checked identity, or an edit made on both sides resolved in favour of one
+without saying so.
+
+The subtle one is the deletion. A contact deleted here and still live there
+can be matched two ways — by its preserved id, or by the ±2 minute window when
+the instances logged it independently — and only the second reaches the query
+that could resurrect it. A test that only covered the first passed against a
+merge that had the bug, which is why both paths are asserted.
 
 It also greps `ezfd-admin.sh` for three things a round trip cannot see,
 because each of them failed *silently*:

@@ -218,17 +218,48 @@ submit to.
 
 ### `POST /api/import/event`
 
-Recreate an event from a full-event JSON export.
+Bring a full-event JSON export into this instance. Two modes.
 
 ```json
 { "payload": [ /* the export */ ], "admin_key": "optional" }
 ```
 
-Always creates a **new** event with a fresh join code — never overwrites or
-merges — so importing is safe to try, and safe to try twice. Returns
-`{ "imported": [{ "orig_code", "new_code", "qso_count" }] }`.
+**Restore** (no query string) creates a **new** event with a fresh join code —
+never overwrites or merges — so importing is safe to try, and safe to try
+twice. Returns `{ "imported": [{ "orig_code", "new_code", "qso_count" }] }`
+with `201`.
 
-Gated by `EZFD_ADMIN_KEY` when it is set, matching event creation.
+**Merge** (`?merge_into=CODE`) reconciles the export into an event that
+already exists here, for when one activation ran in two places at once. Takes
+exactly one event, not a whole-database export. Returns `200` and a report:
+
+```json
+{ "merged": {
+  "target_join_code": "AB12CD", "origin_event_id": "…", "origin_matched": true,
+  "qsos_added": 12, "already_present_by_id": 40, "already_present_by_time": 3,
+  "skipped_deleted_here": 1, "conflicts": [], "roster_added": 2,
+  "roster_already_present": 3, "reservations_added": 6,
+  "dupe_flags_changed": 4, "settings_differ": ["bonuses"]
+} }
+```
+
+| Field | Meaning |
+|---|---|
+| `qsos_added` | Contacts this instance did not have |
+| `already_present_by_id` | Recognised by preserved QSO id |
+| `already_present_by_time` | Logged independently in both, matched within ±2 minutes |
+| `skipped_deleted_here` | Deleted here, still live there — the deletion stands |
+| `conflicts` | Edited on both sides; reported, never resolved |
+| `dupe_flags_changed` | Rows whose `is_dupe` the recompute corrected |
+| `settings_differ` | Event settings that disagree; the target's are kept |
+
+`400` if the export is a different activation — pass
+`"allow_different_origin": true` to override, which genuinely combines two
+events. `404` if no event here has that join code.
+
+Both modes are gated by `EZFD_ADMIN_KEY` when it is set. See
+[Administration → Merging two instances of one event](administration.md#merging-two-instances-of-one-event)
+for when you would.
 
 ### `POST /api/import/adif`
 
@@ -240,7 +271,9 @@ Gated by `EZFD_ADMIN_KEY` when it is set, matching event creation.
 Returns `{ imported, dupes, already_present, skipped, total }`.
 
 Idempotent: a record matching an existing QSO on callsign, band, mode and a
-±2 minute window is skipped rather than inserted.
+±2 minute window is skipped rather than inserted. A contact you deleted counts
+as absent here and comes back — importing a file is a deliberate act. The
+event merge above goes the other way, because it is bulk and automatic.
 
 ## Lookups
 

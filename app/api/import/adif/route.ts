@@ -1,12 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { parseAdif } from '@/lib/adif';
-import { isDupeQSO } from '@/lib/events';
-
-/** How close two contacts must be in time to be considered the same QSO
- *  arriving twice. ADIF only carries minute resolution, and a logger may
- *  round differently, so an exact timestamp match is too strict. */
-const MERGE_WINDOW_SECONDS = 120;
+import { isDupeQSO, MERGE_WINDOW_SECONDS } from '@/lib/events';
 
 export async function POST(request: Request) {
   const body = await request.json() as {

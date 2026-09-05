@@ -20,6 +20,23 @@ export const EVENT_COLUMNS = `
 
 
 /**
+ * How close two contacts must be in time to be the same contact arriving
+ * twice, rather than a station worked twice.
+ *
+ * Distinct from the dupe *rule* below: that flags a contact genuinely worked
+ * twice on the air, this recognises one contact reaching the log by two
+ * routes. ADIF carries only minute resolution and loggers round differently,
+ * and two instances of the same event stamp a contact seconds apart, so an
+ * exact timestamp match is too strict for both.
+ *
+ * One definition because it is now used in two places — the ADIF import and
+ * the event merge — and `ezfd_merge_event` takes it as a parameter rather
+ * than hardcoding a second copy in SQL. `scripts/test-merge.cjs` fails if the
+ * function's default drifts from this value.
+ */
+export const MERGE_WINDOW_SECONDS = 120;
+
+/**
  * Dupe detection, per the event's configured rule:
  *
  *   EVENT — once per band/mode for the whole event (the ARRL contest rule)

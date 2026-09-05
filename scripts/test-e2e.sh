@@ -426,6 +426,64 @@ else
   no "  a missing payload is refused"
 fi
 
+# ── Merging two instances of one event (#20) ─────────────────────────────────
+#
+# The field-server case: the same weekend ran in two places and both hold real
+# contacts. Restoring would make a third event; merging reconciles them into
+# one log. $NEW_CODE above is a genuine second copy of $PORT_EV — restored
+# from its export — so it carries the same origin identity and is exactly the
+# shape this is for.
+echo
+echo "── Merging two instances of one event ──"
+
+# Work a contact only the copy has, then merge the copy back into the original.
+NEW_ID=$(req GET "/api/events/$NEW_CODE" | jq_get id)
+req POST /api/qso "{\"event_id\":\"$NEW_ID\",\"callsign\":\"K2FLD\",\"band\":\"40m\",\"mode\":\"CW\",\"rcvd_section\":\"WMA\",\"operator_call\":\"W0AAA\"}" > /dev/null
+COPY_JSON=$(req GET "/api/export/$NEW_CODE?format=json")
+
+MERGED=$(req POST "/api/import/event?merge_into=$PORT_EV" "{\"payload\":$COPY_JSON}")
+M_ADDED=$(echo "$MERGED" | python3 -c "import sys,json;print(json.load(sys.stdin).get('merged',{}).get('qsos_added',''))" 2>/dev/null)
+M_MATCH=$(echo "$MERGED" | python3 -c "import sys,json;print(json.load(sys.stdin).get('merged',{}).get('origin_matched',''))" 2>/dev/null)
+if [[ "$M_ADDED" == "1" ]]; then
+  ok "  merging adds only the contact the target did not have"
+else
+  no "  merging adds only the contact the target did not have" "qsos_added=$M_ADDED"
+fi
+if [[ "$M_MATCH" == "True" ]]; then
+  ok "  and recognises the copy as the same activation"
+else
+  no "  and recognises the copy as the same activation" "origin_matched=$M_MATCH"
+fi
+if [[ "$(req GET "/api/export/$PORT_EV")" == *"K2FLD"* ]]; then
+  ok "  the merged contact is in the original event's log"
+else
+  no "  the merged contact is in the original event's log"
+fi
+
+# Idempotency is what makes this safe to retry after a half-finished transfer.
+AGAIN=$(req POST "/api/import/event?merge_into=$PORT_EV" "{\"payload\":$COPY_JSON}")
+A_ADDED=$(echo "$AGAIN" | python3 -c "import sys,json;print(json.load(sys.stdin).get('merged',{}).get('qsos_added',''))" 2>/dev/null)
+if [[ "$A_ADDED" == "0" ]]; then
+  ok "  running the same merge twice adds nothing the second time"
+else
+  no "  running the same merge twice adds nothing the second time" "qsos_added=$A_ADDED"
+fi
+
+# An unrelated event is a different activation, and merging it would combine
+# two logs into one. Refused unless somebody says so explicitly.
+OTHER=$(req POST /api/events '{"club_name":"Other","club_call":"W0OTH","class":"2A","arrl_section":"WI"}' | jq_get join_code)
+OTHER_JSON=$(req GET "/api/export/$OTHER?format=json")
+if [[ "$(status POST "/api/import/event?merge_into=$PORT_EV" "{\"payload\":$OTHER_JSON}")" == "400" ]]; then
+  ok "  merging a different activation is refused"
+else
+  no "  merging a different activation is refused"
+fi
+if [[ "$(status POST "/api/import/event?merge_into=NOSUCH" "{\"payload\":$COPY_JSON}")" == "404" ]]; then
+  ok "  and merging into a join code that isn't here is a 404"
+else
+  no "  and merging into a join code that isn't here is a 404"
+fi
+
 # ── Per-station coordination for contests ────────────────────────────────────
 #
 # Field Day has the same one-signal-per-band-per-mode rule as a special event,

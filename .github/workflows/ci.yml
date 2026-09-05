@@ -5,7 +5,8 @@
 #             then lint, typecheck and the production build (the AGENTS.md
 #             gate), then the end-to-end API flow against the real server
 #   schema  — schema idempotency, the SES exclusion constraint, the route-level
-#             SQL, and the admin console's backup/restore round trip
+#             SQL, the admin console's backup/restore round trip, and merging
+#             two instances of one event back into a single log
 #   shell   — syntax-checks the shell scripts, gates on shellcheck, and
 #             verifies the two rig-bridge copies haven't drifted
 
@@ -210,6 +211,13 @@ jobs:
       # This path has been wrong twice, both times silently.
       - name: Backup/restore round trip
         run: PSQL="psql -h localhost -U postgres" bash scripts/test-restore.sh
+
+      # Merging two instances of one event rewrites a log that a club then
+      # submits, and every interesting case is a way to silently change it:
+      # a contact counted twice, a deletion undone, dupe flags left as each
+      # instance computed them. All of it is SQL, so it needs the database.
+      - name: Event merge tests
+        run: DATABASE_URL=postgres://postgres:postgres@localhost:5432/ezfd node scripts/test-merge.cjs
 
   shell:
     runs-on: ubuntu-latest

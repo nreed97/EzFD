@@ -27,6 +27,18 @@ only run events.
 
 ### Added
 
+- **Merge an event that ran in two places into one log** `Setup` — A field
+  server at the site and the hosted instance can both hold real contacts from
+  the same weekend. Importing that export used to make a *third* event, so the
+  two logs had to be reconciled by hand. `POST /api/import/event?merge_into=`
+  now reconciles them: contacts you don't have are added, duplicate flags are
+  recomputed across the whole log — each instance computed its own against a
+  different subset, so both were wrong for the union — and the roster and
+  checkout history come across. It reports what it did rather than just
+  succeeding, and it will not resolve a contact edited on both sides, undo a
+  deletion, or change the event's settings. Running it twice is safe.
+  ([#90])
+  Docs: [Administration → Merging two instances of one event](administration.md#merging-two-instances-of-one-event), [API → POST /api/import/event](api.md#post-apiimportevent)
 - **Rig control is a button in the header** `Display` — It shows whether a
   radio is connected and what it is tuned to, and with none connected it reads
   `Rig off` and opens the panel you connect from. That panel used to be
@@ -496,3 +508,4 @@ continuous enough to be worth summarising.
 [#87]: https://github.com/nreed97/EzFD/pull/87
 [#88]: https://github.com/nreed97/EzFD/pull/88
 [#89]: https://github.com/nreed97/EzFD/pull/89
+[#90]: https://github.com/nreed97/EzFD/pull/90
