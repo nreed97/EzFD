@@ -66,6 +66,12 @@ jobs:
       - name: GOTA tests
         run: node scripts/test-gota.cjs
 
+      # The pre-submission read of the log. Also the guard that keeps rule
+      # 7.3's class-eligibility column in lib/bonuses.ts matching the
+      # transcription in docs/rules-reference.md.
+      - name: Pre-submission check tests
+        run: node scripts/test-preflight.cjs
+
       # ADIF and Cabrillo are what a log looks like once it leaves this app —
       # the file uploaded to LoTW and the one submitted to the ARRL. Both were
       # covered only by substring checks in the end-to-end suite, which can't
@@ -82,6 +88,12 @@ jobs:
       # answer hides a contact an operator is looking for.
       - name: Log view tests
         run: node scripts/test-log-filters.cjs
+
+      # Who worked what. The figures are all derived from the log, so the way
+      # they go wrong is quietly: a table that totals less than the scoreboard
+      # beside it, with nothing to say which of the two is right.
+      - name: Per-operator statistics tests
+        run: node scripts/test-op-stats.cjs
 
       # What the operating position picker shows before someone sits down. A
       # wrong answer sends an operator to a band another station is already

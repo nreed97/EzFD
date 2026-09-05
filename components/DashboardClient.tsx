@@ -6,6 +6,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { calculateScore } from '@/lib/scoring';
 import { applyQsoEvent } from '@/lib/qsoStream';
+import { operatorStats, UNATTRIBUTED } from '@/lib/opStats';
 import type { Event, QSO, Bonuses, SesReservation } from '@/lib/types';
 import Scoreboard from './Scoreboard';
 import SectionGrid from './SectionGrid';
@@ -18,10 +19,11 @@ import SummarySheet from './SummarySheet';
 import SectionsNeeded from './SectionsNeeded';
 import CheckoutBoard from './CheckoutBoard';
 import LogView from './LogView';
+import OperatorStats from './OperatorStats';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
-type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed' | 'checkouts' | 'log';
+type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed' | 'checkouts' | 'log' | 'ops';
 
 interface StationPresence {
   op_call: string;
@@ -148,28 +150,25 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   const oneHourAgo = new Date(nowMs - 60 * 60 * 1000).toISOString();
   const recentQSOs = qsos.filter(q => !q.is_dupe && (typeof q.datetime_utc === 'string' ? q.datetime_utc : q.datetime_utc.toISOString()) > oneHourAgo).length;
 
-  const opStats: Record<string, { total: number; ph: number; cw: number; dig: number; first: number; last: number }> = {};
-  for (const q of qsos) {
-    if (q.is_dupe || !q.operator_call) continue;
-    const op = q.operator_call;
-    const t = new Date(q.datetime_utc).getTime();
-    if (!opStats[op]) opStats[op] = { total: 0, ph: 0, cw: 0, dig: 0, first: t, last: t };
-    const s = opStats[op];
-    s.total++;
-    if (q.mode === 'PH') s.ph++;
-    else if (q.mode === 'CW') s.cw++;
-    else s.dig++;
-    if (t < s.first) s.first = t;
-    if (t > s.last) s.last = t;
-  }
-  const operators = Object.keys(opStats).sort();
+  // One table, read by both the sidebar panel and the Operators tab. It used
+  // to be counted inline here and the panel divided by a clamped span for its
+  // rate; the tab would have been a second derivation of the same figures,
+  // which is how the section list and the bonus schedule came to disagree
+  // with themselves. lib/opStats.ts is the only place any of this is worked
+  // out now.
+  const opTable = operatorStats(qsos, event.event_type);
+  const opRows = new Map(opTable.rows.map(r => [r.call, r]));
+  const operators = opTable.rows
+    .map(r => r.call)
+    .filter((c): c is string => c !== UNATTRIBUTED)
+    .sort();
 
   const presenceByOp: Record<string, StationPresence> = {};
   for (const p of presence) presenceByOp[p.op_call] = p;
 
   // Union of ops who've logged a QSO and ops who are currently present but
   // haven't logged one yet (e.g. just signed on) — everyone gets a row.
-  const allOpCalls = Array.from(new Set([...Object.keys(opStats), ...presence.map(p => p.op_call)]));
+  const allOpCalls = Array.from(new Set([...operators, ...presence.map(p => p.op_call)]));
 
   const activeReservations = reservations.filter(r => {
     const start = new Date(r.starts_at).getTime();
@@ -182,6 +181,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         { id: 'log',       label: 'Log' },
         { id: 'rate',      label: 'Rate' },
         { id: 'bands',     label: 'Bands' },
+        { id: 'ops',       label: 'Operators' },
         { id: 'checkouts', label: 'Checkouts' },
       ]
     : [
@@ -191,6 +191,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         { id: 'needed',   label: 'Needed' },
         { id: 'rate',     label: 'Rate' },
         { id: 'bands',    label: 'Bands' },
+        { id: 'ops',      label: 'Operators' },
       ];
 
   return (
@@ -286,7 +287,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
             Checkouts is a tall interactive form, so it gets more of the
             viewport than the at-a-glance map/chart views do on mobile. */}
         <div className={`shrink-0 overflow-hidden md:h-auto md:flex-1 ${
-          mainView === 'checkouts' || mainView === 'log' ? 'h-[65vh]' : 'h-56'
+          mainView === 'checkouts' || mainView === 'log' || mainView === 'ops' ? 'h-[65vh]' : 'h-56'
         }`}>
           {mainView === 'log'      && <LogView event={event} qsos={qsos} />}
           {mainView === 'map'      && <MapView workedSections={score.sections} />}
@@ -294,6 +295,14 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
           {mainView === 'needed'   && <SectionsNeeded workedSections={score.sections} unknownSections={score.unknown_sections} />}
           {mainView === 'rate'     && <RateChart qsos={qsos} />}
           {mainView === 'bands'    && <BandBreakdown score={score} />}
+          {mainView === 'ops'      && (
+            <OperatorStats
+              qsos={qsos}
+              eventType={event.event_type}
+              presence={presence}
+              nowMs={nowMs}
+            />
+          )}
           {mainView === 'checkouts' && (
             <CheckoutBoard
               eventId={event.id}
@@ -391,13 +400,25 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
 
           {allOpCalls.length > 0 && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
-              <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Operators</div>
+              <div className="mb-2 flex items-baseline justify-between gap-2">
+                <span className="text-xs text-zinc-500 uppercase tracking-wider">Operators</span>
+                <button
+                  onClick={() => setMainView('ops')}
+                  className="text-[10px] text-zinc-500 underline decoration-dotted underline-offset-2 hover:text-amber-400 light:hover:text-amber-700"
+                >
+                  Details
+                </button>
+              </div>
               {allOpCalls
-                .map(op => ({ op, s: opStats[op] ?? { total: 0, ph: 0, cw: 0, dig: 0, first: 0, last: 0 } }))
-                .sort((a, b) => b.s.total - a.s.total)
+                .map(op => ({ op, s: opRows.get(op) }))
+                .sort((a, b) => (b.s?.qsos ?? 0) - (a.s?.qsos ?? 0))
                 .map(({ op, s }) => {
-                  const windowHours = Math.max((s.last - s.first) / 3_600_000, 1);
-                  const qhr = s.total > 0 ? Math.round(s.total / windowHours) : 0;
+                  // The panel's rate is the operator's best hour, the same
+                  // figure the Operators tab prints. It used to be their
+                  // total divided by however long they had been sitting
+                  // there, clamped to an hour — which reads a 60-in-the-first
+                  // -hour run as 15/hr once the band goes quiet, and would
+                  // have disagreed with the tab on the same screen.
                   const p = presenceByOp[op];
                   const active = p ? (nowMs - new Date(p.updated_at).getTime()) <= INACTIVE_MS : false;
                   return (
@@ -409,7 +430,12 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
                           )}
                           <span className="font-mono text-xs font-bold text-zinc-200 light:text-zinc-800 truncate">{op}</span>
                         </span>
-                        <span className="font-mono text-xs text-zinc-400 light:text-zinc-500 shrink-0">{s.total} Q · {qhr}/hr</span>
+                        <span
+                          title="Contacts logged, and the most this operator worked in any 60 minutes"
+                          className="font-mono text-xs text-zinc-400 light:text-zinc-500 shrink-0"
+                        >
+                          {s?.qsos ?? 0} Q · {s?.bestHour ?? 0}/hr
+                        </span>
                       </div>
                       <div className="mt-0.5 flex items-center gap-1.5 flex-wrap">
                         {p && (
@@ -418,9 +444,9 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
                             <span className={MODE_COLORS[p.mode] ?? 'text-zinc-400'}>{p.mode}</span>
                           </span>
                         )}
-                        {s.ph > 0 && <span className="text-[10px] text-blue-400 light:text-blue-600">{s.ph} PH</span>}
-                        {s.cw > 0 && <span className="text-[10px] text-yellow-400 light:text-yellow-600">{s.cw} CW</span>}
-                        {s.dig > 0 && <span className="text-[10px] text-green-400 light:text-green-600">{s.dig} DIG</span>}
+                        {(s?.ph ?? 0) > 0 && <span className="text-[10px] text-blue-400 light:text-blue-600">{s!.ph} PH</span>}
+                        {(s?.cw ?? 0) > 0 && <span className="text-[10px] text-yellow-400 light:text-yellow-600">{s!.cw} CW</span>}
+                        {(s?.dig ?? 0) > 0 && <span className="text-[10px] text-green-400 light:text-green-600">{s!.dig} DIG</span>}
                       </div>
                     </div>
                   );
@@ -440,6 +466,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         <SummarySheet
           event={event}
           score={score}
+          qsos={qsos}
           bonuses={bonuses}
           operators={operators}
           onClose={() => setShowSummary(false)}

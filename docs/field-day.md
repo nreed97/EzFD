@@ -97,6 +97,29 @@ Bonuses are added **after** the power multiplier is applied, so a QRP entry's
 bonuses are worth exactly the same as a high-power entry's. Rule 7.3.13.1 says
 so explicitly for GOTA contacts, and it holds for all of them.
 
+### Before you submit
+
+Open **Summary** on the dashboard and the sheet opens with a short read of the
+log: unrecognised sections, a station that sent two different exchanges, a
+class or callsign that cannot be one, contacts on a band the entry cannot
+score, and any bonus claimed that rule 7.3 does not list for your class.
+
+Two levels, and the difference matters:
+
+| | Means |
+|---|---|
+| **Fix** | The log contradicts the claim. A Winter Field Day objective you have ticked that the log shows you did not meet — those multiply, so one wrong tick moves the whole score |
+| **Check** | Worth your eye. It may be perfectly correct; the app cannot tell |
+
+It does **not** check callsigns against a list of known stations. Field Day
+exists to bring out operators who never enter contests, so the Super Check
+Partial file simply does not contain many good Field Day callsigns — and it is
+downloaded best-effort, so a field server with no internet has none of it at
+all. Flagging every such contact would bury the findings that are real. The
+panel names what it did not look at for the same reason.
+
+Nothing here is refused or corrected for you. It is your entry.
+
 ### The GOTA station
 
 Set a **GOTA callsign** when you create the event and operators can sign in at
