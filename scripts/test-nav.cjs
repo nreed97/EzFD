@@ -271,6 +271,34 @@ console.log('\n-- no source file carries a literal unicode escape --');
   else no('no \\uXXXX escape is written into a component or library', offenders.join(', '));
 }
 
+console.log('\n-- the dashboard does not nest a scroll inside a scroll on a phone --');
+{
+  // A desktop gets a fixed two-pane shell; a phone gets an ordinary scrolling
+  // document. Stacking the desktop shape on a phone gave two peepholes and no
+  // page scroll: a window onto the log, and under it one about two lines tall
+  // onto the score, bonuses, sections, operators and the join code.
+  const src = read('components/DashboardClient.tsx');
+
+  truthy(/min-h-screen/.test(src) && /md:h-screen/.test(src) && /md:overflow-hidden/.test(src),
+    'the shell is min-h-screen on a phone and a fixed height only from md up');
+  truthy(!/className="flex h-screen flex-col overflow-hidden/.test(src),
+    'the root does not lock the document height at every width');
+  truthy(/sticky top-0/.test(src),
+    'the header sticks, so the view tabs stay reachable while the page scrolls');
+
+  // The sidebar must not carry a scroll of its own below md — that is what
+  // made it a peephole rather than part of the page.
+  const aside = /<aside className="([^"]*)"/.exec(src);
+  truthy(aside, 'the sidebar is found');
+  if (aside) {
+    const cls = aside[1];
+    truthy(!/(^|\s)overflow-y-auto(\s|$)/.test(cls),
+      'the sidebar has no unconditional overflow-y-auto');
+    truthy(/md:overflow-y-auto/.test(cls),
+      'it scrolls only from md up, where it sits beside the content rather than under it');
+  }
+}
+
 console.log('\n-- the type scale stays collapsed --');
 {
   // The interface had grown thirteen distinct font sizes, four of them within
