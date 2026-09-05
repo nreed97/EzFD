@@ -87,5 +87,33 @@ for (const line of docsLines) {
 if (checked > 0) ok(`${checked} links checked`);
 else no('links checked', 'none found');
 
+// Every entry cites its pull request as `([#82])`, a reference-style link that
+// only becomes a link if `[#82]: https://...` is defined at the foot of the
+// file. Forget the definition and Markdown renders the citation as the literal
+// text `[#82]` — on GitHub and at /docs alike. It looks almost right, which is
+// why it survives review: the brackets read as deliberate. This is the same
+// failure the anchors above have, one layer down.
+console.log('\n── every issue and PR citation is defined ──');
+{
+  const defined = new Set(
+    [...changelog.matchAll(/^\[(#\d+)\]:\s*\S+/gm)].map(m => m[1]));
+
+  const cited = new Set();
+  for (const line of changelog.split('\n')) {
+    if (/^\[#\d+\]:/.test(line)) continue;          // the definitions themselves
+    for (const m of line.matchAll(/\[(#\d+)\](?!\()/g)) cited.add(m[1]);
+  }
+
+  const missing = [...cited].filter(c => !defined.has(c));
+  if (missing.length === 0) ok(`${cited.size} citations all have a definition`);
+  else no('citations all have a definition', `undefined: ${missing.join(', ')}`);
+
+  // The other direction is harmless but is dead weight, and a definition
+  // nothing cites is usually a citation that was edited away by accident.
+  const unused = [...defined].filter(d => !cited.has(d));
+  if (unused.length === 0) ok('no definition is left over');
+  else no('no definition is left over', `never cited: ${unused.join(', ')}`);
+}
+
 console.log(failures === 0 ? '\nAll changelog link tests passed.' : `\n${failures} failure(s).`);
 process.exit(failures === 0 ? 0 : 1);

@@ -37,10 +37,10 @@ Both must be clean. This is the gate `AGENTS.md` sets and CI enforces.
 
 ## Tests
 
-Fifteen suites, all run by CI. They come in two kinds, and the split is worth
+Sixteen suites, all run by CI. They come in two kinds, and the split is worth
 knowing when you are deciding what to run before a commit.
 
-**Eleven need nothing at all** — no database, no build, no server. They cover
+**Twelve need nothing at all** — no database, no build, no server. They cover
 pure functions, so they run in about a second and are the ones to reach for
 first:
 
@@ -52,6 +52,7 @@ $ node scripts/test-preflight.cjs       # the pre-submission read, and rule 7.3'
 $ node scripts/test-adif.cjs            # ADIF parse and export
 $ node scripts/test-cabrillo.cjs        # Cabrillo submission
 $ node scripts/test-log-filters.cjs     # the dashboard log view
+$ node scripts/test-op-stats.cjs        # who worked what, and that the rows add up
 $ node scripts/test-slot-board.cjs      # the operating position board
 $ node scripts/test-last-position.cjs   # what the position picker preselects
 $ node scripts/test-changelog-links.cjs # the changelog's links into these guides

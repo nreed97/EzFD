@@ -617,6 +617,13 @@ else
   no "  the operating position screenshot is served"
 fi
 
+# The per-operator screenshot is referenced from the operating guide.
+if [[ "$(curl -s -o /dev/null -w '%{content_type}' "$BASE/docs/images/operators.png")" == "image/png" ]]; then
+  ok "  the Operators view screenshot is served"
+else
+  no "  the Operators view screenshot is served"
+fi
+
 # The slug reaches the filesystem, so it must not be able to leave docs/.
 if [[ "$(status GET "/docs/images/..%2f..%2fpackage.json")" == "404" ]]; then
   ok "  a traversal attempt on the docs images is refused"
