@@ -121,6 +121,16 @@ only run events.
   view tabs pinned at the top, and only the log and the operators table keep a
   scroll of their own. Nothing changes on a laptop. ([#88])
   Docs: [Operating → The dashboard](operating.md#the-dashboard)
+- **Field Day says band coordination, not call checkout** `Display` — The
+  logging panel was worded for a special event whatever the event was, so a
+  Field Day screen offered to "check out" the callsign and reported that
+  "nobody has the call checked out" — about a callsign nobody was competing
+  for, since every station sends the club call all weekend. It now says what
+  is actually being coordinated on a contest: the transmitter, one signal per
+  band and mode, held by a station rather than a person. Claiming is still
+  optional there, and the panel no longer prints an empty list saying so.
+  ([#89])
+  Docs: [Operating → Claiming a band and mode](operating.md#claiming-a-band-and-mode), [Quick start → Pick where you're operating](quick-start.md#pick-where-youre-operating)
 - **A busy club no longer pushes the logging panel off the screen** `Display` —
   The Operators list grew with the roster: ten people signed in made it 368px
   tall and ran the side panel 143px past the bottom of a 900px display. It
@@ -485,3 +495,4 @@ continuous enough to be worth summarising.
 [#86]: https://github.com/nreed97/EzFD/pull/86
 [#87]: https://github.com/nreed97/EzFD/pull/87
 [#88]: https://github.com/nreed97/EzFD/pull/88
+[#89]: https://github.com/nreed97/EzFD/pull/89

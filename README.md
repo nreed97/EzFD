@@ -64,11 +64,14 @@ contacts into the exported ADIF, which is what LoTW needs from a station
 operated from several places. One operator can run two radios at once, as two
 logging windows.
 
-**Band and mode coordination, enforced.** A slot is checked out for a band and
-mode, and a database constraint makes overlapping checkouts impossible — one
-signal per band per mode, enforced rather than merely intended. On a special
-event the holder is an operator; on Field Day it's a station, because station 2
-holds 20m phone whoever is sitting at it.
+**Band and mode coordination, enforced.** A slot is claimed for a band and
+mode, and a database constraint makes overlapping claims impossible — one
+signal per band per mode, enforced rather than merely intended. The screen
+says what is actually happening: on Field Day and WFD it is **band
+coordination** and the holder is a station, because station 2 holds 20m phone
+whoever is sitting at it; on a special event it is **call checkout** and the
+holder is the operator, because the shared callsign is what is being handed
+around.
 
 **Exports that go where you need them.** ADIF for LoTW and QRZ, Cabrillo for
 ARRL submission, a printable summary worksheet, and per-operator or

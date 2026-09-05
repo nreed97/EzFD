@@ -28,7 +28,7 @@ Two things you may also be asked for:
 
 ## Pick where you're operating
 
-![Choosing an operating position: bands laid out by mode, colour-coded for what is free, checked out, or already on air](images/operating-position.png)
+![Choosing an operating position: bands laid out by mode, colour-coded for what is free, claimed, or already on air](images/operating-position.png)
 
 Next you're asked where you're sitting. Bands are laid out by mode and
 colour-coded:
@@ -36,27 +36,38 @@ colour-coded:
 | Colour | Meaning |
 |---|---|
 | Plain | Free |
-| Amber | Somebody is logging there but hasn't checked it out |
-| Red | Somebody has it checked out |
-| Green | You have it checked out |
+| Amber | Somebody is logging there but hasn't claimed it |
+| Red | Somebody has claimed it |
+| Green | You have claimed it |
+
+On a special event what is being claimed is the shared callsign, and the
+screen says **check out** rather than claim — see
+[Special event stations](special-events.md). Everything below works the same
+way either way.
 
 One may already be picked for you, with a line underneath saying why:
 
-- **You have it checked out.** Your booking for this shift, which is the whole
-  reason for checking out in the first place.
+- **You have it claimed.** Your booking for this shift, which is the whole
+  reason for claiming in the first place.
 - **This radio was last on it.** Where this browser was logging before —
   usually the rig in front of you, since a club's laptop stays at its radio
   while the operators rotate through.
 
-A checkout wins where both apply, and a band somebody *else* has checked out
-is never offered this way. Either way it is only a starting guess: click any
+A claim wins where both apply, and a band somebody *else* holds is never
+offered this way. Either way it is only a starting guess: click any
 other band and it changes.
 
-Pick one and you get two buttons. **Check out and start logging** claims the
-band and mode so nobody else takes it; **Start without checking out** just
-tunes the form there. On a special event, check out — that's what stops two
-operators signing the same callsign on one band. On a contest it's optional,
-and a casual club can ignore it entirely.
+Pick one and you get two buttons. The first — **Claim and start logging**, or
+**Check out and start logging** on a special event — takes the band and mode
+so nobody else does; the second just tunes the form there without taking it.
+
+On a special event, check out: that's what stops two operators signing the
+same callsign on one band, and it's the whole point of the screen. On Field
+Day or Winter Field Day it's optional. Nobody needs permission to use the club
+call, and the rule being respected is the one about transmitters — one signal
+per band and mode. A casual club can ignore the claim entirely and rely on the
+Operators panel in the logger, which reports who is actually on air without
+anyone having to remember to claim.
 
 If you pick something someone else holds, you can still start there. The log
 warns on each contact rather than refusing it, because a contact that already

@@ -14,9 +14,10 @@
 //   * presence without a claim is its own state, not "open" and not "claimed"
 
 const { compile } = require('./_compile-ts.cjs');
-const ts = compile(['lib/slotBoard.ts', 'lib/bands.ts']);
+const ts = compile(['lib/slotBoard.ts', 'lib/bands.ts', 'lib/slotWords.ts']);
 const { buildSlotBoard, countOpen, slotKey } = ts.load('slotBoard');
 const { bandsFor, extraBandsFor, BAND_GRID, MODES } = ts.load('bands');
+const { slotWords } = ts.load('slotWords');
 
 let failures = 0;
 const ok = m => console.log(`ok    ${m}`);
@@ -147,6 +148,64 @@ console.log('\n── bands offered ──');
   eq(BAND_GRID.flat().every(b => fd.includes(b)), true, 'every grid band is offered');
   eq(extraBandsFor('FD').includes('70cm'), true, 'a contest still gets UHF');
   eq(MODES.join(','), 'PH,CW,DIG', 'and the three scoring modes');
+}
+
+// ── the two vocabularies ────────────────────────────────────────────────
+// The database does the same thing for every event type, but what it means to
+// the operator does not. A special event checks out the shared *callsign*; a
+// contest coordinates the *transmitter* on a band and mode, and nothing about
+// the call is in question — every station sends the club's call all weekend.
+//
+// The logging panel called itself "Call Checkout" and said "Nobody has the
+// call checked out" on a Field Day screen, while the position picker two steps
+// earlier had the contest wording right: the same failure as the section list
+// in two components. The table is one place now, and this is what keeps a
+// contest string from quietly acquiring SES words again.
+console.log('\n── slot vocabulary ──');
+{
+  const fd = slotWords('FD');
+  const wfd = slotWords('WFD');
+  const ses = slotWords('SES');
+  const B = '20m', M = 'PH';
+
+  // Everything a contest operator reads, flattened.
+  const contestText = [
+    fd.title, fd.blurb, fd.claim(B, M), fd.nowHeading, fd.noneHeld ?? '',
+    fd.nobodyHolds(B, M), fd.pickHint, fd.overrideHint,
+    fd.claimAndStart, fd.claiming, fd.startWithout, fd.claimFailed,
+  ].join(' ').toLowerCase();
+
+  // "Call" is the word that makes a contest string wrong: there is no callsign
+  // question on Field Day. "Checkout"/"check out" is the SES metaphor for
+  // holding it, and reads as a permission a contest operator does not need.
+  for (const word of ['call', 'checkout', 'check out', 'checked out']) {
+    eq(contestText.includes(word), false, `no contest string says "${word}"`);
+  }
+  eq(contestText.includes('band and mode'), true,
+    'and a contest string does name the band and mode');
+
+  eq(JSON.stringify(fd) === JSON.stringify(wfd), true,
+    'Winter Field Day reads exactly as Field Day — same one-signal rule, same words');
+  eq(fd.title === ses.title, false, 'the two are not the same panel heading');
+  eq(ses.title.toLowerCase().includes('call'), true,
+    'and a special event does say call, because the call is what is held');
+
+  // Null is the deliberate value, not a missing string: on a contest an
+  // unclaimed band is normal and the Operators panel already answers it.
+  eq(fd.noneHeld, null, 'a contest has no empty-list line');
+  eq(typeof ses.noneHeld, 'string', 'a special event does — an unheld call is news');
+
+  // Every field is populated for both, so a new one cannot ship half-written.
+  for (const [name, w] of [['FD', fd], ['SES', ses]]) {
+    for (const key of ['title', 'blurb', 'nowHeading', 'pickHint', 'overrideHint',
+                       'claimAndStart', 'claiming', 'startWithout', 'claimFailed']) {
+      eq(typeof w[key] === 'string' && w[key].length > 0, true, `${name}.${key} is set`);
+    }
+    for (const key of ['claim', 'nobodyHolds']) {
+      eq(w[key](B, M).includes(B) && w[key](B, M).includes(M), true,
+        `${name}.${key}() names the band and the mode`);
+    }
+  }
 }
 
 console.log(failures === 0 ? '\nAll slot board tests passed.' : `\n${failures} failure(s).`);

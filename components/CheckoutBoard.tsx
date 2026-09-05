@@ -2,7 +2,7 @@
 
 // Dashboard-level view of every SES call checkout: a band/mode grid for
 // taking or assigning the callsign right now, plus the full schedule of
-// upcoming slots. Unlike the compact SesCoordination panel on the logging
+// upcoming slots. Unlike the compact SlotCoordination panel on the logging
 // page (which only acts on the operator's own current band/mode), this is
 // meant for a coordinator managing the whole roster from one screen.
 

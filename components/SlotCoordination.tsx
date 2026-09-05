@@ -2,13 +2,28 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useNow } from '@/lib/useNow';
-import type { Band, Mode, SesReservation } from '@/lib/types';
+import type { Band, EventType, Mode, SesReservation } from '@/lib/types';
+import { slotWords } from '@/lib/slotWords';
 import { useStoredFlag } from '@/lib/useStoredFlag';
 import { BANDS, MODES } from '@/lib/types';
 import DateTimeField from './DateTimeField';
 
+/**
+ * The band/mode slot panel on the logging screen.
+ *
+ * One component, two readings. A special event checks out the *callsign* for
+ * a band and mode; a contest coordinates the *transmitter* on it — the same
+ * exclusion in the database, a different thing to the operator in front of it.
+ * All of the wording comes from `lib/slotWords.ts` so the two can never say
+ * the same sentence about different things; see that file for why the contest
+ * reading matters.
+ */
+
 interface Props {
   eventId: string;
+  /** Decides the vocabulary, and nothing else — every behaviour below keys off
+   *  `stationNumber`, which is what actually records the holder. */
+  eventType: EventType;
   myOpCall: string;
   /** Which radio/window this is. On a special event one operator can run two
    *  radios from two windows; this is what tells their claims apart. */
@@ -84,11 +99,12 @@ function minutesUntil(iso: string | null): number | null {
   return isNaN(ms) ? null : Math.round(ms / 60_000);
 }
 
-export default function SesCoordination({
-  eventId, myOpCall, stationNumber = null, myStation, currentBand, currentMode, slotMinutes,
+export default function SlotCoordination({
+  eventId, eventType, myOpCall, stationNumber = null, myStation, currentBand, currentMode, slotMinutes,
   eventStartsAt, eventEndsAt, refreshToken, lastQsoAt, onHoldingChange,
   startFolded = false,
 }: Props) {
+  const words = slotWords(eventType);
   const [open, setOpen] = useStoredFlag('ezfd_checkout_open', !startFolded);
   const [reservations, setReservations] = useState<SesReservation[]>([]);
   const [busy, setBusy] = useState(false);
@@ -254,7 +270,7 @@ export default function SesCoordination({
         }),
       });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) setError(data.error ?? `Checkout failed (${res.status})`);
+      if (!res.ok) setError(data.error ?? `${words.claimFailed} (${res.status})`);
       await fetchReservations();
     } finally {
       setBusy(false);
@@ -330,7 +346,7 @@ export default function SesCoordination({
           className="tap flex items-center gap-1 text-2xs font-semibold uppercase tracking-wider text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700"
         >
           <span className={`inline-block transition-transform motion-reduce:transition-none ${open ? 'rotate-90' : ''}`}>›</span>
-          Call Checkout
+          {words.title}
         </button>
         {/* Stays visible folded: a live claim is the one thing here an
             operator must not be able to lose track of. */}
@@ -343,6 +359,14 @@ export default function SesCoordination({
 
       {open && (
       <div className="mt-2">
+
+      {/* What this panel is for, in one line. It is not decoration on a
+          contest: an operator who opens a panel called "band coordination"
+          needs to know that claiming is optional here and that the live
+          answer to "is anyone on 20m phone" is the Operators list below. */}
+      <p className="mb-2 text-2xs leading-snug text-zinc-500 light:text-zinc-500">
+        {words.blurb}
+      </p>
 
       {/* Status for the band/mode the form is currently set to */}
       <div className={`mb-2 rounded border px-2 py-1.5 text-2xs ${
@@ -357,7 +381,7 @@ export default function SesCoordination({
         ) : hereHolder ? (
           <><strong>{holderLabel(hereHolder)}</strong> holds {currentBand} {currentMode} until {clockUTC(hereHolder.ends_at)}</>
         ) : (
-          <>Nobody holds <strong>{currentBand} {currentMode}</strong> right now</>
+          <>{words.nobodyHolds(currentBand, currentMode)}</>
         )}
       </div>
 
@@ -431,10 +455,10 @@ export default function SesCoordination({
             type="button"
             disabled={busy || !!hereHolder}
             onClick={checkOut}
-            title={hereHolder ? `${holderLabel(hereHolder)} already holds this band/mode` : undefined}
+            title={hereHolder ? `${holderLabel(hereHolder)} already holds ${currentBand} ${currentMode}` : undefined}
             className="flex-1 rounded bg-amber-400 py-1.5 text-2xs font-bold text-zinc-900 hover:bg-amber-300 disabled:opacity-40 disabled:hover:bg-amber-400"
           >
-            Check out {currentBand} {currentMode}
+            {words.claim(currentBand, currentMode)}
           </button>
         </div>
       )}
@@ -499,13 +523,19 @@ export default function SesCoordination({
         )}
       </div>
 
-      {/* Who has what right now */}
+      {/* Who has what right now.
+          Dropped entirely on a contest with nothing claimed: `noneHeld` is
+          null there, so an empty heading would be a section announcing that
+          an optional feature is unused, in the pane with the least room. On a
+          special event an empty list is real information — nobody has the
+          call — so it stays. */}
+      {(active.length > 0 || words.noneHeld) && (
       <div className="mt-2.5">
         <div className="text-2xs font-semibold uppercase tracking-wider text-zinc-500 mb-1">
-          On the air ({active.length})
+          {words.nowHeading} ({active.length})
         </div>
-        {active.length === 0 && (
-          <p className="text-2xs text-zinc-600 light:text-zinc-400">Nobody has the call checked out.</p>
+        {active.length === 0 && words.noneHeld && (
+          <p className="text-2xs text-zinc-600 light:text-zinc-400">{words.noneHeld}</p>
         )}
         <div className="flex flex-col gap-1">
           {active.map(r => {
@@ -539,6 +569,7 @@ export default function SesCoordination({
           })}
         </div>
       </div>
+      )}
 
       {upcoming.length > 0 && (
         <div className="mt-2.5">

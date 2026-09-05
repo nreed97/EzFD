@@ -20,6 +20,7 @@ import CheckoutBoard from './CheckoutBoard';
 import LogView from './LogView';
 import OperatorStats from './OperatorStats';
 import NavDrawer from './NavDrawer';
+import { slotWords } from '@/lib/slotWords';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
@@ -57,6 +58,9 @@ interface Props {
 
 export default function DashboardClient({ event, initialQSOs, isVisitor = false }: Props) {
   const isSes = event.event_type === 'SES';
+  // This block is SES-only, and the words for it live in one table with the
+  // logging panel's — the same sentence in two files is how they drift.
+  const sesWords = slotWords('SES');
 
   const [qsos, setQSOs] = useState<QSO[]>(initialQSOs);
   // The log opens first, for both event types. It is the thing a dashboard is
@@ -398,10 +402,10 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
           {/* Who currently has the shared callsign, read-only. */}
           {isSes && (
             <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
-              <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">On The Air</div>
+              <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">{sesWords.nowHeading}</div>
               {activeReservations.length === 0 ? (
                 <p className="text-2xs text-zinc-600 light:text-zinc-400">
-                  Nobody has the call checked out.
+                  {sesWords.noneHeld}
                 </p>
               ) : (
                 activeReservations.map(r => (
