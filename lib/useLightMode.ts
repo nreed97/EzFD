@@ -33,3 +33,23 @@ const getServerSnapshot = () => false;
 export function useLightMode(): boolean {
   return useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 }
+
+/**
+ * Flip the theme.
+ *
+ * Lives here rather than inside `ThemeToggle` because the nav drawer offers
+ * the same switch, and two copies of "what light mode means" is the drift this
+ * whole change is about. The root class is the source of truth; the stored
+ * preference is what the inline boot script reads back.
+ */
+export function toggleLightMode(): void {
+  const root = document.documentElement;
+  const next = !root.classList.contains('light');
+  root.classList.toggle('light', next);
+  try {
+    localStorage.setItem('ezfd_theme', next ? 'light' : 'dark');
+  } catch {
+    // A browser with site data blocked still gets the switch, just not the
+    // memory of it — losing the preference is better than losing the toggle.
+  }
+}

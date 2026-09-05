@@ -28,6 +28,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-adif.cjs` | ADIF parse and export — the `Date`/string shapes, per-operator `MY_*`, SES vs contest exchange |
 | `scripts/test-cabrillo.cjs` | Cabrillo submission — `CLAIMED-SCORE`, transmitter numbering, ordering, null class/section |
 | `scripts/test-log-filters.cjs` | The dashboard log view — filters combine, an empty filter restricts nothing, column defaults per event type |
+| `scripts/test-nav.cjs` | The menu behind the hamburger — one list for every surface and width, every action wired up, no component keeping its own copy |
 | `scripts/test-op-stats.cjs` | Who worked what — the rows sum to the log, a dupe earns nothing, a section belongs to whoever reached it first, and rate is a rolling hour |
 | `scripts/test-slot-board.cjs` | The operating position board — released/expired claims, station vs operator attribution, the contest band list |
 | `scripts/test-last-position.cjs` | What the position picker preselects — a claim outranks a remembered position, and a remembered one is validated against the event's bands |
@@ -249,6 +250,8 @@ Hard-won fixes worth knowing before touching this code:
 - **FlexRadio SmartCAT emulates Kenwood TS-2000 CAT**, not FlexRadio's native protocol — use Hamlib model `2014`, not the FlexRadio-specific models (which are TCP-only and can't open a COM port at all).
 - **All rigctld I/O is guarded by one `asyncio.Lock`** — polling (`get_freq`/`get_mode`) and CW commands share a single connection and must not interleave.
 
+- **Chrome is one list, not one per breakpoint.** Everything an operator can *do* comes from `lib/nav.ts` and renders through `components/NavDrawer.tsx`; the header keeps only status. The logger used to hand-maintain two copies — a desktop header and a phone bar — and they drifted into contradictions nobody chose: the guides were reachable **only** below 640px, while `Import ADIF`, both exports and the second-radio window were reachable **only** at 768px and up. A `hidden sm:` is a layout decision and must never be the thing that decides whether a feature exists. `scripts/test-nav.cjs` fails if `lib/nav.ts` grows a width or device term, if a component grows its own copy of an item the menu already offers, or if an entry is added that no surface wires up — the last of which would render a menu row that silently does nothing. Filter on what the event and the hardware *are* (an SES has no Cabrillo, a rig that cannot key CW has no CW window, a visitor gets no files), never on the viewport.
+
 ## React gotchas from this project
 
 - **`react-hooks/set-state-in-effect` cannot see through an async boundary.** It flags `useEffect(() => { load(); })` where `load` is async exactly as it flags a synchronous `setState`, even though the state update happens in a promise continuation and cannot cascade. Those sites carry a per-site disable with that reasoning; a *synchronous* setState in an effect is a real finding and should be fixed, not disabled.
@@ -276,6 +279,8 @@ Hard-won fixes worth knowing before touching this code:
 | `lib/bonuses.ts` | The bonus schedule — one table, read by the scorer, the tracker and the summary sheet |
 | `components/LogView.tsx` | Dashboard log — filtering, column choice, arrival highlight |
 | `lib/logFilters.ts` | Log filtering, pure over an already-loaded array |
+| `lib/nav.ts` | The menu — one table, read by the logger and the dashboard alike |
+| `components/NavDrawer.tsx` | The hamburger and its slide-out panel |
 | `lib/opStats.ts` | Per-operator figures — the one derivation, read by the dashboard tab and the sidebar panel |
 | `components/OperatorStats.tsx` | The dashboard's Operators view |
 | `lib/logColumns.ts` | The log column table and per-event-type defaults |

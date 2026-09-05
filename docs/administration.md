@@ -226,9 +226,9 @@ status, then lets you act on one:
 
 ## Backups
 
-Event owners can also take a backup without shell access: the dashboard's
-**Backup** button downloads the same JSON this console writes, and the home
-page restores one. Both call the same `ezfd_export_events()` /
+Event owners can also take a backup without shell access: **Full event backup**
+in the dashboard's ☰ menu downloads the same JSON this console writes, and the
+home page restores one. Both call the same `ezfd_export_events()` /
 `ezfd_restore_events()` functions in `db/schema.sql`, so the two paths cannot
 produce or accept different shapes.
 

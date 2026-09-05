@@ -107,8 +107,9 @@ One operator on two rigs — 20m phone on one, 40m CW on the other — is a norm
 special event pattern, and the checkout has always allowed it: slots are
 exclusive per band and mode, not per person, so holding two at once is legal.
 
-Each radio is its own logging window. Click **+ Radio 2** in the header to open
-one; it is a full logger at `?station=2`, and its own header offers **+ Radio 3**
+Each radio is its own logging window. Choose **Open station 2** from the ☰
+menu to open one; it is a full logger at `?station=2`, and its own menu offers
+**Open station 3**
 if you need it. Everything is per window from there: each shows what *that*
 radio holds, going QRT shuts down only that radio, and changing band in one
 releases only that radio's slot.
@@ -200,7 +201,8 @@ collecting per-operator logs doesn't produce a directory of identical names.
 
 ## Merging offline logs
 
-Operators who logged in N1MM or N3FJP can merge with **Import ADIF**. Records
+Operators who logged in N1MM or N3FJP can merge with **Import ADIF**, in the
+☰ menu. Records
 already present — matched on callsign, band, mode and a ±2 minute window — are
 skipped rather than inserted, so re-importing the same file, or two operators
 importing overlapping exports, can't double the log. The result reports them
