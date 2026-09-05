@@ -214,7 +214,7 @@ export default function CheckoutBoard({
                     return (
                       <td key={mode} className="p-1 align-top">
                         {holder ? (
-                          <div className="flex flex-col gap-0.5 rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-1 text-[11px] light:border-zinc-300 light:bg-zinc-100">
+                          <div className="flex flex-col gap-0.5 rounded border border-zinc-700 bg-zinc-800/60 px-1.5 py-1 text-2xs light:border-zinc-300 light:bg-zinc-100">
                             <span className="font-mono font-semibold text-amber-400 light:text-amber-700">{holder.op_call}</span>
                             <span className="font-mono text-zinc-500">until {clockUTC(holder.ends_at)}</span>
                             {!readOnly && (
@@ -222,7 +222,7 @@ export default function CheckoutBoard({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => release(holder)}
-                                className="mt-0.5 self-start text-[10px] text-red-400 hover:underline disabled:opacity-50"
+                                className="mt-0.5 self-start text-2xs text-red-400 hover:underline disabled:opacity-50"
                               >
                                 Release
                               </button>
@@ -236,12 +236,12 @@ export default function CheckoutBoard({
                               onChange={e => setAssignCall(e.target.value.toUpperCase())}
                               placeholder="Callsign"
                               list="ckb-known-ops"
-                              className="w-full rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 font-mono text-[11px] text-zinc-200 light:border-zinc-300 light:bg-white light:text-zinc-800"
+                              className="w-full rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 font-mono text-2xs text-zinc-200 light:border-zinc-300 light:bg-white light:text-zinc-800"
                             />
                             <select
                               value={assignMinutes}
                               onChange={e => setAssignMinutes(Number(e.target.value))}
-                              className="w-full rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 text-[11px] text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
+                              className="w-full rounded border border-zinc-700 bg-zinc-800 px-1 py-0.5 text-2xs text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700"
                             >
                               {DURATIONS.map(m => (
                                 <option key={m} value={m}>{m >= 60 ? `${m / 60}h` : `${m}m`}</option>
@@ -252,14 +252,14 @@ export default function CheckoutBoard({
                                 type="button"
                                 disabled={busy}
                                 onClick={() => take(band, mode, assignCall, assignMinutes)}
-                                className="flex-1 rounded bg-amber-400 py-0.5 text-[10px] font-bold text-zinc-900 hover:bg-amber-300 disabled:opacity-50"
+                                className="flex-1 rounded bg-amber-400 py-0.5 text-2xs font-bold text-zinc-900 hover:bg-amber-300 disabled:opacity-50"
                               >
                                 Assign
                               </button>
                               <button
                                 type="button"
                                 onClick={() => setAssignCell(null)}
-                                className="rounded border border-zinc-700 px-1.5 text-[10px] text-zinc-400 hover:bg-zinc-800 light:border-zinc-300"
+                                className="rounded border border-zinc-700 px-1.5 text-2xs text-zinc-400 hover:bg-zinc-800 light:border-zinc-300"
                               >
                                 &times;
                               </button>
@@ -270,7 +270,7 @@ export default function CheckoutBoard({
                             <button
                               type="button"
                               onClick={() => { setAssignCell({ band, mode }); setAssignCall(myOpCall); setAssignMinutes(slotMinutes); }}
-                              className="w-full rounded border border-dashed border-zinc-700 py-1.5 text-[10px] text-zinc-600 hover:border-amber-400 hover:text-amber-400 light:border-zinc-300 light:text-zinc-400"
+                              className="w-full rounded border border-dashed border-zinc-700 py-1.5 text-2xs text-zinc-600 hover:border-amber-400 hover:text-amber-400 light:border-zinc-300 light:text-zinc-400"
                             >
                               + Take
                             </button>
@@ -298,7 +298,7 @@ export default function CheckoutBoard({
             <button
               type="button"
               onClick={() => setShowSchedule(v => !v)}
-              className="rounded border border-zinc-700 px-2 py-1 text-[11px] font-semibold text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 light:border-zinc-300 light:text-zinc-500"
+              className="rounded border border-zinc-700 px-2 py-1 text-2xs font-semibold text-zinc-400 hover:border-zinc-500 hover:text-zinc-200 light:border-zinc-300 light:text-zinc-500"
             >
               {showSchedule ? 'Close' : '+ Book a slot'}
             </button>

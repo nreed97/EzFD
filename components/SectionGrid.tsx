@@ -25,7 +25,7 @@ export default function SectionGrid({ workedSections }: Props) {
       <div className="flex flex-col gap-3">
         {SECTION_GROUPS.map(group => (
           <div key={group.label}>
-            <div className="mb-1 text-[10px] font-semibold uppercase tracking-widest text-zinc-600 light:text-zinc-400">
+            <div className="mb-1 text-2xs font-semibold uppercase tracking-widest text-zinc-600 light:text-zinc-400">
               {group.title}
             </div>
             <div className="flex flex-wrap gap-1">

@@ -274,10 +274,10 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, even
                   <span className="flex items-center gap-1.5 flex-wrap">
                     {qso.callsign}
                     {qso._pending && (
-                      <span className="text-[10px] text-yellow-500 animate-pulse">↑ sync</span>
+                      <span className="text-2xs text-yellow-500 animate-pulse">↑ sync</span>
                     )}
                     {qso.is_dupe && !qso._pending && (
-                      <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-[9px] font-medium uppercase tracking-wide text-zinc-400">
+                      <span className="rounded bg-zinc-700 px-1.5 py-0.5 text-2xs font-medium uppercase tracking-wide text-zinc-400">
                         dupe
                       </span>
                     )}

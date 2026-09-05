@@ -337,7 +337,7 @@ export default function LoggingClient({
           {isGota && event.gota_call && (
             <span
               title={`Get On The Air station — contacts count for ${event.club_call} and earn 5 bonus points each`}
-              className="hidden sm:inline-flex shrink-0 rounded border border-sky-700 bg-sky-900/30 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-sky-400"
+              className="hidden sm:inline-flex shrink-0 rounded border border-sky-700 bg-sky-900/30 px-1.5 py-0.5 text-2xs font-semibold uppercase tracking-wide text-sky-400"
             >
               GOTA
             </span>
@@ -370,7 +370,7 @@ export default function LoggingClient({
             title={rigConnected
               ? `Rig control active${rigFreq ? ` — ${(rigFreq / 1e6).toFixed(3)} MHz` : ''}. Click for details.`
               : 'Connect a radio — Web Serial in Chrome, or the bridge for other browsers'}
-            className={`inline-flex shrink-0 items-center gap-1.5 rounded border px-2 py-1 text-[10px] font-semibold transition-colors ${
+            className={`tap inline-flex shrink-0 items-center gap-1.5 rounded border px-2 py-1 text-2xs font-semibold transition-colors ${
               rigConnected
                 ? 'border-green-700 bg-green-900/30 text-green-400 hover:bg-green-900/50'
                 : 'border-zinc-700 text-zinc-400 hover:bg-zinc-800 light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100'
@@ -395,7 +395,7 @@ export default function LoggingClient({
             <button
               onClick={navHandlers.cwWindow}
               title="Open the CW macro and keying window"
-              className="inline-flex shrink-0 items-center gap-1 rounded border border-amber-700 bg-amber-900/20 px-2 py-1 text-[10px] font-semibold uppercase tracking-wide text-amber-400 transition-colors hover:bg-amber-900/40"
+              className="tap inline-flex shrink-0 items-center gap-1 rounded border border-amber-700 bg-amber-900/20 px-2 py-1 text-2xs font-semibold uppercase tracking-wide text-amber-400 transition-colors hover:bg-amber-900/40"
             >
               CW
             </button>
@@ -477,7 +477,7 @@ export default function LoggingClient({
       </div>
 
       <div className="flex flex-1 overflow-hidden">
-        <aside className={`${mobileTab === 'log' ? 'flex' : 'hidden'} md:flex w-full md:w-80 flex-col gap-3 overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-4 shrink-0 light:border-zinc-200 light:bg-zinc-50`}>
+        <aside className={`${mobileTab === 'log' ? 'flex' : 'hidden'} md:flex w-full md:w-80 flex-col gap-2 overflow-y-auto border-r border-zinc-800 bg-zinc-900 p-3 shrink-0 light:border-zinc-200 light:bg-zinc-50`}>
           {/* For an SES the checkout panel is authoritative about who may
               transmit, so the presence-based conflict warning would just be
               noise on top of it. */}
@@ -569,7 +569,7 @@ export default function LoggingClient({
               <button
                 type="button"
                 onClick={() => setShowNeeds(true)}
-                className="w-full rounded-lg border border-zinc-700 py-2 text-xs font-semibold text-zinc-400 hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
+                className="tap w-full rounded-lg border border-zinc-700 py-2 text-xs font-semibold text-zinc-400 hover:border-zinc-500 hover:bg-zinc-800 hover:text-zinc-200 transition-colors light:border-zinc-300 light:text-zinc-600 light:hover:bg-zinc-100"
               >
                 Sections Needed ({Math.max(0, ARRL_SECTIONS.length - score.sections_worked)})
               </button>

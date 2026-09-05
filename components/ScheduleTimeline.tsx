@@ -137,7 +137,7 @@ export default function ScheduleTimeline({ eventId, myOpCall, refreshToken }: Pr
               type="button"
               onClick={() => setSpanHours(s.hours)}
               aria-pressed={spanHours === s.hours}
-              className={`px-2 py-0.5 text-[11px] transition-colors ${
+              className={`px-2 py-0.5 text-2xs transition-colors ${
                 spanHours === s.hours
                   ? 'bg-amber-400 font-semibold text-zinc-900'
                   : 'text-zinc-400 hover:bg-zinc-800 light:text-zinc-600 light:hover:bg-zinc-100'
@@ -151,7 +151,7 @@ export default function ScheduleTimeline({ eventId, myOpCall, refreshToken }: Pr
 
       {/* Legend — identity is never colour-alone, but the fills still need
           naming so the strip reads without hovering. */}
-      <div className="mb-2 flex flex-wrap items-center gap-3 text-[10px] text-zinc-500">
+      <div className="mb-2 flex flex-wrap items-center gap-3 text-2xs text-zinc-500">
         <span className="flex items-center gap-1">
           <span className="h-2.5 w-4 rounded-sm bg-amber-400" /> You
         </span>
@@ -179,7 +179,7 @@ export default function ScheduleTimeline({ eventId, myOpCall, refreshToken }: Pr
                 <span
                   key={t.label + t.pct}
                   style={{ left: `${t.pct}%` }}
-                  className="absolute -translate-x-1/2 font-mono text-[10px] text-zinc-600 light:text-zinc-400"
+                  className="absolute -translate-x-1/2 font-mono text-2xs text-zinc-600 light:text-zinc-400"
                 >
                   {t.label}
                 </span>
@@ -193,7 +193,7 @@ export default function ScheduleTimeline({ eventId, myOpCall, refreshToken }: Pr
                       readable here whether or not colour comes through. */}
                   {/* 5.5rem + the 0.5rem gap lines the lanes up with the
                       axis row's ml-24 (6rem). */}
-                  <div className="w-[5.5rem] shrink-0 text-right font-mono text-[11px]">
+                  <div className="w-[5.5rem] shrink-0 text-right font-mono text-2xs">
                     <span className="text-zinc-300 light:text-zinc-700">{lane.band}</span>{' '}
                     <span className={`font-bold ${MODE_COLORS[lane.mode] ?? 'text-zinc-400'}`}>
                       {lane.mode}
@@ -235,7 +235,7 @@ export default function ScheduleTimeline({ eventId, myOpCall, refreshToken }: Pr
                           }`}
                         >
                           <span
-                            className={`truncate font-mono text-[10px] font-semibold ${
+                            className={`truncate font-mono text-2xs font-semibold ${
                               done
                                 ? 'text-zinc-500'
                                 : mine

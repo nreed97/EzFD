@@ -42,7 +42,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
               href={`/docs/${prev.slug}`}
               className="group min-w-0 flex-1 rounded-lg border border-zinc-800 px-3 py-2 hover:border-zinc-600 light:border-zinc-200 light:hover:border-zinc-400"
             >
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Previous</div>
+              <div className="text-2xs font-semibold uppercase tracking-wider text-zinc-500">Previous</div>
               <div className="truncate text-sm text-zinc-300 group-hover:text-amber-400 light:text-zinc-700">
                 ← {prev.title}
               </div>
@@ -55,7 +55,7 @@ export default async function DocPage({ params }: { params: Promise<{ slug: stri
               href={`/docs/${next.slug}`}
               className="group min-w-0 flex-1 rounded-lg border border-zinc-800 px-3 py-2 text-right hover:border-zinc-600 light:border-zinc-200 light:hover:border-zinc-400"
             >
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">Next</div>
+              <div className="text-2xs font-semibold uppercase tracking-wider text-zinc-500">Next</div>
               <div className="truncate text-sm text-zinc-300 group-hover:text-amber-400 light:text-zinc-700">
                 {next.title} →
               </div>

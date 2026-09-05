@@ -447,10 +447,10 @@ function CwMacroPanel({ onSend, onStop, getFormValues, myCall, eventClass, event
               <div className="flex items-center gap-1 leading-tight">
                 <span className="text-xs font-bold text-amber-400">F{i + 1}</span>
                 {role && esm && (
-                  <span className="text-[10px] font-bold text-blue-400 border border-blue-800 rounded px-1">{role}</span>
+                  <span className="text-2xs font-bold text-blue-400 border border-blue-800 rounded px-1">{role}</span>
                 )}
               </div>
-              <div className="text-[11px] text-zinc-300 leading-tight truncate light:text-zinc-700">
+              <div className="text-2xs text-zinc-300 leading-tight truncate light:text-zinc-700">
                 {macros[i] || <span className="text-zinc-600">empty</span>}
               </div>
             </button>

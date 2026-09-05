@@ -49,7 +49,7 @@ export default function DocsNav({ groups, indexLabel = 'All guides' }: Props) {
       <li>{link('/docs', indexLabel, onIndex)}</li>
       {groups.map(group => (
         <li key={group.title}>
-          <div className="px-2 pb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+          <div className="px-2 pb-1 text-2xs font-semibold uppercase tracking-wider text-zinc-500">
             {group.title}
           </div>
           <ul className="flex flex-col gap-0.5">

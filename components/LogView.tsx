@@ -197,7 +197,7 @@ export default function LogView({ event, qsos }: Props) {
       <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-zinc-800 light:border-zinc-200">
         <table className="w-full border-collapse font-mono text-xs">
           <thead className="sticky top-0 z-10 bg-zinc-900 light:bg-zinc-100">
-            <tr className="text-left text-[10px] uppercase tracking-wider text-zinc-500">
+            <tr className="text-left text-2xs uppercase tracking-wider text-zinc-500">
               {columns.map(c => (
                 <th
                   key={c.id}

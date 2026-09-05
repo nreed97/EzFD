@@ -195,7 +195,7 @@ export default function OperatorStats({ qsos, eventType, presence = [], nowMs }:
                     {r.stations.length > 1 && (
                       <span
                         title={`Logged from stations ${r.stations.join(', ')}`}
-                        className="ml-1.5 text-[10px] text-zinc-500"
+                        className="ml-1.5 text-2xs text-zinc-500"
                       >
                         stn {r.stations.join('/')}
                       </span>
@@ -209,11 +209,11 @@ export default function OperatorStats({ qsos, eventType, presence = [], nowMs }:
                   <td className={`px-2 py-1 text-zinc-400 light:text-zinc-600 ${numeric}`}>{rate(r.spanRate)}</td>
                   <td className="px-2 py-1">
                     <span className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5">
-                      <span className="font-mono text-[11px] text-zinc-300 light:text-zinc-700">
+                      <span className="font-mono text-2xs text-zinc-300 light:text-zinc-700">
                         {r.bands.length > 0 ? r.bands.join(' ') : '—'}
                       </span>
                       {r.modes.map(m => (
-                        <span key={m} className={`text-[10px] font-mono ${MODE_COLORS[m] ?? 'text-zinc-400'}`}>{m}</span>
+                        <span key={m} className={`text-2xs font-mono ${MODE_COLORS[m] ?? 'text-zinc-400'}`}>{m}</span>
                       ))}
                     </span>
                   </td>
@@ -231,7 +231,7 @@ export default function OperatorStats({ qsos, eventType, presence = [], nowMs }:
                   <td className={`px-2 py-1 ${numeric} ${r.dupes > 0 ? 'text-zinc-400 light:text-zinc-600' : 'text-zinc-700 light:text-zinc-300'}`}>
                     {r.dupes || '—'}
                   </td>
-                  <td className="whitespace-nowrap px-2 py-1 font-mono text-[11px] text-zinc-500 light:text-zinc-500">
+                  <td className="whitespace-nowrap px-2 py-1 font-mono text-2xs text-zinc-500 light:text-zinc-500">
                     {r.first ? `${hhmmZ(r.first)}–${hhmmZ(r.last)}` : '—'}
                   </td>
                   {table.hasGota && (
@@ -243,12 +243,12 @@ export default function OperatorStats({ qsos, eventType, presence = [], nowMs }:
                     {p ? (
                       <span className="flex items-center gap-1.5">
                         <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${active ? 'bg-green-400' : 'bg-zinc-600'}`} />
-                        <span className="font-mono text-[11px] text-amber-400 light:text-amber-700">{p.band}</span>
-                        <span className={`font-mono text-[11px] ${MODE_COLORS[p.mode] ?? 'text-zinc-400'}`}>{p.mode}</span>
-                        {!active && <span className="text-[10px] text-zinc-600">idle</span>}
+                        <span className="font-mono text-2xs text-amber-400 light:text-amber-700">{p.band}</span>
+                        <span className={`font-mono text-2xs ${MODE_COLORS[p.mode] ?? 'text-zinc-400'}`}>{p.mode}</span>
+                        {!active && <span className="text-2xs text-zinc-600">idle</span>}
                       </span>
                     ) : (
-                      <span className="text-[11px] text-zinc-700 light:text-zinc-300">—</span>
+                      <span className="text-2xs text-zinc-700 light:text-zinc-300">—</span>
                     )}
                   </td>
                 </tr>
@@ -263,14 +263,14 @@ export default function OperatorStats({ qsos, eventType, presence = [], nowMs }:
                   <td className="px-2 py-1">
                     <span className="font-mono font-bold text-zinc-200 light:text-zinc-800">{call}</span>
                   </td>
-                  <td colSpan={columns.length - 1 + (table.hasGota ? 1 : 0)} className="px-2 py-1 text-[11px] italic text-zinc-500">
+                  <td colSpan={columns.length - 1 + (table.hasGota ? 1 : 0)} className="px-2 py-1 text-2xs italic text-zinc-500">
                     signed in, nothing logged yet
                   </td>
                   <td className="whitespace-nowrap px-2 py-1">
                     <span className="flex items-center gap-1.5">
                       <span className={`h-1.5 w-1.5 shrink-0 rounded-full ${active ? 'bg-green-400' : 'bg-zinc-600'}`} />
-                      <span className="font-mono text-[11px] text-amber-400 light:text-amber-700">{p.band}</span>
-                      <span className={`font-mono text-[11px] ${MODE_COLORS[p.mode] ?? 'text-zinc-400'}`}>{p.mode}</span>
+                      <span className="font-mono text-2xs text-amber-400 light:text-amber-700">{p.band}</span>
+                      <span className={`font-mono text-2xs ${MODE_COLORS[p.mode] ?? 'text-zinc-400'}`}>{p.mode}</span>
                     </span>
                   </td>
                 </tr>
@@ -282,7 +282,7 @@ export default function OperatorStats({ qsos, eventType, presence = [], nowMs }:
               without adding a column up by hand. */}
           <tfoot className="sticky bottom-0 bg-zinc-900 light:bg-zinc-50">
             <tr className="border-t border-zinc-700 light:border-zinc-300">
-              <td className="px-2 py-1.5 text-[11px] uppercase tracking-wider text-zinc-500">Total</td>
+              <td className="px-2 py-1.5 text-2xs uppercase tracking-wider text-zinc-500">Total</td>
               <td className={`px-2 py-1.5 font-bold text-zinc-100 light:text-zinc-900 ${numeric}`}>{table.totals.qsos}</td>
               <td className={`px-2 py-1.5 font-bold text-amber-400 light:text-amber-700 ${numeric}`}>{table.totals.qsoPoints}</td>
               <td colSpan={table.showsSections ? 5 : 3} />

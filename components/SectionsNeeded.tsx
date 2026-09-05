@@ -55,10 +55,10 @@ export default function SectionsNeeded({ workedSections, unknownSections = [] }:
           return (
             <div key={region.title}>
               <div className="mb-1 flex items-center gap-2">
-                <span className="text-[10px] font-semibold uppercase tracking-wider text-zinc-500">
+                <span className="text-2xs font-semibold uppercase tracking-wider text-zinc-500">
                   {region.title}
                 </span>
-                <span className="text-[10px] text-zinc-600">
+                <span className="text-2xs text-zinc-600">
                   {needed.length}/{region.sections.length} needed
                 </span>
               </div>

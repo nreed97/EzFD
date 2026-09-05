@@ -146,7 +146,7 @@ function ClockFace({
               y={y}
               textAnchor="middle"
               dominantBaseline="central"
-              className={`pointer-events-none text-[13px] font-mono ${
+              className={`pointer-events-none text-xs font-mono ${
                 p.active ? 'fill-zinc-900 font-bold' : 'fill-zinc-300 light:fill-zinc-600'
               }`}
             >
@@ -258,7 +258,7 @@ export default function ClockTimePicker({
   }
 
   const wrapperClass = compact
-    ? 'flex items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-[11px] text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700'
+    ? 'flex items-center gap-1 rounded border border-zinc-700 bg-zinc-800 px-1.5 py-1 text-2xs text-zinc-300 light:border-zinc-300 light:bg-white light:text-zinc-700'
     : 'input flex items-center gap-1 py-1';
   const digitWidth = compact ? 'w-5' : 'w-7';
   const iconSize = compact ? 'h-3.5 w-3.5' : 'h-4 w-4';
@@ -287,7 +287,7 @@ export default function ClockTimePicker({
           aria-label={label ? `${label} minute` : 'Minute'}
           className={`${digitWidth} border-0 bg-transparent p-0 text-center font-mono focus:outline-none`}
         />
-        {!compact && <span className="ml-auto text-[10px] uppercase tracking-wide text-zinc-500">24h</span>}
+        {!compact && <span className="ml-auto text-2xs uppercase tracking-wide text-zinc-500">24h</span>}
         <button
           type="button"
           onClick={() => setOpen(o => !o)}

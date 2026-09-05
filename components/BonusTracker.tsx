@@ -89,7 +89,7 @@ export default function BonusTracker({
               +{bonusPoints.toLocaleString()}
             </span>
           )}
-          {saving && <span className="text-[10px] text-zinc-600">saving…</span>}
+          {saving && <span className="text-2xs text-zinc-600">saving…</span>}
         </div>
         <span className="text-zinc-600 text-xs">{open ? '▲' : '▼'}</span>
       </button>
@@ -97,7 +97,7 @@ export default function BonusTracker({
       {open && (
         <div className="border-t border-zinc-800 light:border-zinc-200 px-3 pb-3 pt-2 flex flex-col gap-1.5">
           {isWfd && (
-            <p className="mb-1 text-[10px] leading-snug text-zinc-500 light:text-zinc-400">
+            <p className="mb-1 text-2xs leading-snug text-zinc-500 light:text-zinc-400">
               Objectives multiply your QSO points — score is
               {' '}<span className="font-mono text-zinc-400 light:text-zinc-600">QSO points × (OM + 1)</span>.
               {' '}{done} of {WFD_OBJECTIVES.length} complete, ×{objMult} of a possible ×{WFD_MAX_MULTIPLIER}.
@@ -117,7 +117,7 @@ export default function BonusTracker({
                   {obj.label}
                 </span>
               </div>
-              <span className="shrink-0 font-mono text-[10px] text-zinc-600 light:text-zinc-400">
+              <span className="shrink-0 font-mono text-2xs text-zinc-600 light:text-zinc-400">
                 OM +{obj.om}
               </span>
             </div>
@@ -170,7 +170,7 @@ export default function BonusTracker({
               {/* The rule number rides with the rate rather than the label:
                   inside the label's truncating span it ate enough width to
                   clip "Message to section manager" down to a stub. */}
-              <span className="shrink-0 text-[10px] text-zinc-600 light:text-zinc-400">
+              <span className="shrink-0 text-2xs text-zinc-600 light:text-zinc-400">
                 {def.rule && <span className="mr-1.5 opacity-70">{def.rule}</span>}
                 {bonusRate(def, ctx)}
               </span>
