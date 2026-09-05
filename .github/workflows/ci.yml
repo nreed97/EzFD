@@ -66,6 +66,12 @@ jobs:
       - name: GOTA tests
         run: node scripts/test-gota.cjs
 
+      # The pre-submission read of the log. Also the guard that keeps rule
+      # 7.3's class-eligibility column in lib/bonuses.ts matching the
+      # transcription in docs/rules-reference.md.
+      - name: Pre-submission check tests
+        run: node scripts/test-preflight.cjs
+
       # ADIF and Cabrillo are what a log looks like once it leaves this app —
       # the file uploaded to LoTW and the one submitted to the ARRL. Both were
       # covered only by substring checks in the end-to-end suite, which can't

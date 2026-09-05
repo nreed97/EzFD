@@ -440,6 +440,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         <SummarySheet
           event={event}
           score={score}
+          qsos={qsos}
           bonuses={bonuses}
           operators={operators}
           onClose={() => setShowSummary(false)}

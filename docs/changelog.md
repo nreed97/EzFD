@@ -27,6 +27,15 @@ only run events.
 
 ### Added
 
+- **A read of the log before you submit** `Scoring` `Display` — The summary
+  sheet now opens with anything worth settling first: unrecognised sections, a
+  station that sent two different exchanges, a bonus claimed that rule 7.3
+  does not list for your class, and Winter Field Day objectives the log
+  contradicts — those multiply, so a wrong tick moves the whole score. It does
+  not check callsigns against any list: Field Day brings out operators no
+  contest list has heard of, and flagging them would bury the findings that
+  are real. ([#81])
+  Docs: [Field Day → Before you submit](field-day.md#before-you-submit)
 - **The GOTA station is a real station now** `Scoring` `Exports` `Display` —
   Set a GOTA callsign on the event and operators can sign in there; their
   contacts are signed with that call, count for the entry as normal, and earn

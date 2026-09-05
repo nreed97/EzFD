@@ -147,6 +147,12 @@ export function isSES(event: Pick<Event, 'event_type'>): boolean {
  * one (1)", so anything unparseable or non-positive floors at 1 rather than
  * zeroing the per-transmitter emergency power bonus that reads this.
  */
+/** The letter of an entry class — "A" from "3A". Empty when there isn't one,
+ *  which is every special event and any malformed class. */
+export function entryClassLetter(eventClass: string | null | undefined): string {
+  return (eventClass ?? '').toUpperCase().replace(/^\d+/, '').trim();
+}
+
 export function transmitterCount(eventClass: string | null | undefined): number {
   const n = parseInt(eventClass?.match(/^\d+/)?.[0] ?? '', 10);
   return Number.isFinite(n) && n > 0 ? n : 1;

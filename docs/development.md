@@ -37,10 +37,10 @@ Both must be clean. This is the gate `AGENTS.md` sets and CI enforces.
 
 ## Tests
 
-Fourteen suites, all run by CI. They come in two kinds, and the split is worth
+Fifteen suites, all run by CI. They come in two kinds, and the split is worth
 knowing when you are deciding what to run before a commit.
 
-**Ten need nothing at all** — no database, no build, no server. They cover
+**Eleven need nothing at all** — no database, no build, no server. They cover
 pure functions, so they run in about a second and are the ones to reach for
 first:
 
@@ -48,6 +48,7 @@ first:
 $ node scripts/test-sections.cjs        # the ARRL/RAC section list, in all three places
 $ node scripts/test-scoring.cjs         # the ARRL formula, bonuses and their caps
 $ node scripts/test-gota.cjs            # GOTA counts twice, and its count comes from the log
+$ node scripts/test-preflight.cjs       # the pre-submission read, and rule 7.3's class column
 $ node scripts/test-adif.cjs            # ADIF parse and export
 $ node scripts/test-cabrillo.cjs        # Cabrillo submission
 $ node scripts/test-log-filters.cjs     # the dashboard log view
@@ -143,7 +144,7 @@ A test that has never been observed failing is a test you don't know works.
 
 | Job | Runs |
 |---|---|
-| `build` | The ten pure suites, then lint, typecheck and build, then the end-to-end suite against the built server |
+| `build` | The eleven pure suites, then lint, typecheck and build, then the end-to-end suite against the built server |
 | `schema` | Schema applied twice for idempotency, then the constraint, query and restore suites |
 | `shell` | `bash -n` on every tracked `.sh`, the rig-bridge copy check, then `shellcheck` |
 
