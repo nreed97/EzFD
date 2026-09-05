@@ -8,9 +8,20 @@ interface Props {
   /** Winter Field Day multiplies by objectives rather than power, and has no
    *  bonus points at all. */
   isWfd?: boolean;
+  /** The logging screen's copy: the mode split and the score, and nothing
+   *  else.
+   *
+   *  The full panel is 318px, which is what pushed the logging pane past the
+   *  bottom of a 768-tall laptop. Everything it drops — QSO points, the
+   *  multiplier, sections, the base score, the bonus line and the by-band
+   *  table — is on the dashboard, a menu tap away, and none of it changes
+   *  between one contact and the next in a way an operator acts on mid-run.
+   *  The two numbers that do are here. */
+  compact?: boolean;
 }
 
-export default function Scoreboard({ score, bonusPoints = 0, isWfd = false }: Props) {
+export default function Scoreboard({ score, bonusPoints = 0, isWfd = false, compact = false }: Props) {
+  const total = score.total_score;
   return (
     <div className="rounded-xl border border-zinc-800 bg-zinc-900/50 p-3 text-xs light:border-zinc-200 light:bg-zinc-100/50">
       <h3 className="mb-2 font-semibold text-zinc-400 uppercase tracking-wider text-[10px] light:text-zinc-500">Score</h3>
@@ -30,6 +41,15 @@ export default function Scoreboard({ score, bonusPoints = 0, isWfd = false }: Pr
         </div>
       </div>
 
+      {compact ? (
+        <div className="flex items-baseline justify-between border-t border-zinc-800 pt-2 light:border-zinc-200">
+          <span className="font-semibold text-zinc-100 light:text-zinc-900">
+            {bonusPoints > 0 ? 'Claimed' : 'Score'}
+          </span>
+          <span className="font-mono text-lg font-bold text-amber-400">{total.toLocaleString()}</span>
+        </div>
+      ) : (
+      <>
       <div className="flex items-baseline justify-between border-t border-zinc-800 pt-2 mb-1 light:border-zinc-200">
         <span className="text-zinc-400 light:text-zinc-600">QSO pts</span>
         <span className="font-mono text-zinc-200 light:text-zinc-800">{score.qso_points}</span>
@@ -81,6 +101,8 @@ export default function Scoreboard({ score, bonusPoints = 0, isWfd = false }: Pr
             </div>
           ))}
         </div>
+      )}
+      </>
       )}
     </div>
   );

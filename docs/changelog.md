@@ -27,6 +27,12 @@ only run events.
 
 ### Added
 
+- **Rig control is a button in the header** `Display` — It shows whether a
+  radio is connected and what it is tuned to, and with none connected it reads
+  `Rig off` and opens the panel you connect from. That panel used to be
+  reachable only from the band list further down, which is not where anyone
+  looks for "how do I hook up my radio". ([#86])
+  Docs: [Operating → Reading the header](operating.md#reading-the-header), [Rig control → Setup](rig-control.md#setup)
 - **One menu, behind ☰** `Display` — Everything you can *do* on the logger and
   the dashboard now lives in a slide-out menu, grouped and with a line under
   each entry saying what it is. The header keeps only what you read at a
@@ -61,6 +67,26 @@ only run events.
 
 ### Changed
 
+- **The logging screen's side panel fits without scrolling** `Display` — On a
+  1366x768 laptop it ran 307px past the bottom of the screen. The score panel
+  now shows the mode split and the score, with the full breakdown on the
+  dashboard, and the call checkout starts folded on a contest, where claiming
+  a band is opt-in. It stays open on a special event, and a claim you hold is
+  shown either way. ([#86])
+  Docs: [Operating → The dashboard](operating.md#the-dashboard)
+- **Quick Log is offered on special events only** `Exports` — It logs a
+  contact straight from the callsign box, which is what a special event wants
+  and what a contest cannot use: Field Day and Winter Field Day need a class
+  and section from every station, and logging without them filed whatever was
+  left in the boxes. With a callsign the call-history file knew, that was a
+  *plausible* exchange the station never sent, and it went to Cabrillo
+  unchallenged. ([#86])
+  Docs: [Special event stations → Quick Log](special-events.md#quick-log)
+- **The rig control panel is short now** `Display` — Status, a connect button
+  and the three steps that start the bridge. The per-platform install walls and
+  the troubleshooting section it used to carry are in the rig control guide,
+  linked from the panel. ([#86])
+  Docs: [Rig control → Setup](rig-control.md#setup)
 - **Every control is reachable at every screen size** `Display` — Which
   controls you got used to depend on how wide your browser was, and not on
   purpose. The guides were reachable **only** on a phone; **Import ADIF**, both
@@ -78,6 +104,15 @@ only run events.
 
 ### Fixed
 
+- **The CW keying button came back to the header** `Display` — Opening the
+  keying window is something you do at the start of a CW shift, so putting it
+  in the menu made it look as though it had been removed. It is a button again,
+  beside Rig, and whether it appears comes from the same rule the menu uses.
+  ([#86])
+  Docs: [Operating → Reading the header](operating.md#reading-the-header)
+- **The header printed `\u00d7` instead of `×`** `Display` — Between the
+  sections worked and the score. A unicode escape had been written into the
+  markup as text rather than as the character it stands for. ([#86])
 - **The logger kept two disagreeing copies of its own controls** — One for the
   header and one for a phone bar, each hand-maintained, which is why the two
   had drifted apart. There is one list now, read by both screens, and a test
@@ -424,3 +459,4 @@ continuous enough to be worth summarising.
 [#81]: https://github.com/nreed97/EzFD/pull/81
 [#82]: https://github.com/nreed97/EzFD/pull/82
 [#84]: https://github.com/nreed97/EzFD/pull/84
+[#86]: https://github.com/nreed97/EzFD/pull/86

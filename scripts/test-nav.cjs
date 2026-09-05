@@ -22,7 +22,7 @@ const fs = require('fs');
 const path = require('path');
 const { compile } = require('./_compile-ts.cjs');
 const ts = compile(['lib/nav.ts']);
-const { navItems, itemsByGroup, actionsFor, NAV_GROUPS } = ts.load('nav');
+const { navItems, itemsByGroup, actionsFor, hasNavItem, NAV_GROUPS } = ts.load('nav');
 
 let failures = 0;
 const ok = m => console.log(`ok    ${m}`);
@@ -131,13 +131,49 @@ console.log('\n-- a visitor is read-only --');
 console.log('\n-- rig entries follow the hardware, not the layout --');
 {
   truthy(!has(logger(), 'cwWindow'), 'no CW window without a rig');
-  truthy(!has(logger(), 'rigDetails'), 'and no rig readout');
+  // Rig control is the *connect* path as well as the readout, so it has to be
+  // offered before anything is attached. Gating it on being connected left
+  // the panel an operator connects from reachable only through the band
+  // panel, which is not where anyone looks for "how do I hook up my radio".
+  truthy(has(logger(), 'rigDetails'), 'but rig control is offered with no rig — it is how you connect one');
+  truthy(navItems(logger()).find(i => i.id === 'rigDetails').hint.toLowerCase().includes('connect'),
+    'and says so, when nothing is connected');
+  truthy(!navItems(logger({ rigConnected: true })).find(i => i.id === 'rigDetails').hint.toLowerCase().includes('connect'),
+    'while a connected rig gets a hint about what it is reporting');
   truthy(!has(logger({ rigConnected: true }), 'cwWindow'),
     'a rig that cannot key CW is offered no CW window');
   truthy(has(logger({ rigConnected: true }), 'rigDetails'),
     'but its details are offered');
   truthy(has(logger({ rigConnected: true, canCw: true }), 'cwWindow'),
     'a CW-capable rig gets the keying window');
+}
+
+console.log('\n-- the header reads availability from the table, not its own rule --');
+{
+  // The logging screen shows rig control and the CW window as header buttons
+  // as well: they are reached mid-run, and a menu is the wrong home for them.
+  // Moving the CW button into the menu made it look as though it had been
+  // removed, which is what this guards against coming back.
+  for (const [ctx, id, want] of [
+    [logger(), 'cwWindow', false],
+    [logger({ rigConnected: true }), 'cwWindow', false],
+    [logger({ rigConnected: true, canCw: true }), 'cwWindow', true],
+    [logger(), 'rigDetails', true],
+  ]) {
+    eq(hasNavItem(ctx, id), want, `hasNavItem agrees with navItems for ${id}`);
+  }
+  truthy(!hasNavItem(logger(), 'nosuchentry'), 'and an unknown id is not offered');
+
+  // The header must ask the table rather than re-deriving the condition, or
+  // the button and the menu row can drift apart — the failure this whole
+  // module exists to prevent.
+  const src = read('components/LoggingClient.tsx');
+  truthy(/hasNavItem\(navCtx, 'cwWindow'\)/.test(src),
+    'the CW button asks hasNavItem rather than re-testing rig.canCw itself');
+  truthy(!/rigConnected && rig\.canCw/.test(src),
+    'and the old hand-rolled condition is gone');
+  truthy(/ctx=\{navCtx\}/.test(src),
+    'the drawer is handed the same context the header used');
 }
 
 console.log('\n-- the second radio is named for the station it opens --');
@@ -200,6 +236,37 @@ console.log('\n-- the drawer itself lists nothing of its own --');
     .filter(l => new RegExp(`>${l}<|'${l}'|"${l}"`).test(src));
   if (leaked.length === 0) ok('no menu label is written into the drawer markup');
   else no('no menu label is written into the drawer markup', leaked.join(', '));
+}
+
+console.log('\n-- no source file carries a literal unicode escape --');
+{
+  // `\u00d7` written into JSX renders as those six characters, not as a
+  // multiplication sign. It shipped: the logger header read "17 Q 10 \u00d7"
+  // where it meant "17 Q  10 ×", because the header was edited through a
+  // script and the escape survived into the file instead of the character it
+  // stands for. Nothing else would have caught it — it typechecks, it lints,
+  // and it only looks wrong on screen.
+  const dirs = ['components', 'lib', 'app'];
+  const offenders = [];
+  const walk = dir => {
+    for (const entry of fs.readdirSync(path.join(root, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${entry.name}`;
+      if (entry.isDirectory()) walk(rel);
+      else if (/\.tsx?$/.test(entry.name)) {
+        const src = fs.readFileSync(path.join(root, rel), 'utf8');
+        // Only JSX *text*. Inside a quoted string or a template literal the
+        // escape is processed by the language and is perfectly correct — it
+        // is JSX text children that render the six characters verbatim, so
+        // the pattern looks for one that follows a `>` with no quote between.
+        for (const m of src.matchAll(/>[^<>'"`]*?(\\u[0-9a-fA-F]{4})/g)) {
+          offenders.push(`${rel}: ${m[1]} as JSX text`);
+        }
+      }
+    }
+  };
+  for (const d of dirs) walk(d);
+  if (offenders.length === 0) ok('no \\uXXXX escape is written into a component or library');
+  else no('no \\uXXXX escape is written into a component or library', offenders.join(', '));
 }
 
 console.log('\n-- the drawer is reachable and dismissable by keyboard --');

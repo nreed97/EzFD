@@ -144,7 +144,7 @@ isn't obvious which.
 
 ## Rig control
 
-**No `● RIG` indicator.** The bridge must run on the same machine as the
+**The header's Rig button still reads `off`.** The bridge must run on the same machine as the
 browser — it connects to `localhost:4575`. Check the bridge window for errors.
 
 **Frequency readings are wrong or offset.** Restart the bridge. A misread byte

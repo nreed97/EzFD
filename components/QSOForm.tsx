@@ -150,6 +150,18 @@ function QSOForm({
   // the exchange wants that everywhere, so it's read/written directly to
   // localStorage rather than threaded through event settings.
   const [quickLog, setQuickLog] = useStoredFlag('ezfd_quicklog');
+  // Quick Log submits from the callsign field, taking the exchange boxes as
+  // they stand. On a special event that is the whole point — there is no
+  // contest exchange to collect. On Field Day and Winter Field Day the class
+  // and section are required, per contact, and are the exchange: submitting
+  // without them logs whatever is left in the boxes, and the call-history
+  // prefill means that is often a *plausible* class and section the station
+  // never sent, which goes on to the Cabrillo file unchallenged.
+  //
+  // The preference is stored per browser rather than per event, so it is not
+  // enough to hide the checkbox — an operator who used Quick Log at a special
+  // event would carry it into Field Day. The behaviour is gated too.
+  const quickLogOn = quickLog && isSes;
   function toggleQuickLog() {
     setQuickLog(prev => !prev);
   }
@@ -313,17 +325,19 @@ function QSOForm({
       <div>
         <div className="mb-1 flex items-center justify-between">
           <label className="block text-xs text-zinc-400 light:text-zinc-600">Callsign</label>
-          <label className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700">
-            <input type="checkbox" checked={quickLog} onChange={toggleQuickLog} tabIndex={-1} className="h-3 w-3" />
-            Quick Log
-            <span
-              tabIndex={0}
-              title="Enter logs immediately with default exchange values, skipping the other fields"
-              className="ml-0.5 flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border border-zinc-600 text-[9px] leading-none text-zinc-500 hover:border-zinc-400 hover:text-zinc-300"
-            >
-              ?
-            </span>
-          </label>
+          {isSes && (
+            <label className="flex items-center gap-1 text-[11px] text-zinc-500 hover:text-zinc-300 light:hover:text-zinc-700">
+              <input type="checkbox" checked={quickLog} onChange={toggleQuickLog} tabIndex={-1} className="h-3 w-3" />
+              Quick Log
+              <span
+                tabIndex={0}
+                title="Log on Enter straight from the callsign field. Special events only — a contest exchange has to be collected per contact."
+                className="ml-0.5 flex h-3.5 w-3.5 cursor-help items-center justify-center rounded-full border border-zinc-600 text-[9px] leading-none text-zinc-500 hover:border-zinc-400 hover:text-zinc-300"
+              >
+                ?
+              </span>
+            </label>
+          )}
         </div>
         <input
           ref={callRef}
@@ -331,7 +345,7 @@ function QSOForm({
           onChange={e => handleCallChange(e.target.value)}
           onKeyDown={e => {
             if (e.key === 'Enter') {
-              if (quickLog && !esm) {
+              if (quickLogOn && !esm) {
                 if (callsign) {
                   e.preventDefault();
                   formRef.current?.requestSubmit();
