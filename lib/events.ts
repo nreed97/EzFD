@@ -14,7 +14,8 @@ export const EVENT_COLUMNS = `
   event_type, power, location, qrz_username, use_call_history,
   use_master_callsign_file, bonuses, created_at,
   starts_at, ends_at, ses_description, ses_qsl_info,
-  slot_enforcement, slot_minutes, dupe_rule, require_operator_approval
+  slot_enforcement, slot_minutes, dupe_rule, require_operator_approval,
+  gota_call
 `;
 
 

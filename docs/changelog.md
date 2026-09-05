@@ -23,6 +23,20 @@ only run events.
 
 ---
 
+## 2026-09-05
+
+### Added
+
+- **The GOTA station is a real station now** `Scoring` `Exports` `Display` —
+  Set a GOTA callsign on the event and operators can sign in there; their
+  contacts are signed with that call, count for the entry as normal, and earn
+  their 5 bonus points each from the log rather than from a number somebody
+  remembers to type. There is no cap and no per-operator limit — the app used
+  to apply a 1,000-point cap that was never in the rules. ([#80], closes [#23])
+  Docs: [Field Day → The GOTA station](field-day.md#the-gota-station), [Database → qsos](database.md#qsos)
+
+---
+
 ## 2026-08-30
 
 ### Added
@@ -298,6 +312,7 @@ only run events.
 Earlier history is in the commit log. This file starts where the work became
 continuous enough to be worth summarising.
 
+[#23]: https://github.com/nreed97/EzFD/issues/23
 [#25]: https://github.com/nreed97/EzFD/pull/25
 [#26]: https://github.com/nreed97/EzFD/pull/26
 [#27]: https://github.com/nreed97/EzFD/pull/27

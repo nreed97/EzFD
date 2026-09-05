@@ -13,6 +13,11 @@ export interface PendingQSO {
   rcvd_section: string;
   operator_call: string;
   station_number: number;
+  /** Worked at the GOTA station. Carried through the queue because a contact
+   *  that loses the flag on replay silently drops 5 bonus points, and the
+   *  count is derived from the log rather than typed — so nothing else would
+   *  notice it had gone. */
+  is_gota?: boolean;
   // SES exchange — absent on contest QSOs.
   rst_sent?: string;
   rst_rcvd?: string;

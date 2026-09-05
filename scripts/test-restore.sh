@@ -83,11 +83,12 @@ q "INSERT INTO qsos (event_id, callsign, band, mode, operator_call, rst_sent, rs
 # 2. A Field Day event — its SES arrays serialise as JSON null.
 q "
 WITH e AS (
-  INSERT INTO events (join_code, club_name, club_call, event_type, class, arrl_section, power, bonuses)
-  VALUES ('RTFD','Round Trip FD','W0RT','FD','3A','MN','LOW','{\"emergency_power\":true}'::jsonb)
+  INSERT INTO events (join_code, club_name, club_call, event_type, class, arrl_section, power, bonuses, gota_call)
+  VALUES ('RTFD','Round Trip FD','W0RT','FD','3A','MN','LOW','{\"emergency_power\":true}'::jsonb,'W0GOTA')
   RETURNING id)
-INSERT INTO qsos (event_id, callsign, band, mode, sent_class, sent_section, rcvd_class, rcvd_section)
-SELECT id,'K1XYZ','20m','PH','3A','MN','2A','EPA' FROM e;" >/dev/null
+INSERT INTO qsos (event_id, callsign, band, mode, sent_class, sent_section, rcvd_class, rcvd_section, is_gota)
+SELECT id, v.c,'20m','PH','3A','MN','2A','EPA', v.g FROM e, (VALUES
+  ('K1XYZ',FALSE),('K2GOT',TRUE)) AS v(c,g);" >/dev/null
 
 # 3. An event with no QSOs at all — the case that used to abort the restore.
 q "INSERT INTO events (join_code, club_name, club_call, event_type, class, arrl_section)
@@ -225,10 +226,25 @@ if [[ -z "$FD_NEW" ]]; then
 else
   ok "FD event restores as $FD_NEW"
   if [[ "$(q "SELECT class||'/'||arrl_section||'/'||power||'/'||(SELECT COUNT(*) FROM qsos q WHERE q.event_id=e.id)
-           FROM events e WHERE join_code='$FD_NEW';")" == "3A/MN/LOW/1" ]]; then
+           FROM events e WHERE join_code='$FD_NEW';")" == "3A/MN/LOW/2" ]]; then
     ok "  contest fields and QSOs survive"
   else
     no "  contest fields and QSOs survive"
+  fi
+
+  # The GOTA bonus is counted from the flag rather than typed, so a restore
+  # that drops it silently loses 5 points per contact with nothing to notice —
+  # the same shape as the SES roster the backup used to drop.
+  if [[ "$(q "SELECT COALESCE(gota_call,'-') FROM events WHERE join_code='$FD_NEW';")" == "W0GOTA" ]]; then
+    ok "  the GOTA callsign survives"
+  else
+    no "  the GOTA callsign survives"
+  fi
+  if [[ "$(q "SELECT COUNT(*) FILTER (WHERE is_gota)||'/'||COUNT(*)
+           FROM qsos q JOIN events e ON e.id=q.event_id WHERE e.join_code='$FD_NEW';")" == "1/2" ]]; then
+    ok "  and exactly the flagged contact comes back flagged"
+  else
+    no "  and exactly the flagged contact comes back flagged"
   fi
 fi
 

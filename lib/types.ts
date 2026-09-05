@@ -85,6 +85,9 @@ export interface Event {
   class: string | null;
   /** null for SES — there is no contest section. */
   arrl_section: string | null;
+  /** The Get On The Air station's callsign, when the club runs one. Null
+   *  otherwise, which is what turns the whole feature off. */
+  gota_call: string | null;
   location: string | null;
   qrz_username: string | null;
   use_call_history: boolean;
@@ -199,6 +202,10 @@ export interface QSO {
   operator_call: string | null;
   station_number: number;
   is_dupe: boolean;
+  /** Worked at the GOTA station. Still earns full QSO credit for the parent
+   *  entry (rule 4.1.1.5) — the flag adds the 7.3.13.1 bonus, it does not
+   *  move the contact out of the main score. */
+  is_gota: boolean;
   /** Audit trail. updated_by/deleted_by are self-asserted callsigns — who
    *  claimed to act, not a verified identity. */
   updated_at?: string | Date | null;
@@ -243,6 +250,10 @@ export interface BandStats {
 
 export interface Score {
   total_qsos: number;
+  /** GOTA contacts counted from the log. They are already inside
+   *  `valid_qsos` and `qso_points` — rule 4.1.1.5 gives them full credit —
+   *  and this is what the 7.3.13.1 bonus is claimed on. */
+  gota_qsos: number;
   valid_qsos: number;
   phone_qsos: number;
   cw_qsos: number;
