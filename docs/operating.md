@@ -180,24 +180,59 @@ toggle and persists across sessions.
 | Amber number | Score before bonuses (contest events only) |
 | `OFFLINE` | The browser has lost connectivity |
 | `3 pending ↑` | QSOs queued locally, click to retry |
-| `● RIG 14.250` | A radio is connected; click for details |
-| `⚡ CW` | The rig supports CAT keying; opens the macro window |
-| `Op On W0NY` | Who this window logs as; click to sign in as someone else, or to move position |
-| `ST2` | Which station this window is |
+| `● RIG 14.250` | A radio is connected, and what it is tuned to |
+| `☰` | The menu — everything you can *do* |
 
 A special event shows only the QSO count — there is no contest score.
 
-`ST2` appears only where the number can be wrong: a multi-transmitter entry,
-where you chose it at sign-in, or any window opened with **+ Radio**. A 1A club
-on its only radio has nothing to confuse and does not see it. Check it before
-you start a shift — every contact you log carries that transmitter number into
-the Cabrillo export, and the export is where a wrong one used to first show up.
-The CW keying window shows the same badge, which is what tells two of them
-apart when you are running two radios.
+The header is deliberately all **status**: things you read at a glance without
+acting on them. Anything you click to make something happen is in the menu.
+
+Which station this window is appears at the top of the menu, beside your
+callsign, and only where the number can be wrong: a multi-transmitter entry,
+where you chose it at sign-in, or any window opened with **Open station 2**. A
+1A club on its only radio has nothing to confuse and does not see it. Check it
+before you start a shift — every contact you log carries that transmitter
+number into the Cabrillo export, and the export is where a wrong one used to
+first show up. The CW keying window shows the same badge, which is what tells
+two of them apart when you are running two radios.
+
+## The menu
+
+![The menu open over the logging screen, with entries grouped under Go to, This event, Export, Display and Help, each with a line explaining what it does](images/menu.png)
+
+Everything you can *do* is behind **☰** in the top right, on the logger and the
+dashboard alike, at every screen size. Each entry says what it is, because
+"ADIF" and "Backup" both look like a download until something tells you which
+is which.
+
+| Group | Holds |
+|---|---|
+| **Go to** | The dashboard, or back to the logger |
+| **This event** | Switch operator, open a second station, the CW window, rig details, Import ADIF |
+| **Export** | ADIF for uploading, Cabrillo for submitting, and the full event backup |
+| **Display** | Light/dark, and night mode |
+| **Help** | These guides, in a new tab |
+
+Entries appear based on what your event and your radio actually are, never on
+the size of your screen. A special event is offered no Cabrillo file and no
+ARRL summary sheet, because neither exists for one. The CW window appears only
+when a rig that can key CW is connected. A read-only visitor is offered no
+files at all.
+
+**Escape closes it**, and the whole menu is reachable by keyboard: Tab moves
+through it, Enter opens an entry, and focus returns to **☰** when it closes.
+
+> **This used to be split across two rows of buttons that disagreed with each
+> other.** Which controls you got depended on how wide your browser was, and
+> not on purpose: the guides were reachable *only* on a phone, while Import
+> ADIF, both exports and the second-radio window were reachable only at tablet
+> width and up. If you have been logging from a phone and could not find the
+> export, that is why — it is in the menu now.
 
 ## The dashboard
 
-![The dashboard on the Map tab: sections worked plotted across North America, with the tab bar, live rate, claimed score and the sections list down the right](images/dashboard.png)
+![The dashboard on the Map tab: sections worked plotted across North America, with the view tabs and the menu button in the header, and live rate, claimed score and the sections list down the right](images/dashboard.png)
 
 A separate read-only view for a second screen. It opens on the **Log**:
 

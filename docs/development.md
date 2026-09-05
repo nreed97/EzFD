@@ -37,10 +37,10 @@ Both must be clean. This is the gate `AGENTS.md` sets and CI enforces.
 
 ## Tests
 
-Sixteen suites, all run by CI. They come in two kinds, and the split is worth
+Eighteen suites, all run by CI. They come in two kinds, and the split is worth
 knowing when you are deciding what to run before a commit.
 
-**Twelve need nothing at all** — no database, no build, no server. They cover
+**Fourteen need nothing at all** — no database, no build, no server. They cover
 pure functions, so they run in about a second and are the ones to reach for
 first:
 
@@ -53,10 +53,12 @@ $ node scripts/test-adif.cjs            # ADIF parse and export
 $ node scripts/test-cabrillo.cjs        # Cabrillo submission
 $ node scripts/test-log-filters.cjs     # the dashboard log view
 $ node scripts/test-op-stats.cjs        # who worked what, and that the rows add up
+$ node scripts/test-nav.cjs             # the menu — one list for every surface and width
 $ node scripts/test-slot-board.cjs      # the operating position board
 $ node scripts/test-last-position.cjs   # what the position picker preselects
 $ node scripts/test-changelog-links.cjs # the changelog's links into these guides
 $ node scripts/test-docs-nav.cjs        # the /docs sidebar and its reading order
+$ node scripts/test-cat-protocol.cjs    # Kenwood CAT decoding for native rig control
 ```
 
 **Four need a database, or a running server:**
@@ -145,7 +147,7 @@ A test that has never been observed failing is a test you don't know works.
 
 | Job | Runs |
 |---|---|
-| `build` | The eleven pure suites, then lint, typecheck and build, then the end-to-end suite against the built server |
+| `build` | The fourteen pure suites, then lint, typecheck and build, then the end-to-end suite against the built server |
 | `schema` | Schema applied twice for idempotency, then the constraint, query and restore suites |
 | `shell` | `bash -n` on every tracked `.sh`, the rig-bridge copy check, then `shellcheck` |
 

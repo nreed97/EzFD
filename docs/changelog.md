@@ -27,6 +27,12 @@ only run events.
 
 ### Added
 
+- **One menu, behind ☰** `Display` — Everything you can *do* on the logger and
+  the dashboard now lives in a slide-out menu, grouped and with a line under
+  each entry saying what it is. The header keeps only what you read at a
+  glance. On a phone the dashboard header was four rows of buttons before the
+  filter bar even started; it is two now. ([#84])
+  Docs: [Operating → The menu](operating.md#the-menu)
 - **Who worked what** `Display` — A new **Operators** view on the dashboard,
   reading the log you already have: contacts, points, best hour, bands,
   sections, and which sections that operator was the first to reach. Sort by
@@ -55,6 +61,13 @@ only run events.
 
 ### Changed
 
+- **Every control is reachable at every screen size** `Display` — Which
+  controls you got used to depend on how wide your browser was, and not on
+  purpose. The guides were reachable **only** on a phone; **Import ADIF**, both
+  exports and the second-radio window **only** at tablet width and up. If you
+  have been logging from a phone and could not find the export, that is why.
+  ([#84])
+  Docs: [Operating → The menu](operating.md#the-menu)
 - **The rate beside each operator is now their best hour** `Display` — The
   dashboard's Operators panel divided an operator's contacts by however long
   they had been sitting there, so a good run read lower and lower as the band
@@ -65,6 +78,11 @@ only run events.
 
 ### Fixed
 
+- **The logger kept two disagreeing copies of its own controls** — One for the
+  header and one for a phone bar, each hand-maintained, which is why the two
+  had drifted apart. There is one list now, read by both screens, and a test
+  fails if a second copy appears or an entry is added that nothing wires up.
+  ([#84])
 - **Changelog entries citing a pull request rendered as literal text** — A
   citation like `[#80]` needs a matching definition at the foot of this file to
   become a link; two entries were missing theirs and showed the brackets
@@ -76,6 +94,15 @@ only run events.
 ## 2026-08-30
 
 ### Added
+
+- **Rig control without installing anything, on Chromium** `Display` — Chrome
+  and Edge can open the radio's CAT port directly, so band and mode follow the
+  VFO with no Python, no Hamlib and no second process to keep running — and a
+  second radio needs no second bridge. Kenwood and Elecraft commands for now,
+  which also covers FlexRadio SmartCAT, and reading only: CW keying still uses
+  the bridge. The bridge is unchanged and stays the default, and is still the
+  only option on Firefox, Safari, iOS and a plain-HTTP server. ([#79])
+  Docs: [Rig control → Two ways to connect](rig-control.md#two-ways-to-connect)
 
 - **A `LICENSE` file** — The licence was stated in the README and nowhere a
   tool looks, so GitHub reported the project as unlicensed and anyone checking
@@ -392,6 +419,8 @@ continuous enough to be worth summarising.
 [#76]: https://github.com/nreed97/EzFD/pull/76
 [#77]: https://github.com/nreed97/EzFD/pull/77
 [#78]: https://github.com/nreed97/EzFD/pull/78
+[#79]: https://github.com/nreed97/EzFD/pull/79
 [#80]: https://github.com/nreed97/EzFD/pull/80
 [#81]: https://github.com/nreed97/EzFD/pull/81
 [#82]: https://github.com/nreed97/EzFD/pull/82
+[#84]: https://github.com/nreed97/EzFD/pull/84

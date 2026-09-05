@@ -28,11 +28,13 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-adif.cjs` | ADIF parse and export — the `Date`/string shapes, per-operator `MY_*`, SES vs contest exchange |
 | `scripts/test-cabrillo.cjs` | Cabrillo submission — `CLAIMED-SCORE`, transmitter numbering, ordering, null class/section |
 | `scripts/test-log-filters.cjs` | The dashboard log view — filters combine, an empty filter restricts nothing, column defaults per event type |
+| `scripts/test-nav.cjs` | The menu behind the hamburger — one list for every surface and width, every action wired up, no component keeping its own copy |
 | `scripts/test-op-stats.cjs` | Who worked what — the rows sum to the log, a dupe earns nothing, a section belongs to whoever reached it first, and rate is a rolling hour |
 | `scripts/test-slot-board.cjs` | The operating position board — released/expired claims, station vs operator attribution, the contest band list |
 | `scripts/test-last-position.cjs` | What the position picker preselects — a claim outranks a remembered position, and a remembered one is validated against the event's bands |
 | `scripts/test-changelog-links.cjs` | Every guide and `#anchor` the changelog points at resolves — a renamed section is otherwise invisible — and every `[#nn]` citation has a definition, or it renders as literal brackets |
 | `scripts/test-docs-nav.cjs` | The `/docs` sidebar — every guide appears exactly once, grouped and ordered by the index |
+| `scripts/test-cat-protocol.cjs` | The Kenwood CAT decode — framing, mode letters, and that the native path's band and mode tables still match the bridge's |
 
 When adding a test, check it can actually fail — break the thing it guards and
 watch it go red. Doing that is what surfaced the missing self-heal on the
@@ -239,6 +241,30 @@ out of date. That part is on you.
 
 ## Rig control / CW keying (`ezfd-rig-bridge.py`, `lib/useRigBridge.ts`)
 
+**The Python bridge is the default transport and is not going away.** `lib/useSerialRig.ts`
+adds a browser-native read path over Web Serial (#65), which is Chromium-only,
+needs a secure context — so it is unavailable on the plain-HTTP field servers
+this app supports — and speaks only the Kenwood/Elecraft dialect. It does
+nothing at all until an operator picks a port by hand, so any setup that does
+not use it behaves exactly as it did. Removing the bridge is not on the table.
+
+- **A Kenwood `MD` value above 9 arrives as a letter.** Hamlib reads it as
+  `modebuf[offs] - 'A' + 10`, so `MDA` is mode 10 (PSK). Parsing that field as
+  "a digit" — the obvious reading of one character — turns every data mode on a
+  newer rig into a decode failure, and the symptom is the mode quietly ceasing
+  to update rather than an error.
+- **Poll `FR` before reading the frequency.** `FA` is VFO A specifically, so
+  reading it unconditionally reports the wrong frequency whenever the operator
+  is on VFO B or working split. A wrong frequency picks a wrong band, and the
+  band is what the contact is logged and scored on — a plausible-looking number
+  with nothing on screen to say it is wrong.
+- **`lib/catProtocol.ts`'s tables are transcribed, not invented.** The mode
+  table comes from Hamlib's `kenwood_mode_table`, and the band edges and mode
+  classification from the bridge's own `BANDS` and `MODE_MAP`.
+  `scripts/test-cat-protocol.cjs` reads those back out of `ezfd-rig-bridge.py`
+  and fails if the two drift: an operator must not see a different band or mode
+  depending on which transport they happened to connect with.
+
 A local Python script bridges Hamlib `rigctld` ↔ WebSocket (`ws://localhost:4575`) ↔ browser. Runs entirely on the operator's machine; the EzFD server is never involved. `lib/useRigBridge.ts` is a shared hook used independently by both `LoggingClient` (main tab) and `CwLoggingClient` (CW popout) — each opens its own WS connection.
 
 Hard-won fixes worth knowing before touching this code:
@@ -248,6 +274,8 @@ Hard-won fixes worth knowing before touching this code:
 - **Serial connections default to `--set-conf=serial_handshake=None`** — virtual/software CAT ports (e.g. FlexRadio SmartCAT) commonly don't implement RTS/CTS hardware handshake, causing silent write failures otherwise. Safe default for real hardware too.
 - **FlexRadio SmartCAT emulates Kenwood TS-2000 CAT**, not FlexRadio's native protocol — use Hamlib model `2014`, not the FlexRadio-specific models (which are TCP-only and can't open a COM port at all).
 - **All rigctld I/O is guarded by one `asyncio.Lock`** — polling (`get_freq`/`get_mode`) and CW commands share a single connection and must not interleave.
+
+- **Chrome is one list, not one per breakpoint.** Everything an operator can *do* comes from `lib/nav.ts` and renders through `components/NavDrawer.tsx`; the header keeps only status. The logger used to hand-maintain two copies — a desktop header and a phone bar — and they drifted into contradictions nobody chose: the guides were reachable **only** below 640px, while `Import ADIF`, both exports and the second-radio window were reachable **only** at 768px and up. A `hidden sm:` is a layout decision and must never be the thing that decides whether a feature exists. `scripts/test-nav.cjs` fails if `lib/nav.ts` grows a width or device term, if a component grows its own copy of an item the menu already offers, or if an entry is added that no surface wires up — the last of which would render a menu row that silently does nothing. Filter on what the event and the hardware *are* (an SES has no Cabrillo, a rig that cannot key CW has no CW window, a visitor gets no files), never on the viewport.
 
 ## React gotchas from this project
 
@@ -268,6 +296,8 @@ Hard-won fixes worth knowing before touching this code:
 | `components/CwMacroPanel.tsx` | F1–F12 macros, Run/S&P modes, ESM, auto-CQ |
 | `components/BandActivity.tsx` | Presence/conflict panel — QRT, QSY occupancy |
 | `lib/useRigBridge.ts` | Shared rig WebSocket hook |
+| `lib/useSerialRig.ts` | Browser-native CAT over Web Serial — read path, additive to the bridge |
+| `lib/catProtocol.ts` | Kenwood/Elecraft CAT decoding, transcribed from Hamlib and the bridge |
 | `lib/useQsoQueue.ts` | Offline QSO queue — enqueue/submit, drain, retry; used by both logging windows |
 | `components/SesCoordination.tsx` | SES call checkout panel — claim/extend/release a band+mode |
 | `lib/ses.ts` | SES slot queries, `23P01` constant, UTC slot-time formatting |
@@ -276,6 +306,8 @@ Hard-won fixes worth knowing before touching this code:
 | `lib/bonuses.ts` | The bonus schedule — one table, read by the scorer, the tracker and the summary sheet |
 | `components/LogView.tsx` | Dashboard log — filtering, column choice, arrival highlight |
 | `lib/logFilters.ts` | Log filtering, pure over an already-loaded array |
+| `lib/nav.ts` | The menu — one table, read by the logger and the dashboard alike |
+| `components/NavDrawer.tsx` | The hamburger and its slide-out panel |
 | `lib/opStats.ts` | Per-operator figures — the one derivation, read by the dashboard tab and the sidebar panel |
 | `components/OperatorStats.tsx` | The dashboard's Operators view |
 | `lib/logColumns.ts` | The log column table and per-event-type defaults |

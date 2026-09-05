@@ -64,7 +64,7 @@ UDP server at the relay's address deliberately.
 
 ## ADIF import
 
-**Import ADIF** in the logger header accepts any `.adi` file — a WSJT-X log,
+**Import ADIF**, in the logger's **☰** menu under *This event*, accepts any `.adi` file — a WSJT-X log,
 an N1MM export, N3FJP, or a hand-built file.
 
 Records are matched to bands by the `BAND` field, falling back to `FREQ`.

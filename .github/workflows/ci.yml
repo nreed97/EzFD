@@ -89,6 +89,13 @@ jobs:
       - name: Log view tests
         run: node scripts/test-log-filters.cjs
 
+      # The menu behind the hamburger. The logger used to keep two hand-written
+      # copies of its controls and they drifted until Docs was phone-only and
+      # the exports were desktop-only; this fails if a component grows its own
+      # copy again, or if an entry is added that nothing wires up.
+      - name: Navigation tests
+        run: node scripts/test-nav.cjs
+
       # Who worked what. The figures are all derived from the log, so the way
       # they go wrong is quietly: a table that totals less than the scoreboard
       # beside it, with nothing to say which of the two is right.
@@ -118,6 +125,12 @@ jobs:
       # still reachable by URL, invisible in the app.
       - name: Docs navigation tests
         run: node scripts/test-docs-nav.cjs
+
+      # The decoding half of browser-native rig control. A misread frequency
+      # picks a wrong band, and the band is what a contact is scored on — the
+      # failure looks like a plausible number, not like an error.
+      - name: CAT protocol tests
+        run: node scripts/test-cat-protocol.cjs
 
       # Gated now that the react-hooks backlog is worked through. Anything it
       # reports is new.
