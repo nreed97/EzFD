@@ -27,6 +27,15 @@ only run events.
 
 ### Added
 
+- **Who worked what** `Display` — A new **Operators** view on the dashboard,
+  reading the log you already have: contacts, points, best hour, bands,
+  sections, and which sections that operator was the first to reach. Sort by
+  any column. The totals row is meant to be checked against the scoreboard, so
+  contacts imported without an operator get their own row rather than
+  disappearing out of the count. The per-hour average stays blank until an
+  operator's contacts span an hour, since dividing by less than one projects a
+  partial hour out to a whole one. ([#82])
+  Docs: [Operating → The Operators view](operating.md#the-operators-view)
 - **A read of the log before you submit** `Scoring` `Display` — The summary
   sheet now opens with anything worth settling first: unrecognised sections, a
   station that sent two different exchanges, a bonus claimed that rule 7.3
@@ -43,6 +52,24 @@ only run events.
   remembers to type. There is no cap and no per-operator limit — the app used
   to apply a 1,000-point cap that was never in the rules. ([#80], closes [#23])
   Docs: [Field Day → The GOTA station](field-day.md#the-gota-station), [Database → qsos](database.md#qsos)
+
+### Changed
+
+- **The rate beside each operator is now their best hour** `Display` — The
+  dashboard's Operators panel divided an operator's contacts by however long
+  they had been sitting there, so a good run read lower and lower as the band
+  went quiet around it. It now shows the most they worked in any 60 minutes,
+  which is the same figure the new Operators view prints — the two would
+  otherwise have disagreed on the same screen. ([#82])
+  Docs: [Operating → The Operators view](operating.md#the-operators-view)
+
+### Fixed
+
+- **Changelog entries citing a pull request rendered as literal text** — A
+  citation like `[#80]` needs a matching definition at the foot of this file to
+  become a link; two entries were missing theirs and showed the brackets
+  instead. The link test now checks citations as well as guide anchors.
+  ([#82])
 
 ---
 
@@ -365,3 +392,6 @@ continuous enough to be worth summarising.
 [#76]: https://github.com/nreed97/EzFD/pull/76
 [#77]: https://github.com/nreed97/EzFD/pull/77
 [#78]: https://github.com/nreed97/EzFD/pull/78
+[#80]: https://github.com/nreed97/EzFD/pull/80
+[#81]: https://github.com/nreed97/EzFD/pull/81
+[#82]: https://github.com/nreed97/EzFD/pull/82

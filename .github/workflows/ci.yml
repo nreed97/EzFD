@@ -89,6 +89,12 @@ jobs:
       - name: Log view tests
         run: node scripts/test-log-filters.cjs
 
+      # Who worked what. The figures are all derived from the log, so the way
+      # they go wrong is quietly: a table that totals less than the scoreboard
+      # beside it, with nothing to say which of the two is right.
+      - name: Per-operator statistics tests
+        run: node scripts/test-op-stats.cjs
+
       # What the operating position picker shows before someone sits down. A
       # wrong answer sends an operator to a band another station is already
       # signing the callsign on, which is what the checkout exists to prevent.

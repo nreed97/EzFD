@@ -28,9 +28,10 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-adif.cjs` | ADIF parse and export — the `Date`/string shapes, per-operator `MY_*`, SES vs contest exchange |
 | `scripts/test-cabrillo.cjs` | Cabrillo submission — `CLAIMED-SCORE`, transmitter numbering, ordering, null class/section |
 | `scripts/test-log-filters.cjs` | The dashboard log view — filters combine, an empty filter restricts nothing, column defaults per event type |
+| `scripts/test-op-stats.cjs` | Who worked what — the rows sum to the log, a dupe earns nothing, a section belongs to whoever reached it first, and rate is a rolling hour |
 | `scripts/test-slot-board.cjs` | The operating position board — released/expired claims, station vs operator attribution, the contest band list |
 | `scripts/test-last-position.cjs` | What the position picker preselects — a claim outranks a remembered position, and a remembered one is validated against the event's bands |
-| `scripts/test-changelog-links.cjs` | Every guide and `#anchor` the changelog points at resolves — a renamed section is otherwise invisible |
+| `scripts/test-changelog-links.cjs` | Every guide and `#anchor` the changelog points at resolves — a renamed section is otherwise invisible — and every `[#nn]` citation has a definition, or it renders as literal brackets |
 | `scripts/test-docs-nav.cjs` | The `/docs` sidebar — every guide appears exactly once, grouped and ordered by the index |
 
 When adding a test, check it can actually fail — break the thing it guards and
@@ -275,6 +276,8 @@ Hard-won fixes worth knowing before touching this code:
 | `lib/bonuses.ts` | The bonus schedule — one table, read by the scorer, the tracker and the summary sheet |
 | `components/LogView.tsx` | Dashboard log — filtering, column choice, arrival highlight |
 | `lib/logFilters.ts` | Log filtering, pure over an already-loaded array |
+| `lib/opStats.ts` | Per-operator figures — the one derivation, read by the dashboard tab and the sidebar panel |
+| `components/OperatorStats.tsx` | The dashboard's Operators view |
 | `lib/logColumns.ts` | The log column table and per-event-type defaults |
 | `components/OperatingPosition.tsx` | Sign-in step two — pick a band/mode, optionally check it out |
 | `lib/slotBoard.ts` | What each band/mode is doing, from claims plus presence |
