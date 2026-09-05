@@ -252,6 +252,13 @@ A separate read-only view for a second screen. It opens on the **Log**:
 Special events show Log, Rate, Bands, Operators and a live **On The Air**
 list instead of the section-based views, which don't apply.
 
+**On a phone the dashboard is one scrolling page.** The tabs stay pinned at
+the top as you scroll, and the score, bonuses, sections worked, operators and
+join code are laid out in full below the view rather than in a panel of their
+own. The log and the operators table keep their own scroll, because those are
+tables and have no natural end — everything else you reach by scrolling the
+page.
+
 ### The Log view
 
 ![The dashboard log: filter bar with a band filter active, showing 33 of 97 contacts in a table of time, callsign, band, mode, class, section, operator and station](images/log-view.png)
