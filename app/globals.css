@@ -146,3 +146,23 @@
 .ezfd-tabstrip::-webkit-scrollbar {
   display: none;
 }
+
+/* A dark map without a keyed tile provider.
+ *
+ * OpenStreetMap publishes one tile style, and it is a light one. CARTO's dark
+ * style is what this used to use, and it now answers unauthenticated requests
+ * with "API key required" drawn into the tile image — a map that still draws
+ * and tells you nothing.
+ *
+ * Inverting the tile pane gets a credible dark map out of the light tiles. The
+ * hue rotation puts the colours back the right way round after the invert, so
+ * water reads blue rather than orange; the small brightness and saturation
+ * trims stop the result glaring next to a zinc-950 page.
+ *
+ * Scoped to `.leaflet-tile-pane` on purpose. Leaflet renders markers,
+ * tooltips, the zoom control and the attribution in sibling panes, so they
+ * keep the colours they were given — inverting the whole container would turn
+ * the amber worked-section labels an unreadable blue. */
+.map-dark .leaflet-tile-pane {
+  filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.75);
+}

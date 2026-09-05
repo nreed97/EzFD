@@ -163,6 +163,32 @@ and log back in.
 
 More detail in [Rig control](rig-control.md#troubleshooting).
 
+## The map says "API key required" on every tile
+
+The map used to draw from CARTO's basemap CDN, which was open to anyone and
+then stopped being: unauthenticated tiles come back with *"API key required"*
+rendered **into the image**. So the map still drew, still placed every section
+marker in the right place, and was still unreadable — nothing failed, no
+request errored, and there was nothing on screen to say what had happened.
+
+Fixed by moving to OpenStreetMap's own tiles, which need no account and no
+key. **Update the application** and the map draws again; there is nothing to
+configure.
+
+If you are still on an older build and can't update yet, the map is the only
+thing affected — the section grid, **Sections Needed**, scoring and every
+export read from the same data and are unaffected.
+
+## The map is very dark, or the labels look wrong
+
+OpenStreetMap publishes one tile style and it is a light one, so dark mode
+inverts the tiles with a CSS filter rather than loading a second style. The
+filter is scoped to the tile layer alone, so the amber worked-section labels
+and the tooltips keep their own colours.
+
+Switch to light mode from **☰ → Light / dark** if you would rather have the
+unfiltered map. Nothing about the data changes either way.
+
 ## Duplicate QSOs after importing
 
 Imports are idempotent — matched on callsign, band, mode and a ±2 minute

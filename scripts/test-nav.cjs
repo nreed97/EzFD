@@ -275,6 +275,43 @@ console.log('\n-- slot wording is not written into a component --');
   else no('no surface writes a panel heading or empty-state of its own', offenders.join(', '));
 }
 
+console.log('\n-- the map needs no account to draw --');
+{
+  // CARTO's basemap CDN was open, then wasn't: unauthenticated tiles came
+  // back with "API key required" rendered into the image. The map still drew
+  // and still placed every section correctly, so nothing looked broken except
+  // the picture — no console error, no failed request to notice.
+  //
+  // A key is the wrong shape here whatever it costs. There is no account to
+  // attach one to, the field servers this supports run on plain HTTP with no
+  // internet guarantee, and cloning the repo has to give you a working map.
+  const src = readCode('components/MapView.tsx');
+
+  const KEYED = [
+    [/cartocdn\.com/i, 'CARTO'],
+    [/api\.mapbox\.com/i, 'Mapbox'],
+    [/tiles\.stadiamaps\.com/i, 'Stadia'],
+    [/thunderforest\.com/i, 'Thunderforest'],
+    [/maptiler\.com/i, 'MapTiler'],
+    [/api[_-]?key|access[_-]?token|\bapikey\b/i, 'a key or token in the URL'],
+  ];
+  const found = KEYED.filter(([re]) => re.test(src)).map(([, name]) => name);
+  if (found.length === 0) ok('the tile source needs no account or key');
+  else no('the tile source needs no account or key', found.join(', '));
+
+  truthy(/tile\.openstreetmap\.org/.test(src), 'it is OpenStreetMap');
+  truthy(/openstreetmap\.org\/copyright/.test(src),
+    'and it is attributed, which their tile policy asks for');
+
+  // Dark is a filter over the one published style, not a second URL. Scoped
+  // to the tile pane: inverting the whole container would turn the amber
+  // worked-section labels an unreadable blue.
+  truthy(/map-dark/.test(src), 'dark mode is a class on the container');
+  const css = read('app/globals.css');
+  truthy(/\.map-dark \.leaflet-tile-pane\s*\{/.test(css),
+    'and the filter applies to the tile pane alone, not the whole map');
+}
+
 console.log('\n-- no source file carries a literal unicode escape --');
 {
   // `\u00d7` written into JSX renders as those six characters, not as a
