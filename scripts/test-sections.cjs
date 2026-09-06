@@ -160,6 +160,80 @@ if (offenders.length === 0) {
      offenders.join('\n       ') + '\n       Use ARRL_SECTIONS or SECTION_GROUPS instead.');
 }
 
+// --- the map's section boundaries ---------------------------------------
+//
+// public/sections.geo.json is a fourth enumeration of the section list, and
+// this repo has been bitten three times by a second copy going stale. The
+// guard above only scans .ts/.tsx, so a JSON asset slips straight past it.
+//
+// The failure this prevents is specific and silent: a section whose polygon
+// is missing simply is not drawn, and a map with a hole in it looks like a
+// map. Nothing else would notice.
+console.log('\nThe map covers every section');
+{
+  const geoPath = path.join(root, 'public', 'sections.geo.json');
+  if (!fs.existsSync(geoPath)) {
+    no('public/sections.geo.json exists', 'run: node scripts/build-section-geo.mjs');
+  } else {
+    const geo = JSON.parse(fs.readFileSync(geoPath, 'utf8'));
+
+    // Two kinds of feature. A `section` is one section, filled by whether it
+    // has been worked. A `pending` outline is a jurisdiction whose sections
+    // are carved out by county and whose county list has not been transcribed
+    // — it names the sections inside it, and they count as accounted for.
+    const filled = geo.features.filter(f => f.properties.kind === 'section').map(f => f.id);
+    const pending = geo.features
+      .filter(f => f.properties.kind === 'pending')
+      .flatMap(f => f.properties.sections ?? []);
+    const covered = [...filled, ...pending];
+
+    const missing = sections.filter(s => !covered.includes(s));
+    const extra = covered.filter(s => !sectionSet.has(s));
+    const dupes = covered.filter((s, i) => covered.indexOf(s) !== i);
+
+    if (missing.length === 0) ok(`every one of the ${sections.length} sections is on the map`);
+    else no('every section is on the map', `missing: ${missing.join(', ')}`);
+
+    if (extra.length === 0) ok('and nothing on the map is not a section');
+    else no('nothing on the map is not a section', extra.join(', '));
+
+    if (dupes.length === 0) ok('each appears exactly once');
+    else no('each appears exactly once', `repeated: ${[...new Set(dupes)].join(', ')}`);
+
+    // DX is an exchange, never a section. On the map it would be a shape with
+    // no meaning, and in the denominator it would move the target to 86.
+    if (!covered.includes('DX')) ok('DX has no polygon, because DX is not a section');
+    else no('DX has no polygon', 'DX is a valid exchange but never a section');
+
+    const noGeom = geo.features.filter(f => !f.geometry || !f.geometry.coordinates?.length);
+    if (noGeom.length === 0) ok('every feature carries geometry');
+    else no('every feature carries geometry', noGeom.map(f => f.id).join(', '));
+
+    // Alaska and the Pacific section really do straddle the antimeridian, and
+    // they draw correctly only because every island is a separate ring. A
+    // single ring spanning most of the globe is the classic symptom of a
+    // source that does not split at 180 degrees, and it renders as a band
+    // smeared across the whole world.
+    let widest = 0, widestId = '';
+    for (const f of geo.features) {
+      const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+      for (const poly of polys) {
+        const lons = poly[0].map(c => c[0]);
+        const span = Math.max(...lons) - Math.min(...lons);
+        if (span > widest) { widest = span; widestId = f.id; }
+      }
+    }
+    if (widest < 180) ok(`no ring wraps the globe (widest ${widest.toFixed(0)}°, ${widestId})`);
+    else no('no ring wraps the globe', `${widestId} spans ${widest.toFixed(0)}° — it will smear across the map`);
+
+    // The asset is fetched on opening the map view. It has one job and it is
+    // easy to regenerate at a resolution nobody asked for.
+    const kb = fs.statSync(geoPath).size / 1024;
+    if (kb < 400) ok(`the asset is ${kb.toFixed(0)} KB`);
+    else no('the asset stays under 400 KB', `${kb.toFixed(0)} KB — re-run the build with a lower SECTION_GEO_KEEP`);
+  }
+}
+
 console.log('');
 if (failures) {
   console.log(`\x1b[31m${failures} check(s) failed\x1b[0m`);

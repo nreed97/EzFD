@@ -1,15 +1,56 @@
 'use client';
 
-import { useEffect } from 'react';
-import { MapContainer, TileLayer, Marker, Tooltip, useMap } from 'react-leaflet';
+import { useEffect, useMemo, useState } from 'react';
+import { MapContainer, TileLayer, Marker, Tooltip, GeoJSON, useMap } from 'react-leaflet';
 import L from 'leaflet';
-import type { LatLngExpression } from 'leaflet';
+import type { LatLngExpression, PathOptions } from 'leaflet';
+import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import 'leaflet/dist/leaflet.css';
 import { SECTION_DATA } from '@/lib/sections';
 import { useLightMode } from '@/lib/useLightMode';
 
 interface Props {
   workedSections: string[];
+}
+
+/**
+ * Section boundaries, fetched rather than bundled.
+ *
+ * ~144 KB of polygons that only the map view needs, so it stays out of the
+ * logger's bundle — a club logging from a phone on a hotspot should not pay
+ * for a map they never open. Built by `scripts/build-section-geo.mjs` and
+ * checked in, so a field server with no internet still has it: the tiles
+ * underneath need the network, the sections do not.
+ *
+ * Two kinds of feature. A `section` is one ARRL/RAC section and fills with
+ * whether it has been worked. A `pending` outline is a jurisdiction whose
+ * sections are carved out by county and whose county list has not been
+ * transcribed yet — Ontario's four, at the time of writing. It draws neutral
+ * and dashed rather than picking a colour, because "we do not know where this
+ * boundary runs" is not the same as "nobody has worked it", and a confident
+ * fill would be indistinguishable from a real one.
+ */
+interface SectionProps {
+  kind: 'section' | 'pending';
+  name?: string;
+  sections?: string[];
+}
+type SectionFeature = Feature<Geometry, SectionProps>;
+
+function useSectionShapes() {
+  const [shapes, setShapes] = useState<FeatureCollection<Geometry, SectionProps> | null>(null);
+  useEffect(() => {
+    let live = true;
+    // The map is useful without this — the labels and the basemap are already
+    // drawn — so a failure degrades to what the map was before rather than
+    // showing an error over a working screen.
+    fetch('/sections.geo.json')
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { if (live) setShapes(j); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
+  return shapes;
 }
 
 function MapBounds() {
@@ -56,8 +97,29 @@ function sectionIcon(section: string, worked: boolean, lightMode: boolean) {
 }
 
 export default function MapView({ workedSections }: Props) {
-  const workedSet = new Set(workedSections.map(s => s.toUpperCase()));
+  const workedSet = useMemo(
+    () => new Set(workedSections.map(s => s.toUpperCase())), [workedSections]);
   const lightMode = useLightMode();
+  const shapes = useSectionShapes();
+
+  // Amber for worked, matching the label boxes and the Scoreboard, so the
+  // fill and the label agree at a glance rather than being two colour
+  // languages on one screen.
+  const shapeStyle = useMemo(() => (feature?: SectionFeature): PathOptions => {
+    // Worked is the thing being read, so it is the only strong fill. Unworked
+    // is a wash light enough to leave the basemap legible underneath — the
+    // shape and its border are what carry the information there, not the
+    // fill, and 85 opaque polygons would just be a map of nothing.
+    if (feature?.properties?.kind === 'pending') {
+      return { color: lightMode ? '#a1a1aa' : '#52525b', weight: 1, dashArray: '4 3',
+               fillColor: lightMode ? '#e4e4e7' : '#18181b', fillOpacity: 0.2 };
+    }
+    const worked = !!feature?.id && workedSet.has(String(feature.id));
+    return worked
+      ? { color: '#b45309', weight: 1, fillColor: '#fbbf24', fillOpacity: 0.5 }
+      : { color: lightMode ? '#a1a1aa' : '#52525b', weight: 0.6,
+          fillColor: lightMode ? '#f4f4f5' : '#27272a', fillOpacity: 0.15 };
+  }, [workedSet, lightMode]);
 
   // OpenStreetMap's own tiles, which need no account and no key.
   //
@@ -100,6 +162,17 @@ export default function MapView({ workedSections }: Props) {
         // thing on screen naming where the map came from.
         attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
+      {/* Under the markers: Leaflet draws vector overlays below the marker
+          pane, so the section labels stay legible on top of their own fill.
+          Keyed on what it is drawn from, so a change to either redraws it —
+          Leaflet caches path styles otherwise. */}
+      {shapes && (
+        <GeoJSON
+          key={`${workedSections.length}-${lightMode}`}
+          data={shapes}
+          style={shapeStyle as never}
+        />
+      )}
       <MapBounds />
 
       {Object.entries(SECTION_DATA).map(([section, info]) => {

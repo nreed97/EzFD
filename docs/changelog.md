@@ -23,6 +23,21 @@ only run events.
 
 ---
 
+## 2026-09-06
+
+### Added
+
+- **The map fills sections instead of pinning them** `Display` — Sections are
+  drawn as their real boundaries and fill amber once worked, so what you have
+  and where the gaps are is one glance rather than a count of label boxes. 81
+  of the 85 have a boundary; Ontario's four are carved by census division
+  under RAC rather than ARRL rules and ship as one dashed outline until those
+  are transcribed, which is honest rather than a guessed line drawn as
+  confidently as a real one. The boundaries are a file the app ships, so they
+  draw on a field server with no internet — only the basemap under them needs
+  the network. ([#92])
+  Docs: [Operating → The Map view](operating.md#the-map-view)
+
 ## 2026-09-05
 
 ### Added
@@ -519,3 +534,4 @@ continuous enough to be worth summarising.
 [#89]: https://github.com/nreed97/EzFD/pull/89
 [#90]: https://github.com/nreed97/EzFD/pull/90
 [#91]: https://github.com/nreed97/EzFD/pull/91
+[#92]: https://github.com/nreed97/EzFD/pull/92

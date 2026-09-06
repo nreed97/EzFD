@@ -125,6 +125,30 @@ call. It used to carry its own third variant of the backup query, and so
 round-tripped a shape the console's menu action never produced, staying green
 while that action silently dropped the SES roster.
 
+**`scripts/build-section-geo.mjs`** is not a test but belongs next to them:
+it regenerates `public/sections.geo.json`, the section boundaries the map
+draws. Run it after changing the section list or the county table.
+
+```bash
+$ node scripts/build-section-geo.mjs
+public/sections.geo.json  144 KB
+  81 sections with a boundary
+  4 awaiting a county list, in 1 jurisdictions: Ontario
+  85 sections accounted for
+```
+
+It refuses to produce a file that does not account for every section, and
+verifies the county table in both directions: a name no county answers to
+fails, and so does a county in a carved state that no section claims — the
+second being the one that leaves a hole in the map and is invisible in a
+picture. The first run fetches the Canadian source and caches it under
+`.cache/`; later runs need no network.
+
+`scripts/test-sections.cjs` then checks the built file from the outside: every
+section present exactly once, `DX` absent, no ring wrapping the antimeridian
+(the symptom of a source that does not split at 180°, which renders as a band
+smeared across the world), and the asset under 400 KB.
+
 **`scripts/test-merge.cjs`** covers `ezfd_merge_event()` and
 `ezfd_recompute_dupes()` — reconciling an event that ran in two places at once
 into one log. Every case that matters is a way to silently change what a club
