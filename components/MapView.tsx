@@ -59,12 +59,35 @@ export default function MapView({ workedSections }: Props) {
   const workedSet = new Set(workedSections.map(s => s.toUpperCase()));
   const lightMode = useLightMode();
 
-  const tileUrl = lightMode
-    ? 'https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png'
-    : 'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png';
+  // OpenStreetMap's own tiles, which need no account and no key.
+  //
+  // This used to be CARTO's basemap CDN, which had a light and a dark style
+  // and was open to anyone. It is not any more: unauthenticated tiles come
+  // back with "API key required" rendered into the image, so the map still
+  // drew, still placed every section marker correctly, and was still useless
+  // — the failure is a picture, not an error, and nothing on screen said what
+  // had happened.
+  //
+  // A key is the wrong shape for this app whatever CARTO charges. There is no
+  // account to attach one to, the field servers this supports run on plain
+  // HTTP with no internet guarantee, and a club that clones the repo has to
+  // get a working map without signing up for anything.
+  //
+  // No {s} subdomain: OSM deprecated the a/b/c split, and modern browsers
+  // multiplex over one HTTP/2 connection anyway. No {r} either — the standard
+  // tile server has no @2x tiles, so asking for them is a wasted 404 per tile.
+  const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
 
   return (
     <MapContainer
+      // Only one tile style is published, so dark is a filter over it rather
+      // than a second URL. `.map-dark` inverts the tile pane alone — markers,
+      // tooltips and the zoom control are separate panes and keep their own
+      // colours, which is what stops the worked-section labels inverting into
+      // something unreadable. Dark matters here beyond taste: this interface
+      // is dark by default and has a night mode for keeping dark adaptation
+      // after sunset, and a white map at 2am undoes that.
+      className={lightMode ? undefined : 'map-dark'}
       center={[39.5, -98.35]}
       zoom={3}
       style={{ height: '100%', width: '100%', background: lightMode ? '#e8e8e8' : '#111' }}
@@ -73,7 +96,9 @@ export default function MapView({ workedSections }: Props) {
       <TileLayer
         key={tileUrl}
         url={tileUrl}
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>'
+        // OSM's tile usage policy asks for attribution; it is also the only
+        // thing on screen naming where the map came from.
+        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
       />
       <MapBounds />
 

@@ -126,6 +126,15 @@ only run events.
 
 ### Fixed
 
+- **The map draws again** `Display` — Every tile read "API key required". The
+  map came from CARTO's basemap CDN, which used to be open to anyone and is
+  not any more, and the refusal arrives as a *picture* rather than an error —
+  so the map still drew, still put every section in the right place, and said
+  nothing about why it was unreadable. It now uses OpenStreetMap's own tiles,
+  which need no account and no key, so there is nothing to configure and a
+  field server with no credentials works the same as a hosted one. Dark mode
+  filters the tiles rather than loading a second style. ([#91])
+  Docs: [Troubleshooting → The map says "API key required" on every tile](troubleshooting.md#the-map-says-api-key-required-on-every-tile)
 - **The dashboard scrolls like a page on a phone** `Display` — It was two
   stacked panes that each scrolled inside a screen that did not: a window onto
   the log, and under it a window about two lines tall onto the score, bonuses,
@@ -509,3 +518,4 @@ continuous enough to be worth summarising.
 [#88]: https://github.com/nreed97/EzFD/pull/88
 [#89]: https://github.com/nreed97/EzFD/pull/89
 [#90]: https://github.com/nreed97/EzFD/pull/90
+[#91]: https://github.com/nreed97/EzFD/pull/91
