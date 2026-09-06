@@ -189,6 +189,19 @@ and the tooltips keep their own colours.
 Switch to light mode from **☰ → Light / dark** if you would rather have the
 unfiltered map. Nothing about the data changes either way.
 
+## The menu opens behind the map
+
+On the dashboard's **Map** view, the slide-out menu appeared under the map:
+the map stayed bright where the rest of the screen dimmed, and its zoom
+buttons and the OpenStreetMap credit line drew on top of the menu entries. The
+menu was still there and still worked — it was just unreadable where the two
+overlapped.
+
+The map draws itself in layers with their own depths, and those depths used to
+compete with the rest of the page instead of staying inside the map. **Update
+the application** and it is fixed; there is nothing to configure. On an older
+build, switch to another dashboard view before opening the menu.
+
 ## Duplicate QSOs after importing
 
 Imports are idempotent — matched on callsign, band, mode and a ±2 minute
