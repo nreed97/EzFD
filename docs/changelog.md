@@ -38,6 +38,16 @@ only run events.
   the network. ([#92])
   Docs: [Operating → The Map view](operating.md#the-map-view)
 
+### Fixed
+
+- **The menu opens over the map, not under it** `Display` — On the dashboard's
+  **Map** view, opening ☰ drew the map straight through the panel: the map
+  stayed bright where the rest of the screen dimmed, and its zoom buttons and
+  the OpenStreetMap credit sat on top of the menu entries. The map now takes
+  one place in the stacking order like any other panel, so the menu, the
+  sticky header and the log's filter dropdowns all sit above it. ([#93])
+  Docs: [Operating → The menu](operating.md#the-menu)
+
 ## 2026-09-05
 
 ### Added
@@ -535,3 +545,4 @@ continuous enough to be worth summarising.
 [#90]: https://github.com/nreed97/EzFD/pull/90
 [#91]: https://github.com/nreed97/EzFD/pull/91
 [#92]: https://github.com/nreed97/EzFD/pull/92
+[#93]: https://github.com/nreed97/EzFD/pull/93

@@ -166,3 +166,22 @@
 .map-dark .leaflet-tile-pane {
   filter: invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.9) saturate(0.75);
 }
+
+/* The map is one element in the page's stacking order, not a range of it.
+ *
+ * Leaflet gives its panes z-indexes from 200 (tiles) to 1000 (the zoom and
+ * attribution corners), and `.leaflet-container` sets no z-index of its own —
+ * so a positioned-but-auto container creates no stacking context and every one
+ * of those numbers competes directly with the rest of the page. The dashboard's
+ * slide-out menu is `z-50` and its sticky header `z-30`, so opening the menu
+ * over the map view drew the map through it: the panel was there, the map was
+ * on top of it.
+ *
+ * Raising the drawer instead would only move the tie — the corners are already
+ * at 1000, which is what the modals in this app use. `isolation: isolate` fixes
+ * it at the source by making the container a stacking context, so the panes
+ * order among themselves and the map as a whole sits wherever its own box does.
+ * Nothing inside changes: popups still sit over markers, markers over tiles. */
+.leaflet-container {
+  isolation: isolate;
+}

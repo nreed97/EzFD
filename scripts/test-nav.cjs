@@ -310,6 +310,14 @@ console.log('\n-- the map needs no account to draw --');
   const css = read('app/globals.css');
   truthy(/\.map-dark \.leaflet-tile-pane\s*\{/.test(css),
     'and the filter applies to the tile pane alone, not the whole map');
+
+  // Leaflet's panes run from z-index 200 to 1000 and its container declares
+  // none, so without a stacking context of its own the map competes with the
+  // whole page: the slide-out menu (z-50) opened over the map view and the map
+  // drew straight through the panel. Raising the menu only moves the tie, since
+  // the map's corners are already at 1000 — the containment is the fix.
+  truthy(/\.leaflet-container\s*\{[^}]*isolation:\s*isolate/.test(css),
+    'and the map is a stacking context, so its panes cannot outrank the menu');
 }
 
 console.log('\n-- no source file carries a literal unicode escape --');
