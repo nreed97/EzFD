@@ -53,6 +53,14 @@ and ESM. The server is never involved.
 or bulk-import any ADIF file. Imports are idempotent, so re-importing can't
 double your log.
 
+**One log, even when the event ran in two places.** A whole event exports as
+JSON — settings, contacts, roster, checkout history — and imports either as a
+new event or *merged into* one that already exists. That second mode is for
+the field-server case: a Pi at the site and the hosted instance both holding
+real contacts from the same weekend. Contacts you don't have are added,
+duplicate flags are recomputed across the union, and anything edited in both
+places is reported rather than decided for you.
+
 **Correct scoring.** QSO points × power multiplier + bonuses, with all 19
 Field Day bonus categories from rule 7.3 tracked live and each labelled with
 its rule number. Sections neither multiply the score nor earn a bonus —

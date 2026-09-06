@@ -336,6 +336,97 @@ another host, as [Deployment](deployment.md) describes: the count used to go
 through `pg_read_file()`, which reads the *server's* filesystem, and so failed
 on a file the restore beneath it would have read perfectly well.
 
+## Merging two instances of one event
+
+Restoring recreates an event. That is right when a copy is a copy, and wrong
+when the same weekend ran in **two places at once** — a field server at the
+site and the hosted instance — and both hold real contacts that have to become
+one log. Restoring there gives you a third event and two logs to reconcile by
+hand.
+
+Merging is for that case, and only that case. It is a one-shot reconciliation
+after the event, not a sync: nothing runs continuously, nothing goes both
+ways, and nothing you might disagree with is decided for you.
+
+Take a JSON export from the instance you are merging *from*, then post it at
+the event you are merging *into*:
+
+```bash
+# on the field server
+curl -s "http://pi.local:3000/api/export/AB12CD?format=json" > site.json
+
+# against the hosted instance, into the event that already exists there
+curl -s -X POST "https://ezfd.example.org/api/import/event?merge_into=AB12CD" \
+  -H 'Content-Type: application/json' \
+  -d "{\"payload\": $(cat site.json)}" | python3 -m json.tool
+```
+
+### What it does
+
+- **Adds contacts this instance doesn't have.** A contact is recognised as
+  already present either by its own id — copies made by restoring carry the
+  original ids — or, when the two instances logged it independently, by
+  matching callsign, band, mode and a ±2 minute window. That is the same rule
+  the ADIF import uses, and it is here for the same reason: two servers stamp
+  one contact seconds apart.
+- **Recomputes duplicate flags across the whole log.** Each instance worked
+  out its flags against a different subset, so both are wrong for the union —
+  a contact that was first in one copy may be second in the merged whole. This
+  is the step most easily forgotten, so it is not optional.
+- **Adds roster entries that are missing** and never overwrites ones that are
+  here. The grid and state in this instance are the ones somebody has been
+  correcting, and they are the only source for the ADIF `MY_*` fields.
+- **Files the incoming checkout history as released.** Two instances can each
+  legitimately have held 20m phone at the same moment, because the exclusion
+  constraint only ever guaranteed that couldn't happen inside one database.
+  Keeping it as released history preserves the record without the constraint
+  rejecting the merge.
+
+### What it deliberately doesn't do
+
+- **Resolve a contact edited on both sides.** It reports the disagreement,
+  names the fields, and leaves your copy alone. Picking a winner silently is
+  how somebody's correction disappears with nothing on screen to say so.
+- **Change this event's settings.** If the bonuses or the class differ, that
+  is reported and the target's values stand — you merged *into* this one.
+- **Undo a deletion.** A contact you deleted here that is still live in the
+  other copy stays deleted, and the collision is counted in
+  `skipped_deleted_here`. (Importing an ADIF file goes the other way, because
+  choosing a file is a deliberate act; a merge is bulk and automatic.)
+
+### Reading the report
+
+Nothing succeeds silently — the report is the point:
+
+```json
+{ "merged": {
+  "qsos_added": 12, "already_present_by_id": 40, "already_present_by_time": 3,
+  "skipped_deleted_here": 1, "conflicts": [], "dupe_flags_changed": 4,
+  "roster_added": 2, "reservations_added": 6, "settings_differ": ["bonuses"]
+} }
+```
+
+`conflicts` and `settings_differ` are the two to read: both mean something was
+edited in two places and nothing was decided for you.
+
+Running the same merge twice is safe — the second run adds nothing, because
+contact ids are preserved on insert.
+
+### When it refuses
+
+An export has to be provably **the same activation**, or the merge is refused
+with `400`. Every event carries an identity that survives export and restore,
+so a copy made by restoring is recognised automatically. An export taken
+before this existed still carries its own event id, which is the same value,
+so old backups work too.
+
+If two copies of one weekend were genuinely created separately — set up by
+hand on both machines, never restored from each other — nothing links them,
+and merging really does combine two different events. Pass
+`"allow_different_origin": true` in the body to say you mean it.
+
+Field reference in [API → `POST /api/import/event`](api.md#post-apiimportevent).
+
 ## Updating the application
 
 **Update application** runs `git pull` in `EZFD_REPO_DIR`, rebuilds, and
