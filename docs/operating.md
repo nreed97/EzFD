@@ -278,6 +278,26 @@ own. The log and the operators table keep their own scroll, because those are
 tables and have no natural end — everything else you reach by scrolling the
 page.
 
+### The Map view
+
+Sections are drawn as their real boundaries, filled amber once you have worked
+them, so "what have we got, and where are the gaps" is one glance rather than
+a count. The label boxes stay on top — Rhode Island and Delaware are smaller
+than their own names at this zoom, and the whole US Pacific section is a few
+specks off the left edge.
+
+**Ontario is drawn as one dashed outline** covering GH, ONE, ONN and ONS.
+Those four are carved out of Ontario by census division and the boundaries are
+RAC's rather than ARRL's, so they are not transcribed yet. Dashed and neutral
+means "we do not know where this line runs" — which is not the same as
+"nobody has worked it", and the map would look equally confident either way.
+The four sections still count normally everywhere else: the grid, **Sections
+Needed**, the score and every export are unaffected.
+
+The boundaries are a file the app ships, not something it fetches from a map
+service, so they draw on a field server with no internet. The basemap
+underneath is the part that needs the network.
+
 ### The Log view
 
 ![The dashboard log: filter bar with a band filter active, showing 33 of 97 contacts in a table of time, callsign, band, mode, class, section, operator and station](images/log-view.png)

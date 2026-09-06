@@ -1,0 +1,55 @@
+{
+  "_source": "ARRL, \"Section Boundaries\" — the divisions, their sections, and the counties that constitute each section.",
+  "_retrieved": "2026-09-06",
+  "_note": [
+    "Transcribed from ARRL's published list, kept as comma-separated strings in the same order ARRL prints them so a reader can diff this against the source page line by line.",
+    "Three fixes are applied at build time rather than here, so this file stays a faithful copy: ARRL spells Northampton PA as 'Northhampton'; ARRL still calls Miami-Dade FL 'Dade' (renamed 1997); and ARRL's Southern New Jersey list is missing a comma, printing 'Mercer Ocean' for two counties.",
+    "Los Angeles is the only section ARRL gives no county list for, because it is exactly Los Angeles County.",
+    "Ontario is absent: GH/ONE/ONN/ONS are RAC sections, not ARRL ones, and are not in this document."
+  ],
+  "jurisdictions": {
+    "US-25": {
+      "EMA": "Barnstable, Bristol, Dukes, Essex, Middlesex, Nantucket, Norfolk, Plymouth, Suffolk",
+      "WMA": "Berkshire, Franklin, Hampden, Hampshire, Worcester"
+    },
+    "US-34": {
+      "NNJ": "Bergen, Essex, Hudson, Hunterdon, Middlesex, Monmouth, Morris, Passaic, Somerset, Sussex, Union, Warren",
+      "SNJ": "Atlantic, Burlington, Camden, Cape May, Cumberland, Gloucester, Mercer, Ocean, Salem"
+    },
+    "US-36": {
+      "ENY": "Albany, Columbia, Dutchess, Greene, Orange, Putnam, Rensselaer, Rockland, Saratoga, Schenectady, Sullivan, Ulster, Warren, Washington, Westchester",
+      "NLI": "Bronx, Kings, Nassau, New York, Queens, Richmond, Suffolk",
+      "NNY": "Clinton, Essex, Franklin, Fulton, Hamilton, Jefferson, Lewis, Montgomery, St. Lawrence, Schoharie",
+      "WNY": "Allegany, Broome, Cattaraugus, Cayuga, Chautauqua, Chemung, Chenango, Cortland, Delaware, Erie, Genesee, Herkimer, Livingston, Madison, Monroe, Niagara, Oneida, Onondaga, Ontario, Orleans, Oswego, Otsego, Schuyler, Seneca, Steuben, Tioga, Tompkins, Wayne, Wyoming, Yates"
+    },
+    "US-42": {
+      "EPA": "Adams, Berks, Bradford, Bucks, Carbon, Chester, Columbia, Cumberland, Dauphin, Delaware, Juniata, Lackawanna, Lancaster, Lebanon, Lehigh, Luzerne, Lycoming, Monroe, Montgomery, Montour, Northhampton, Northumberland, Perry, Philadelphia, Pike, Schuylkill, Snyder, Sullivan, Susquehanna, Tioga, Union, Wayne, Wyoming, York",
+      "WPA": "Allegheny, Armstrong, Beaver, Bedford, Blair, Butler, Cambria, Cameron, Centre, Clarion, Clearfield, Clinton, Crawford, Elk, Erie, Fayette, Forest, Franklin, Fulton, Greene, Huntingdon, Indiana, Jefferson, Lawrence, McKean, Mercer, Mifflin, Potter, Somerset, Venango, Warren, Washington, Westmoreland"
+    },
+    "US-12": {
+      "NFL": "Alachua, Baker, Bay, Bradford, Calhoun, Citrus, Clay, Columbia, Dixie, Duval, Escambia, Flagler, Franklin, Gadsden, Gilchrist, Gulf, Hamilton, Hernando, Holmes, Jackson, Jefferson, Lafayette, Lake, Leon, Levy, Liberty, Madison, Marion, Nassau, Okaloosa, Orange, Putnam, Santa Rosa, Seminole, St Johns, Sumter, Suwannee, Taylor, Union, Volusia, Wakulla, Walton, Washington",
+      "SFL": "Brevard, Broward, Collier, Dade, Glades, Hendry, Indian River, Lee, Martin, Monroe, Okeechobee, Osceola, Palm Beach, St. Lucie",
+      "WCF": "Charlotte, DeSoto, Hardee, Highlands, Hillsborough, Manatee, Pasco, Pinellas, Polk, Sarasota"
+    },
+    "US-48": {
+      "NTX": "Anderson, Archer, Baylor, Bell, Bosque, Bowie, Brown, Camp, Cass, Cherokee, Clay, Collin, Comanche, Cooke, Coryell, Dallas, Delta, Denton, Eastland, Ellis, Erath, Falls, Fannin, Franklin, Freestone, Grayson, Gregg, Hamilton, Harrison, Henderson, Hill, Hood, Hopkins, Hunt, Jack, Johnson, Kaufman, Lamar, Lampasas, Limestone, McLennan, Marion, Mills, Montague, Morris, Nacogdoches, Navarro, Palo Pinto, Panola, Parker, Rains, Red River, Rockwall, Rusk, Shelby, Smith, Somervell, Stephens, Tarrant, Throckmorton, Titus, Upshur, Van Zandt, Wichita, Wilbarger, Wise, Wood, Young",
+      "STX": "Angelina, Aransas, Atascosa, Austin, Bandera, Bastrop, Bee, Bexar, Blanco, Brazoria, Brazos, Brooks, Burleson, Burnet, Caldwell, Calhoun, Cameron, Chambers, Colorado, Comal, Concho, DeWitt, Dimmit, Duval, Edwards, Fayette, Fort Bend, Frio, Galveston, Gillespie, Goliad, Gonzales, Grimes, Guadalupe, Hardin, Harris, Hays, Hidalgo, Houston, Jackson, Jasper, Jefferson, Jim Hogg, Jim Wells, Karnes, Kendall, Kenedy, Kerr, Kimble, Kinney, Kleberg, La Salle, Lavaca, Lee, Leon, Liberty, Live Oak, Llano, Madison, Mason, Matagorda, Maverick, McCulloch, McMullen, Medina, Menard, Milam, Montgomery, Newton, Nueces, Orange, Polk, Real, Refugio, Robertson, Sabine, San Augustine, San Jacinto, San Patricio, San Saba, Starr, Travis, Trinity, Tyler, Uvalde, Val Verde, Victoria, Walker, Waller, Washington, Webb, Wharton, Willacy, Williamson, Wilson, Zapata, Zavala",
+      "WTX": "Andrews, Armstrong, Bailey, Borden, Brewster, Briscoe, Callahan, Carson, Castro, Childress, Cochran, Coke, Coleman, Collingsworth, Cottle, Crane, Crockett, Crosby, Culberson, Dallam, Dawson, Deaf Smith, Dickens, Donley, Ector, El Paso, Fisher, Floyd, Foard, Gaines, Garza, Glasscock, Gray, Hale, Hall, Hansford, Hardeman, Hartley, Haskell, Hemphill, Hockley, Howard, Hudspeth, Hutchinson, Irion, Jeff Davis, Jones, Kent, King, Knox, Lamb, Lipscomb, Loving, Lubbock, Lynn, Martin, Midland, Mitchell, Moore, Motley, Nolan, Ochiltree, Oldham, Parmer, Pecos, Potter, Presidio, Randall, Reagan, Reeves, Roberts, Runnels, Schleicher, Scurry, Shackelford, Sherman, Sterling, Stonewall, Sutton, Swisher, Taylor, Terrell, Terry, Tom Green, Upton, Ward, Wheeler, Winkler, Yoakum"
+    },
+    "US-06": {
+      "EB":  "Alameda, Contra Costa, Napa, Solano",
+      "LAX": "Los Angeles",
+      "ORG": "Inyo, Orange, Riverside, San Bernardino",
+      "SB":  "San Luis Obispo, Santa Barbara, Ventura",
+      "SCV": "Monterey, San Benito, San Mateo, Santa Clara, Santa Cruz",
+      "SDG": "Imperial, San Diego",
+      "SF":  "Del Norte, Humboldt, Lake, Marin, Mendocino, San Francisco, Sonoma",
+      "SJV": "Calaveras, Fresno, Kern, Kings, Madera, Mariposa, Merced, Mono, San Joaquin, Stanislaus, Tulare, Tuolumne",
+      "SV":  "Alpine, Amador, Butte, Colusa, El Dorado, Glenn, Lassen, Modoc, Nevada, Placer, Plumas, Sacramento, Shasta, Sierra, Siskiyou, Sutter, Tehama, Trinity, Yolo, Yuba"
+    },
+    "US-53": {
+      "EWA": "Adams, Asotin, Benton, Chelan, Columbia, Douglas, Ferry, Franklin, Garfield, Grant, Kittitas, Klickitat, Lincoln, Okanogan, Pend Oreille, Spokane, Stevens, Walla Walla, Whitman, Yakima",
+      "WWA": "Clallam, Clark, Cowlitz, Grays Harbor, Island, Jefferson, King, Kitsap, Lewis, Mason, Pacific, Pierce, San Juan, Skagit, Skamania, Snohomish, Thurston, Wahkiakum, Whatcom"
+    }
+  }
+}

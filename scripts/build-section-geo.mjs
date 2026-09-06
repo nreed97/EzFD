@@ -136,14 +136,81 @@ function dropSpecks(geometry) {
     : { type: 'MultiPolygon', coordinates: keep.map(s => s.poly) };
 }
 
-/** The county → section table, once somebody transcribes it from ARRL's
- *  published list. Absent or partial is fine: whatever is missing stays a
- *  `pending` outline rather than being guessed at. */
+/** The county → section table, transcribed from ARRL's published boundaries.
+ *  Absent or partial is fine: whatever is missing stays a `pending` outline
+ *  rather than being guessed at. */
 function loadCountyTable() {
   const p = path.join(root, 'data', 'arrl-section-counties.json');
   if (!fs.existsSync(p)) return {};
   const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
   return raw.jurisdictions ?? {};
+}
+
+/**
+ * Reconcile ARRL's county names with the Census Bureau's.
+ *
+ * Three differences, all in ARRL's text, and fixed here rather than in the
+ * data file so that file stays a faithful copy of the source somebody can
+ * diff against ARRL's page:
+ *
+ *   * `Northhampton` — ARRL's spelling of Northampton, PA.
+ *   * `Dade` — Florida renamed it Miami-Dade in 1997; ARRL's list did not.
+ *   * `St Johns` — the Census writes St. Johns with the stop.
+ *
+ * Everything else matches once punctuation and case are normalised, which is
+ * checked rather than assumed: an unmatched name fails the build instead of
+ * quietly leaving a hole in a section.
+ */
+const ARRL_COUNTY_ALIASES = {
+  northhampton: 'Northampton',
+  dade: 'Miami-Dade',
+  'st johns': 'St. Johns',
+};
+const normaliseCounty = n =>
+  n.trim().toLowerCase().replace(/\./g, '').replace(/\s+/g, ' ');
+
+/**
+ * Turn one jurisdiction's county lists into section → county-FIPS lists.
+ *
+ * Verifies both directions, because each catches a different way of being
+ * wrong: a name ARRL lists that no county answers to (a typo, or a county
+ * that has since been renamed), and a county in the state that no section
+ * claims (an omission — the failure that leaves a hole in the map and is
+ * invisible in a rendered picture).
+ */
+function resolveJurisdiction(key, table, countiesInState) {
+  const byName = new Map();
+  for (const c of countiesInState) byName.set(normaliseCounty(c.properties.name), c);
+
+  const out = {};
+  const claimedBy = new Map();
+  for (const [section, list] of Object.entries(table)) {
+    out[section] = [];
+    for (const raw of list.split(',')) {
+      const key0 = normaliseCounty(raw);
+      const name = ARRL_COUNTY_ALIASES[key0] ?? raw.trim();
+      const county = byName.get(normaliseCounty(name));
+      if (!county) {
+        throw new Error(`${key} ${section}: no county named "${raw.trim()}" — ` +
+          `check it against the Census name, or add an alias`);
+      }
+      if (claimedBy.has(county.id)) {
+        throw new Error(`${key}: ${county.properties.name} is in both ` +
+          `${claimedBy.get(county.id)} and ${section}`);
+      }
+      claimedBy.set(county.id, section);
+      out[section].push(county.id);
+    }
+  }
+
+  const unclaimed = countiesInState
+    .filter(c => !claimedBy.has(c.id))
+    .map(c => c.properties.name);
+  if (unclaimed.length) {
+    throw new Error(`${key}: ${unclaimed.length} counties belong to no section — ` +
+      unclaimed.join(', '));
+  }
+  return out;
 }
 
 async function naturalEarth() {
@@ -183,6 +250,7 @@ const main = async () => {
   /** Features, in the shape the map consumes. */
   const features = [];
   const accounted = new Set();
+  const dissolved = [];
 
   // ── whole administrative units ────────────────────────────────────────────
   for (const [code, fipsList] of Object.entries(US_WHOLE)) {
@@ -220,19 +288,18 @@ const main = async () => {
   // ── carved jurisdictions ──────────────────────────────────────────────────
   for (const j of CARVED) {
     const table = countyTable[j.key];
-    if (table) {
-      // Real sections, dissolved from counties.
-      for (const [code, fipsCodes] of Object.entries(table)) {
-        const geoms = usCounties.filter(c => fipsCodes.includes(c.id));
-        if (geoms.length !== fipsCodes.length) {
-          throw new Error(`${code}: ${fipsCodes.length} counties listed, ${geoms.length} found`);
-        }
+    if (table && j.fips) {
+      const inState = usCounties.filter(c => c.id.slice(0, 2) === j.fips);
+      const resolved = resolveJurisdiction(j.key, table, inState);
+      for (const [code, fipsCodes] of Object.entries(resolved)) {
+        const set = new Set(fipsCodes);
         features.push({
           type: 'Feature', id: code,
           properties: { kind: 'section' },
-          geometry: tc.merge(us, geoms),
+          geometry: tc.merge(us, inState.filter(c => set.has(c.id))),
         });
         accounted.add(code);
+        dissolved.push(`${code}:${fipsCodes.length}`);
       }
       continue;
     }
@@ -292,7 +359,10 @@ const main = async () => {
     `  ${pending.reduce((n, f) => n + f.properties.sections.length, 0)} awaiting a county list, ` +
     `in ${pending.length} jurisdictions: ${pending.map(f => f.properties.name).join(', ')}\n` +
     `  ${sections.length} sections accounted for\n` +
-    `  ${dropped} islands below ${MIN_ISLAND_KM2} km² dropped as sub-pixel\n`);
+    `  ${dropped} islands below ${MIN_ISLAND_KM2} km² dropped as sub-pixel\n` +
+    (dissolved.length
+      ? `  dissolved from counties: ${dissolved.join(' ')}\n`
+      : ''));
 };
 
 main().catch(e => { process.stderr.write(`build failed: ${e.message}\n`); process.exit(1); });
