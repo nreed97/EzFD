@@ -286,13 +286,21 @@ a count. The label boxes stay on top — Rhode Island and Delaware are smaller
 than their own names at this zoom, and the whole US Pacific section is a few
 specks off the left edge.
 
-**Ontario is drawn as one dashed outline** covering GH, ONE, ONN and ONS.
-Those four are carved out of Ontario by census division and the boundaries are
-RAC's rather than ARRL's, so they are not transcribed yet. Dashed and neutral
-means "we do not know where this line runs" — which is not the same as
-"nobody has worked it", and the map would look equally confident either way.
-The four sections still count normally everywhere else: the grid, **Sections
-Needed**, the score and every export are unaffected.
+Ontario's four — GH, ONE, ONN and ONS — are drawn from RAC's own boundaries,
+which are census divisions rather than the counties ARRL uses everywhere else.
+
+**Nipissing District is drawn as one dashed outline** labelled *ONE or ONN*,
+because RAC splits it along Algonquin Park: the part inside or south of the
+park is Ontario East, the rest is Ontario North. That is the only boundary on
+the map that is not an administrative line somebody else surveyed, so it is
+the only one not drawn. Dashed and neutral means "we do not know where this
+line runs" — which is not the same as "nobody has worked it", and the map
+would look equally confident either way. Hover it to see which two sections
+share it.
+
+Nothing about this changes what a contact counts for. If you worked a station
+in Nipissing, log the section they sent you; the grid, **Sections Needed**,
+the score and every export use that and are unaffected.
 
 The boundaries are a file the app ships, not something it fetches from a map
 service, so they draw on a field server with no internet. The basemap

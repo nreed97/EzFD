@@ -178,12 +178,23 @@ console.log('\nThe map covers every section');
     const geo = JSON.parse(fs.readFileSync(geoPath, 'utf8'));
 
     // Two kinds of feature. A `section` is one section, filled by whether it
-    // has been worked. A `pending` outline is a jurisdiction whose sections
-    // are carved out by county and whose county list has not been transcribed
-    // — it names the sections inside it, and they count as accounted for.
+    // has been worked. A `pending` outline names the sections inside an area
+    // whose internal boundaries are not known, and they count as accounted
+    // for — either a jurisdiction whose county list has not been transcribed,
+    // or an administrative unit two sections split along a line that is not an
+    // administrative one (Nipissing District, cut by Algonquin Park).
+    //
+    // Those two cases have to be told apart or this check reads them wrong.
+    // A jurisdiction *substitutes* for its sections, which have no fill of
+    // their own; a shared unit sits on top of sections that are drawn all
+    // around it, so counting the names it lists would report every one of them
+    // as appearing twice. A pending feature whose sections are all filled
+    // elsewhere is the shared kind — which is exactly what makes it shared.
     const filled = geo.features.filter(f => f.properties.kind === 'section').map(f => f.id);
+    const filledSet = new Set(filled);
     const pending = geo.features
       .filter(f => f.properties.kind === 'pending')
+      .filter(f => !(f.properties.sections ?? []).every(s => filledSet.has(s)))
       .flatMap(f => f.properties.sections ?? []);
     const covered = [...filled, ...pending];
 
@@ -199,6 +210,26 @@ console.log('\nThe map covers every section');
 
     if (dupes.length === 0) ok('each appears exactly once');
     else no('each appears exactly once', `repeated: ${[...new Set(dupes)].join(', ')}`);
+
+    // A shared outline is drawn *over* sections that are filled around it, so
+    // it must name at least two of them and every one must be a real section.
+    // One name would mean the area belongs to that section and should have
+    // been dissolved into it; a name that is not a section, or one with no
+    // fill anywhere, would be an area the map asserts and the log cannot
+    // score — and the coverage check above deliberately looks past these
+    // features, so nothing else would notice.
+    const shared = geo.features
+      .filter(f => f.properties.kind === 'pending')
+      .filter(f => (f.properties.sections ?? []).every(s => filledSet.has(s)));
+    const badShared = shared.filter(f => (f.properties.sections ?? []).length < 2);
+    if (badShared.length === 0) {
+      ok(shared.length
+        ? `${shared.length} shared outline(s), each over two or more filled sections`
+        : 'no shared outlines');
+    } else {
+      no('a shared outline covers two or more sections',
+        badShared.map(f => `${f.id} names ${(f.properties.sections ?? []).join('/') || 'nothing'}`).join('; '));
+    }
 
     // DX is an exchange, never a section. On the map it would be a shape with
     // no meaning, and in the denominator it would move the target to 86.
@@ -230,7 +261,7 @@ console.log('\nThe map covers every section');
     // easy to regenerate at a resolution nobody asked for.
     const kb = fs.statSync(geoPath).size / 1024;
     if (kb < 400) ok(`the asset is ${kb.toFixed(0)} KB`);
-    else no('the asset stays under 400 KB', `${kb.toFixed(0)} KB — re-run the build with a lower SECTION_GEO_KEEP`);
+    else no('the asset stays under 400 KB', `${kb.toFixed(0)} KB — re-run the build with a higher SECTION_GEO_TOLERANCE`);
   }
 }
 
