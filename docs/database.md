@@ -47,6 +47,7 @@ One row per event. The join code is what operators type; the UUID is internal.
 | `slot_minutes` | Default checkout length |
 | `dupe_rule` | `EVENT`, `DAY` or `NONE` |
 | `require_operator_approval` | Roster gating, default false |
+| `origin_event_id` | **Nullable.** Which *activation* this row is, as opposed to which row it is. NULL means the event is its own origin |
 
 `qsos.is_gota` marks a contact worked at the Get On The Air station. It is a
 flag rather than a separate event because rule 4.1.1.5 makes a GOTA contact
@@ -59,6 +60,13 @@ a point per phone contact and two per CW or digital one.
 `class` and `arrl_section` became nullable when special events were added.
 Every read of them needs a null guard — `cabrillo.ts`, `adif.ts`,
 `SummarySheet.tsx` and the QSO insert paths all have one.
+
+`origin_event_id` exists because restoring an export gives the copy a new `id`
+and a new `join_code`, which is right until the two rows are the same weekend
+running in two places and have to be merged back. Read it as
+`COALESCE(origin_event_id, id)`: an event that has never been imported is its
+own origin, so nothing needed backfilling, and an export taken before the
+column existed still carries its `id`, which is that same value.
 
 ## `qsos`
 
@@ -163,6 +171,33 @@ a station's usual class and section. The file is contest- and year-specific.
 `master_callsigns` is a single global list from `MASTER.SCP`, shared by every
 event that opts in and refreshed at most once a day. It is not event-scoped
 because it isn't contest-specific.
+
+## Export, restore and merge
+
+Three functions in `db/schema.sql`, called by `ezfd-admin.sh`, the HTTP API
+and the tests alike. They live in the database rather than in any one caller
+because the SQL was once copied into three places and the copies drifted — the
+menu action silently dropped the SES roster while the test that should have
+caught it round-tripped a shape the menu never produced.
+
+| Function | Does |
+|---|---|
+| `ezfd_export_events(uuid)` | One event or all of them as JSONB. Names its columns explicitly and omits every `qrz_` field by construction |
+| `ezfd_restore_events(jsonb)` | Recreates events with **new** ids and join codes. Never overwrites |
+| `ezfd_merge_event(uuid, jsonb, int, bool)` | Reconciles an export into an event that already exists. Returns a report |
+| `ezfd_recompute_dupes(uuid)` | Re-derives `is_dupe` across a whole event under its `dupe_rule` |
+
+The export deliberately does **not** filter `deleted_at` — a backup that drops
+the audit trail is not one. The ADIF and Cabrillo exports do filter it,
+because those are submissions rather than archives.
+
+`ezfd_recompute_dupes` is a whole-table pass, not a per-row decision, because
+that is the only thing that is correct after a merge: each instance computed
+its flags against a different subset. Earliest contact wins, with `created_at`
+then `id` breaking ties so the result is deterministic. Soft-deleted contacts
+are excluded, so deleting the first promotes the second.
+
+See [Administration → Merging two instances of one event](administration.md#merging-two-instances-of-one-event).
 
 ## Notification triggers
 
