@@ -16,8 +16,11 @@
  *   * **US** — `us-atlas` on npm, which is the Census Bureau's cartographic
  *     boundary files pre-built as TopoJSON. States and counties in one file,
  *     keyed by FIPS.
- *   * **Canada** — Natural Earth 1:50m admin-1, fetched from the project's
- *     public mirror. Cached under .cache/ so a rebuild needs no network.
+ *   * **Canada** — Statistics Canada's census division cartographic boundary
+ *     file, dissolved to provinces for most sections and to RAC's four
+ *     Ontario sections for that province. Already in NAD83 lat/lon, so there
+ *     is nothing to reproject. Cached under .cache/ so a rebuild needs no
+ *     network.
  *
  * ## Two kinds of section
  *
@@ -27,24 +30,33 @@
  * boundary somebody else already surveyed.
  *
  * The other 31 are carved out of nine jurisdictions by county — California
- * alone splits into nine sections. Those need ARRL's published county list,
- * which is not transcribed here yet, so this emits their *jurisdiction* as a
- * single `pending` outline naming the sections inside it. The map draws those
- * neutrally with their labels, which is honest about what is known: a wrong
- * boundary drawn confidently is worse than no boundary at all, and this file
- * would look equally authoritative either way.
+ * alone splits into nine sections — or, in Ontario, by census division. Those
+ * need the published list, and where one is not transcribed yet this emits the
+ * *jurisdiction* as a single `pending` outline naming the sections inside it.
+ * The map draws those neutrally with their labels, which is honest about what
+ * is known: a wrong boundary drawn confidently is worse than no boundary at
+ * all, and this file would look equally authoritative either way.
  *
  * When `data/arrl-section-counties.json` gains a jurisdiction, its counties
  * are dissolved into real sections here and the `pending` outline disappears.
- * Nothing else has to change.
+ * Nothing else has to change. `data/rac-ontario-sections.json` does the same
+ * job for Ontario.
+ *
+ * One `pending` outline is not waiting on a transcription and never will be:
+ * Nipissing District is split between Ontario East and Ontario North by
+ * Algonquin Park's boundary, which is not a census-division line. See the
+ * `_split` note in the Ontario data file.
  *
  * `scripts/test-sections.cjs` checks the output accounts for every section in
  * ARRL_SECTIONS exactly once, whether filled or pending, so a section cannot
  * go missing from the map without the build failing.
  */
+import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
+import zlib from 'node:zlib';
 import { fileURLToPath } from 'node:url';
+import * as shapefile from 'shapefile';
 import * as tc from 'topojson-client';
 import * as ts from 'topojson-server';
 import * as tsimp from 'topojson-simplify';
@@ -53,10 +65,19 @@ const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const cache = path.join(root, '.cache');
 const OUT = path.join(root, 'public', 'sections.geo.json');
 
-/** Natural Earth 1:50m admin-1, public domain. Pinned to a commit rather than
- *  a branch so the shapes cannot move without this line moving. */
-const NE_ADMIN1 =
-  'https://raw.githubusercontent.com/nvkelso/natural-earth-vector/v5.1.2/geojson/ne_50m_admin_1_states_provinces.geojson';
+/** Statistics Canada 2011 census divisions (`gcd_000b11a_e`), cartographic
+ *  boundary file, under the Statistics Canada Open Licence. Ontario's census
+ *  divisions have not changed since, and RAC's table is written against this
+ *  same enumeration. Taken from a repository that vendored StatCan's own zip
+ *  unmodified, because statcan.gc.ca is not reachable from every build host;
+ *  pinned to a commit so the shapes cannot move without this line moving. */
+const STATCAN_CD =
+  'https://raw.githubusercontent.com/NYPL-Simplified/geojson-places-ca/38fd04c29dd002a31c69d091bfa98ea861729140/gcd_000b11a_e.zip';
+const STATCAN_CD_BASE = 'gcd_000b11a_e';
+/** …and checked, because a pinned URL only proves where the bytes came from.
+ *  A boundary file that changed under us would redraw sections silently. */
+const STATCAN_CD_SHA256 =
+  '10c301493274b3c7c513798c99379706ded073630f580e6dc3d7034a5e882735';
 
 // ── Sections that are exactly one administrative unit, or a union of a few ──
 // US, by state FIPS.
@@ -75,15 +96,13 @@ const US_WHOLE = {
   ND: ['38'], NE: ['31'], SD: ['46'],
 };
 
-// Canada, by Natural Earth admin-1 name.
+// Canada, by Statistics Canada province/territory code (PRUID).
 const CA_WHOLE = {
-  AB: ['Alberta'], BC: ['British Columbia'], MB: ['Manitoba'],
-  NB: ['New Brunswick'], NL: ['Newfoundland and Labrador'],
-  NS: ['Nova Scotia'], PE: ['Prince Edward Island'],
-  QC: ['Québec'], SK: ['Saskatchewan'],
+  NL: ['10'], PE: ['11'], NS: ['12'], NB: ['13'],
+  QC: ['24'], MB: ['46'], SK: ['47'], AB: ['48'], BC: ['59'],
   // RAC folded Yukon into the Northern Territories section; it is one section
   // covering all three territories, not three.
-  NT: ['Northwest Territories', 'Yukon', 'Nunavut'],
+  NT: ['60', '61', '62'],
 };
 
 // ── Sections carved out of one jurisdiction by county ───────────────────────
@@ -98,7 +117,7 @@ const CARVED = [
   { key: 'US-48', name: 'Texas',           fips: '48',    sections: ['NTX', 'STX', 'WTX'] },
   { key: 'US-06', name: 'California',      fips: '06',    sections: ['EB', 'LAX', 'ORG', 'SB', 'SCV', 'SDG', 'SF', 'SJV', 'SV'] },
   { key: 'US-53', name: 'Washington',      fips: '53',    sections: ['EWA', 'WWA'] },
-  { key: 'CA-ON', name: 'Ontario',         ne: 'Ontario', sections: ['GH', 'ONE', 'ONN', 'ONS'] },
+  { key: 'CA-ON', name: 'Ontario',         pr: '35',      sections: ['GH', 'ONE', 'ONN', 'ONS'] },
 ];
 
 /** Rough area of a lon/lat ring in km², good enough to decide whether a thing
@@ -124,6 +143,25 @@ function ringAreaKm2(ring) {
  * kilometres is smaller than a pixel: bytes spent on something nobody can
  * see. Every section keeps at least its largest polygon, so none can vanish.
  */
+/**
+ * How much detail survives simplification, as a minimum triangle weight.
+ *
+ * An absolute tolerance rather than "keep the top tenth of the vertices",
+ * which is what this was and which measures the wrong thing: the percentile is
+ * taken over whatever arcs happen to be in the file, so adding a denser source
+ * makes the cut-off finer for *everything else*. Adding Ontario's census
+ * divisions did exactly that — 22,930 arcs became 392,019, the threshold fell
+ * from 0.049 to 0.0000054, and the Northern Territories tripled in size
+ * without anything about the Northern Territories changing.
+ *
+ * The value is the threshold the percentile produced when the file held only
+ * the original sources, so the shapes that were calibrated against the
+ * rendered map keep exactly the detail they were calibrated to. Below about
+ * 0.02 the file stops shrinking usefully; above about 0.15 Michigan's Upper
+ * Peninsula and the Delmarva start to mangle.
+ */
+const TOLERANCE = Number(process.env.SECTION_GEO_TOLERANCE ?? 0.049);
+
 const MIN_ISLAND_KM2 = 250;
 function dropSpecks(geometry) {
   if (geometry.type !== 'MultiPolygon') return geometry;
@@ -144,6 +182,17 @@ function loadCountyTable() {
   if (!fs.existsSync(p)) return {};
   const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
   return raw.jurisdictions ?? {};
+}
+
+/** The census-division → section table for Ontario, transcribed from RAC's
+ *  published one. Same contract as the county table: absent is fine, and
+ *  whatever is missing stays a `pending` outline rather than being guessed. */
+function loadOntarioTable() {
+  const p = path.join(root, 'data', 'rac-ontario-sections.json');
+  if (!fs.existsSync(p)) return null;
+  const raw = JSON.parse(fs.readFileSync(p, 'utf8'));
+  if (!raw.sections) return null;
+  return { sections: raw.sections, split: raw._split ?? {} };
 }
 
 /**
@@ -213,16 +262,196 @@ function resolveJurisdiction(key, table, countiesInState) {
   return out;
 }
 
-async function naturalEarth() {
-  fs.mkdirSync(cache, { recursive: true });
-  const f = path.join(cache, 'ne_50m_admin_1.geojson');
-  if (!fs.existsSync(f)) {
-    process.stderr.write('fetching Natural Earth admin-1…\n');
-    const res = await fetch(NE_ADMIN1);
-    if (!res.ok) throw new Error(`Natural Earth fetch failed: ${res.status}`);
-    fs.writeFileSync(f, await res.text());
+/**
+ * Reconcile RAC's census-division names with Statistics Canada's.
+ *
+ * RAC writes them the way a person says them — "Durham Regional Municipality",
+ * "City of Ottawa", "Manitoulin Island" — and the census writes the bare name.
+ * Stripping the civic prefixes and suffixes does most of it; the rest are
+ * spelled differently and are listed, so an unmatched name fails the build
+ * rather than quietly leaving a hole in a section.
+ *
+ * `City of Sudbury` is the census division "Greater Sudbury / Grand Sudbury",
+ * which is *not* the same thing as Sudbury District — see SUDBURY_DISTRICT.
+ */
+const RAC_CD_ALIASES = {
+  'leeds & grenville': 'Leeds and Grenville',
+  'lennox-addington': 'Lennox and Addington',
+  'prescott & russell': 'Prescott and Russell',
+  'stormont, dundas & glengarry': 'Stormont, Dundas and Glengarry',
+  sudbury: 'Greater Sudbury / Grand Sudbury',
+  // RAC lists each half of these two census divisions as its own row.
+  brantford: 'Brant',
+  haldimand: 'Haldimand-Norfolk',
+  norfolk: 'Haldimand-Norfolk',
+};
+
+/** RAC's rows carry the kind of municipality; the census name does not. */
+const normaliseCd = n =>
+  n.trim().toLowerCase()
+    .replace(/\./g, '')
+    .replace(/^(city|town|township|municipality) of /, '')
+    .replace(/^united counties of /, '')
+    .replace(/ (regional municipality|region municipality|united counties|county|counties|district|island)$/, '')
+    .replace(/\s+/g, ' ');
+
+/**
+ * Sudbury District, which RAC's table does not name.
+ *
+ * The table lists the City of Greater Sudbury but not the district wrapping
+ * around it, so taken literally it leaves one of Ontario's largest census
+ * divisions in no section at all — a hole in the map, and the failure that is
+ * invisible in a rendered picture. ARRL's own section-boundaries page settles
+ * it: Ontario North covers everything northwest of a line from Killarney
+ * through Sudbury and North Bay, and Killarney is a municipality of Sudbury
+ * District. So is Espanola, and so is Chapleau.
+ *
+ * Kept here rather than in the data file because that file is a transcription
+ * and this is an inference — the same reason ARRL's own three spelling quirks
+ * are reconciled in this script instead of edited into their county list.
+ */
+const SUDBURY_DISTRICT = { cd: 'Sudbury', section: 'ONN' };
+
+/**
+ * Turn RAC's table into section → census-division lists.
+ *
+ * Verifies both directions for the same reasons the county resolver does, with
+ * one Ontario-specific allowance: two census divisions are named twice, once
+ * per half (Brant as Brantford and Brant, Haldimand-Norfolk as Haldimand and
+ * Norfolk). That is only ever benign when both halves land in the same
+ * section, so claiming one division for two *different* sections still fails.
+ */
+function resolveOntario(table, split, cdsInProvince) {
+  const byName = new Map();
+  for (const c of cdsInProvince) byName.set(normaliseCd(c.properties.name), c);
+
+  const out = {};
+  const claimedBy = new Map();
+  const claim = (section, raw, viaAlias = true) => {
+    const key = normaliseCd(raw);
+    // The alias table translates RAC's vocabulary, so it applies only to RAC's
+    // own rows. Reading a census name through it would fold Sudbury District
+    // into Greater Sudbury, which is the one distinction that matters here.
+    const name = (viaAlias && RAC_CD_ALIASES[key]) || raw.trim();
+    const cd = byName.get(normaliseCd(name));
+    if (!cd) {
+      throw new Error(`CA-ON ${section}: no census division named "${raw.trim()}" — ` +
+        `check it against the Statistics Canada name, or add an alias`);
+    }
+    const already = claimedBy.get(cd.id);
+    if (already && already !== section) {
+      throw new Error(`CA-ON: ${cd.properties.name} is in both ${already} and ${section}`);
+    }
+    if (already) return; // the second half of a division RAC lists twice
+    claimedBy.set(cd.id, section);
+    (out[section] ??= []).push(cd.id);
+  };
+
+  for (const [section, rows] of Object.entries(table)) {
+    out[section] = [];
+    for (const raw of rows) claim(section, raw);
   }
-  return JSON.parse(fs.readFileSync(f, 'utf8'));
+  claim(SUDBURY_DISTRICT.section, SUDBURY_DISTRICT.cd, false);
+
+  // The divisions RAC's rule splits between two sections are drawn as their
+  // own outline, so they are accounted for without being claimed.
+  const splitIds = new Set();
+  for (const name of Object.keys(split)) {
+    const cd = byName.get(normaliseCd(name));
+    if (!cd) throw new Error(`CA-ON: no census division named "${name}" to split`);
+    if (claimedBy.has(cd.id)) {
+      throw new Error(`CA-ON: ${name} is both split and claimed by ${claimedBy.get(cd.id)}`);
+    }
+    splitIds.add(cd.id);
+  }
+
+  const unclaimed = cdsInProvince
+    .filter(c => !claimedBy.has(c.id) && !splitIds.has(c.id))
+    .map(c => c.properties.name);
+  if (unclaimed.length) {
+    throw new Error(`CA-ON: ${unclaimed.length} census divisions belong to no section — ` +
+      unclaimed.join(', '));
+  }
+  return { resolved: out, splitIds };
+}
+
+/**
+ * Canada's census divisions, as features carrying their province code.
+ *
+ * The download is a 52 MB zip holding all 293 of them, cached like any other
+ * source. The shapes are already NAD83 lat/lon — no projection to undo — and
+ * NAD83 sits within a couple of metres of WGS84, which is nothing at the zoom
+ * this map draws.
+ *
+ * Every Canadian section is built from this one file, provinces included, and
+ * that is the point. Ontario's sections have to come from here because they
+ * are carved by census division and Natural Earth stops at the province; if
+ * its *neighbours* came from Natural Earth instead, the two outlines would not
+ * coincide and a strip belonging to neither would open along the border. That
+ * is not hypothetical — it measured 1.9% of the Ottawa River border and 4.8%
+ * of the Manitoba one before the provinces moved here too. One source per
+ * country means every internal border is the same arcs on both sides, and
+ * topology() below welds them.
+ */
+async function canadianCensusDivisions() {
+  fs.mkdirSync(cache, { recursive: true });
+  const zip = path.join(cache, `${STATCAN_CD_BASE}.zip`);
+  if (!fs.existsSync(zip)) {
+    process.stderr.write('fetching Statistics Canada census divisions…\n');
+    const res = await fetch(STATCAN_CD);
+    if (!res.ok) throw new Error(`census division fetch failed: ${res.status}`);
+    fs.writeFileSync(zip, Buffer.from(await res.arrayBuffer()));
+  }
+  const got = crypto.createHash('sha256').update(fs.readFileSync(zip)).digest('hex');
+  if (got !== STATCAN_CD_SHA256) {
+    throw new Error(`census division file is not the pinned one\n` +
+      `  expected ${STATCAN_CD_SHA256}\n  got      ${got}\n` +
+      `  delete .cache/${STATCAN_CD_BASE}.zip and rebuild, or update the pin deliberately`);
+  }
+
+  const dir = path.join(cache, STATCAN_CD_BASE);
+  if (!fs.existsSync(path.join(dir, `${STATCAN_CD_BASE}.shp`))) {
+    fs.mkdirSync(dir, { recursive: true });
+    // No unzip binary is guaranteed on a build host, and the two members this
+    // needs are plain deflate; inflateRawSync is enough and avoids a dependency.
+    const buf = fs.readFileSync(zip);
+    for (const ext of ['shp', 'dbf']) {
+      const member = `${STATCAN_CD_BASE}.${ext}`;
+      const at = buf.indexOf(Buffer.from(member));
+      if (at < 0) throw new Error(`${member} not found in the census division zip`);
+      const lh = at - 30;                       // back up over the local file header
+      const method = buf.readUInt16LE(lh + 8);
+      const nameLen = buf.readUInt16LE(lh + 26);
+      const extraLen = buf.readUInt16LE(lh + 28);
+      const start = lh + 30 + nameLen + extraLen;
+      const compressed = buf.readUInt32LE(lh + 18);
+      const body = buf.subarray(start, start + compressed);
+      fs.writeFileSync(path.join(dir, member),
+        method === 0 ? body : zlib.inflateRawSync(body));
+    }
+  }
+
+  const src = await shapefile.open(
+    path.join(dir, `${STATCAN_CD_BASE}.shp`),
+    path.join(dir, `${STATCAN_CD_BASE}.dbf`),
+    { encoding: 'latin1' });
+  const out = [];
+  for (let r = await src.read(); !r.done; r = await src.read()) {
+    out.push({
+      type: 'Feature',
+      id: r.value.properties.CDUID,
+      properties: { name: r.value.properties.CDNAME, pr: r.value.properties.PRUID },
+      geometry: r.value.geometry,
+    });
+  }
+  if (out.length !== 293) {
+    throw new Error(`expected Canada's 293 census divisions, got ${out.length}`);
+  }
+  const ontario = out.filter(f => f.properties.pr === '35');
+  if (ontario.length !== 49) {
+    throw new Error(`expected Ontario's 49 census divisions, got ${ontario.length}`);
+  }
+  return out;
 }
 
 /** ARRL_SECTIONS, read out of lib/types.ts rather than restated here — a
@@ -238,14 +467,30 @@ const main = async () => {
   const sections = arrlSections();
   const us = JSON.parse(fs.readFileSync(
     path.join(root, 'node_modules', 'us-atlas', 'counties-10m.json'), 'utf8'));
-  const ne = await naturalEarth();
+  const cds = await canadianCensusDivisions();
   const countyTable = loadCountyTable();
+  const ontarioTable = loadOntarioTable();
 
   const usStates = new Map(us.objects.states.geometries.map(g => [g.id, g]));
   const usCounties = us.objects.counties.geometries;
-  const neByName = new Map(
-    ne.features.filter(f => f.properties.admin === 'Canada')
-      .map(f => [f.properties.name, f]));
+  // Canada gets its own topology so census divisions can be *dissolved* into a
+  // section rather than merely collected into one. tc.merge drops the borders
+  // between them; concatenating their rings keeps every one, and Leaflet
+  // strokes every ring — the Golden Horseshoe drew as its seven constituent
+  // municipalities with the section boundary nowhere distinguishable among
+  // them. This is the same call the US counties already went through.
+  const caTopo = ts.topology({ cds: { type: 'FeatureCollection', features: cds } });
+  const caGeom = new Map(caTopo.objects.cds.geometries.map(g => [g.id, g]));
+  const mergeCds = list => tc.merge(caTopo, list.map(c => {
+    const g = caGeom.get(c.id);
+    if (!g) throw new Error(`census division ${c.id} is missing from the topology`);
+    return g;
+  }));
+  const cdsByProvince = new Map();
+  for (const c of cds) {
+    if (!cdsByProvince.has(c.properties.pr)) cdsByProvince.set(c.properties.pr, []);
+    cdsByProvince.get(c.properties.pr).push(c);
+  }
 
   /** Features, in the shape the map consumes. */
   const features = [];
@@ -267,20 +512,16 @@ const main = async () => {
     accounted.add(code);
   }
 
-  for (const [code, names] of Object.entries(CA_WHOLE)) {
-    const fs_ = names.map(n => {
-      const f = neByName.get(n);
-      if (!f) throw new Error(`${code}: no Canadian admin-1 named ${n}`);
-      return f;
+  for (const [code, prCodes] of Object.entries(CA_WHOLE)) {
+    const inProvince = prCodes.flatMap(pr => {
+      const list = cdsByProvince.get(pr);
+      if (!list) throw new Error(`${code}: no Canadian province with PRUID ${pr}`);
+      return list;
     });
     features.push({
       type: 'Feature', id: code,
       properties: { kind: 'section' },
-      geometry: fs_.length === 1 ? fs_[0].geometry : {
-        type: 'MultiPolygon',
-        coordinates: fs_.flatMap(f =>
-          f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates),
-      },
+      geometry: mergeCds(inProvince),
     });
     accounted.add(code);
   }
@@ -303,10 +544,43 @@ const main = async () => {
       }
       continue;
     }
+    if (j.key === 'CA-ON' && ontarioTable) {
+      const ontario = cdsByProvince.get('35');
+      const { resolved, splitIds } = resolveOntario(
+        ontarioTable.sections, ontarioTable.split, ontario);
+      const byId = new Map(ontario.map(c => [c.id, c]));
+      for (const [code, ids] of Object.entries(resolved)) {
+        features.push({
+          type: 'Feature', id: code,
+          properties: { kind: 'section' },
+          geometry: mergeCds(ids.map(id => byId.get(id))),
+        });
+        accounted.add(code);
+        dissolved.push(`${code}:${ids.length}`);
+      }
+      // A division RAC splits between two sections along something that is not
+      // a division boundary. Drawn once, neutrally, naming both — the same
+      // treatment as a jurisdiction awaiting its list, and for the same reason.
+      for (const id of splitIds) {
+        const cd = byId.get(id);
+        const s = ontarioTable.split[cd.properties.name];
+        features.push({
+          type: 'Feature', id: `CA-ON-${id}`,
+          properties: {
+            kind: 'pending',
+            name: `${cd.properties.name} District`,
+            sections: s.sections,
+          },
+          geometry: cd.geometry,
+        });
+      }
+      continue;
+    }
+
     // No table yet: draw the jurisdiction, name what is inside it.
     const geometry = j.fips
       ? tc.merge(us, [usStates.get(j.fips)])
-      : neByName.get(j.ne).geometry;
+      : mergeCds(cdsByProvince.get(j.pr));
     features.push({
       type: 'Feature', id: j.key,
       properties: { kind: 'pending', name: j.name, sections: j.sections },
@@ -337,13 +611,7 @@ const main = async () => {
   // geometries, which silently produced 63 anonymous polygons the first time.
   let topo = ts.topology({ sections: { type: 'FeatureCollection', features } });
   topo = tsimp.presimplify(topo);
-  const weights = topo.arcs.flat().map(p => p[2]).filter(w => w && isFinite(w)).sort((a, b) => a - b);
-  // Keep the most significant fifth of the vertices. Measured against the
-  // rendered map: coastlines that matter at the zoom this opens at — Florida,
-  // Maine, Michigan, the Chesapeake — still read correctly, and the file is a
-  // twentieth of the size.
-  const KEEP = Number(process.env.SECTION_GEO_KEEP ?? 0.1);
-  topo = tsimp.simplify(topo, weights[Math.floor(weights.length * (1 - KEEP))] ?? 0);
+  topo = tsimp.simplify(topo, TOLERANCE);
   topo = tc.quantize(topo, 1e4);
 
   const out = tc.feature(topo, topo.objects.sections);
@@ -352,12 +620,24 @@ const main = async () => {
 
   const filled = out.features.filter(f => f.properties.kind === 'section').length;
   const pending = out.features.filter(f => f.properties.kind === 'pending');
+  // A jurisdiction still awaiting its list has no section filled anywhere; a
+  // shared division names sections that are already drawn around it.
+  const filledCodes = new Set(
+    out.features.filter(f => f.properties.kind === 'section').map(f => f.id));
+  const shared = pending.filter(f => f.properties.sections.every(s => filledCodes.has(s)));
+  const awaiting = pending.filter(f => !shared.includes(f));
   const kb = (fs.statSync(OUT).size / 1024).toFixed(0);
   process.stderr.write(
     `${OUT.replace(root + '/', '')}  ${kb} KB\n` +
     `  ${filled} sections with a boundary\n` +
-    `  ${pending.reduce((n, f) => n + f.properties.sections.length, 0)} awaiting a county list, ` +
-    `in ${pending.length} jurisdictions: ${pending.map(f => f.properties.name).join(', ')}\n` +
+    (awaiting.length
+      ? `  ${awaiting.reduce((n, f) => n + f.properties.sections.length, 0)} awaiting a county list, ` +
+        `in ${awaiting.length} jurisdictions: ${awaiting.map(f => f.properties.name).join(', ')}\n`
+      : '  every section has a boundary\n') +
+    (shared.length
+      ? `  ${shared.length} drawn as shared, split by something that is not an ` +
+        `administrative line: ${shared.map(f => f.properties.name).join(', ')}\n`
+      : '') +
     `  ${sections.length} sections accounted for\n` +
     `  ${dropped} islands below ${MIN_ISLAND_KM2} km² dropped as sub-pixel\n` +
     (dissolved.length

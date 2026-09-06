@@ -37,8 +37,26 @@ only run events.
   draw on a field server with no internet — only the basemap under them needs
   the network. ([#92])
   Docs: [Operating → The Map view](operating.md#the-map-view)
+- **Ontario's four sections are drawn** `Display` — GH, ONE, ONN and ONS were
+  the last four without a boundary, shipping as one dashed outline over the
+  whole province. They are now drawn from RAC's own published table, so all 85
+  sections fill. Nipissing District stays dashed and is labelled *ONE or ONN*:
+  RAC splits it along Algonquin Park, which is not a census-division line, and
+  a guessed line would look exactly as confident as the 84 real ones. Nothing
+  about what a contact counts for changes — log the section the other station
+  sent you, as before. ([#94])
+  Docs: [Operating → The Map view](operating.md#the-map-view)
 
 ### Fixed
+
+- **Canada's provinces sat slightly apart from Ontario on the map** `Display` —
+  Drawing Ontario's sections from Statistics Canada while its neighbours came
+  from a coarser world dataset left a strip belonging to neither along the
+  Ottawa River and the Manitoba border. Every Canadian boundary now comes from
+  the one source, so the borders meet exactly; provincial outlines are more
+  accurate as a side effect. Nothing outside the map reads these shapes.
+  ([#94])
+  Docs: [Operating → The Map view](operating.md#the-map-view)
 
 - **The menu opens over the map, not under it** `Display` — On the dashboard's
   **Map** view, opening ☰ drew the map straight through the panel: the map
@@ -546,3 +564,4 @@ continuous enough to be worth summarising.
 [#91]: https://github.com/nreed97/EzFD/pull/91
 [#92]: https://github.com/nreed97/EzFD/pull/92
 [#93]: https://github.com/nreed97/EzFD/pull/93
+[#94]: https://github.com/nreed97/EzFD/pull/94
