@@ -1,0 +1,77 @@
+{
+  "_source": "Radio Amateurs of Canada, \"Ontario Sections\", effective 01 Jan 2023 — the census divisions that constitute each of the four Ontario sections, used for ARRL HF Sweepstakes, the ARRL 160m Contest and ARRL Field Day.",
+  "_retrieved": "2026-09-06",
+  "_note": [
+    "Transcribed from RAC's published table, one entry per row in the order RAC prints them, so a reader can diff this against the source line by line. An array rather than a comma-separated string because two of RAC's own rows contain commas.",
+    "The unit is the census division, not the county: RAC's table cites Statistics Canada's list of census divisions of Ontario, and its rows are the regional municipalities, counties, districts and single-tier cities that make up Ontario's 49 of them.",
+    "Two differences from the census are reconciled at build time rather than here, so this file stays a faithful copy. RAC prints 'City of Brantford' and 'City of Brant' as two rows, and 'Town of Haldimand' and 'Town of Norfolk' as two more; the census has one division for each pair — Brant, and Haldimand-Norfolk. Both pairs are Ontario South either way, so nothing about the map turns on it.",
+    "Sudbury District is not in RAC's table, which names only the City of Greater Sudbury. It is assigned to Ontario North at build time rather than added here, because it is an inference and this file is a transcription: ARRL's own section-boundaries page describes ONN as covering everything northwest of a line from Killarney through Sudbury and North Bay, and names Killarney explicitly — Killarney is a municipality of Sudbury District, as are Espanola and Chapleau. Left unassigned it is a hole in the map roughly the size of Belgium.",
+    "Nipissing District is split by Algonquin Park and is deliberately absent from the four lists. See _split."
+  ],
+  "_split": {
+    "Nipissing": {
+      "sections": ["ONE", "ONN"],
+      "rule": "RAC: 'Nipissing District inside or south of Algonquin Park' is Ontario East; the rest of Nipissing District is Ontario North.",
+      "why_not_drawn": "Algonquin Park's boundary is not a census-division boundary, so it cannot be derived from the source the other 48 divisions come from. The district is drawn as one neutral outline naming both sections rather than guessing where the line runs — a guessed line renders exactly as confidently as the boundaries that are real."
+    }
+  },
+  "sections": {
+    "GH": [
+      "Durham Regional Municipality",
+      "Halton Regional Municipality",
+      "City of Hamilton",
+      "Niagara Regional Municipality",
+      "Peel Region Municipality",
+      "City of Toronto",
+      "York Regional Municipality"
+    ],
+    "ONE": [
+      "Frontenac County",
+      "Hastings County",
+      "Haliburton County",
+      "City of Kawartha Lakes",
+      "Lanark County",
+      "Leeds & Grenville United Counties",
+      "Lennox-Addington County",
+      "Northumberland County",
+      "City of Ottawa",
+      "City of Prince Edward",
+      "Peterborough County",
+      "United Counties of Prescott & Russell",
+      "Renfrew County",
+      "United Counties of Stormont, Dundas & Glengarry"
+    ],
+    "ONN": [
+      "Algoma District",
+      "Cochrane District",
+      "Kenora District",
+      "Manitoulin Island",
+      "Rainy River District",
+      "City of Sudbury",
+      "Thunder Bay District",
+      "Timiskaming District"
+    ],
+    "ONS": [
+      "City of Brantford",
+      "City of Brant",
+      "Bruce County",
+      "City of Chatham-Kent",
+      "Dufferin County",
+      "Elgin County",
+      "Essex County",
+      "Grey County",
+      "Town of Haldimand",
+      "Huron County",
+      "Lambton County",
+      "Middlesex County",
+      "Muskoka District",
+      "Town of Norfolk",
+      "Oxford County",
+      "Perth County",
+      "Parry Sound District",
+      "Simcoe County",
+      "Waterloo Regional Municipality",
+      "Wellington County"
+    ]
+  }
+}

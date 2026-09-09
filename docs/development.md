@@ -127,22 +127,48 @@ while that action silently dropped the SES roster.
 
 **`scripts/build-section-geo.mjs`** is not a test but belongs next to them:
 it regenerates `public/sections.geo.json`, the section boundaries the map
-draws. Run it after changing the section list or the county table.
+draws. Run it after changing the section list, the county table or the Ontario
+census-division table.
 
 ```bash
 $ node scripts/build-section-geo.mjs
-public/sections.geo.json  144 KB
-  81 sections with a boundary
-  4 awaiting a county list, in 1 jurisdictions: Ontario
+public/sections.geo.json  164 KB
+  85 sections with a boundary
+  every section has a boundary
+  1 drawn as shared, split by something that is not an administrative line: Nipissing District
   85 sections accounted for
 ```
 
 It refuses to produce a file that does not account for every section, and
-verifies the county table in both directions: a name no county answers to
-fails, and so does a county in a carved state that no section claims — the
-second being the one that leaves a hole in the map and is invisible in a
+verifies both tables in both directions: a name no county or census division
+answers to fails, and so does a county or division that no section claims —
+the second being the one that leaves a hole in the map and is invisible in a
 picture. The first run fetches the Canadian source and caches it under
-`.cache/`; later runs need no network.
+`.cache/`; later runs need no network. That source is pinned by commit *and*
+checked against a SHA-256, because a pinned URL only says where bytes came
+from — a boundary file that changed underneath would redraw sections without
+saying so.
+
+Two things about it are worth knowing before changing it.
+
+**Every Canadian section comes from one file**, Statistics Canada's census
+divisions, provinces included. Ontario's four have to come from there because
+RAC carves them by census division; the provinces followed because when the
+*neighbours* came from Natural Earth instead, the two outlines did not
+coincide and a strip belonging to neither opened along the border — 1.9% of
+the Ottawa River border and 4.8% of the Manitoba one, measured by rendering
+the file over a red background and counting what showed through. One source
+per country means every internal border is the same arcs on both sides.
+
+**Simplification is an absolute tolerance, not a percentile.** It used to keep
+"the most significant tenth of the vertices", which measures the file rather
+than the map: adding a denser source makes the cut-off finer for *everything
+else*. Adding Ontario's census divisions took the arc count from 22,930 to
+392,019, dropped the threshold from 0.049 to 0.0000054, and tripled the size
+of the Northern Territories without anything about the Northern Territories
+changing. `SECTION_GEO_TOLERANCE` overrides it; below about 0.02 the file
+stops shrinking usefully, and above about 0.15 Michigan's Upper Peninsula and
+the Delmarva start to mangle.
 
 `scripts/test-sections.cjs` then checks the built file from the outside: every
 section present exactly once, `DX` absent, no ring wrapping the antimeridian

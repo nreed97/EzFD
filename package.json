@@ -29,6 +29,7 @@
     "@types/react-dom": "^19",
     "eslint": "^9",
     "eslint-config-next": "16.3.2",
+    "shapefile": "^0.6.6",
     "tailwindcss": "^4",
     "topojson-client": "^3.1.0",
     "topojson-server": "^3.0.1",

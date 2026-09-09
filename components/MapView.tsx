@@ -16,19 +16,25 @@ interface Props {
 /**
  * Section boundaries, fetched rather than bundled.
  *
- * ~144 KB of polygons that only the map view needs, so it stays out of the
+ * ~164 KB of polygons that only the map view needs, so it stays out of the
  * logger's bundle — a club logging from a phone on a hotspot should not pay
  * for a map they never open. Built by `scripts/build-section-geo.mjs` and
  * checked in, so a field server with no internet still has it: the tiles
  * underneath need the network, the sections do not.
  *
  * Two kinds of feature. A `section` is one ARRL/RAC section and fills with
- * whether it has been worked. A `pending` outline is a jurisdiction whose
- * sections are carved out by county and whose county list has not been
- * transcribed yet — Ontario's four, at the time of writing. It draws neutral
- * and dashed rather than picking a colour, because "we do not know where this
- * boundary runs" is not the same as "nobody has worked it", and a confident
- * fill would be indistinguishable from a real one.
+ * whether it has been worked. A `pending` outline is an area whose internal
+ * boundaries are not known: either a jurisdiction whose county list has not
+ * been transcribed, or an administrative unit two sections split along a line
+ * that is not an administrative one — Nipissing District, cut between Ontario
+ * East and Ontario North by Algonquin Park, at the time of writing. It draws
+ * neutral and dashed rather than picking a colour, because "we do not know
+ * where this boundary runs" is not the same as "nobody has worked it", and a
+ * confident fill would be indistinguishable from a real one.
+ *
+ * A pending outline names the sections inside it on hover. Every section has a
+ * label with a tooltip of its own, so without one this is the only shape on
+ * the map that answers nothing when you ask it what it is.
  */
 interface SectionProps {
   kind: 'section' | 'pending';
@@ -171,6 +177,13 @@ export default function MapView({ workedSections }: Props) {
           key={`${workedSections.length}-${lightMode}`}
           data={shapes}
           style={shapeStyle as never}
+          onEachFeature={(feature, layer) => {
+            const p = (feature as SectionFeature).properties;
+            if (p?.kind !== 'pending' || !p.name) return;
+            layer.bindTooltip(
+              `${p.name} — ${(p.sections ?? []).join(' or ')}`,
+              { sticky: true });
+          }}
         />
       )}
       <MapBounds />
