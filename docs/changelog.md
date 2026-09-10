@@ -53,6 +53,19 @@ only run events.
   a working RTC answers no by definition. It now says the clock is being held
   by the RTC and what to check instead. ([#95])
   Docs: [Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites)
+- **The field-server guide told Pi 5 owners to build somewhere else** `Setup` —
+  It said "Don't build on the Pi", citing the swap file `deploy.sh` adds as
+  evidence that the build is memory-hungry. That had the evidence backwards:
+  the swap only triggers below 2 GB of RAM, so it is a threshold a 4 GB or 8 GB
+  Pi 5 is clear of, and the 1 GB droplets that do trip it build the app on
+  every deploy regardless. Measured, a cold build peaks around 550 MB and still
+  completes with the JS heap capped at 256 MB. If you have a Pi 5 you can run
+  `docker compose up -d --build` on it and skip the cross-build entirely — and
+  cross-building arm64 on an x86 laptop goes through QEMU, so it was the slower
+  path being recommended as the faster one. The one real constraint is
+  unchanged and now stated as the constraint: building needs a network, so it
+  happens before you leave, on whichever machine you like. ([#95])
+  Docs: [Offline field servers → Where to build](field-server.md#where-to-build)
 
 ## 2026-09-06
 

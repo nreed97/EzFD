@@ -20,7 +20,7 @@ view nothing is offline.
 
 | | |
 |---|---|
-| A Linux box | A Raspberry Pi 4 or 5 is the usual choice. 2 GB of RAM is plenty to *run* EzFD; see [Don't build on the Pi](#dont-build-on-the-pi) about building |
+| A Linux box | A Raspberry Pi 4 or 5 is the usual choice. 2 GB of RAM is plenty to *run* EzFD, and a Pi 5 builds it too; see [Where to build](#where-to-build) |
 | Docker | Installed once, at home, with `curl -fsSL https://get.docker.com \| sh` |
 | A network | A travel router, an old home router with no uplink, or a phone hotspot. It does not need internet — it only needs to put everyone on one LAN |
 | A clock | See [The clock is the part that bites](#the-clock-is-the-part-that-bites). This is not optional |
@@ -69,10 +69,27 @@ Open `http://localhost/`, create your event, and log a test contact.
 > blocks the event, it just means no callsign prefill for the whole weekend.
 > Creating it at home is the difference between having that and not.
 
-### Don't build on the Pi
+### Where to build
 
-`next build` is memory-hungry enough that `deploy.sh` adds swap for small VPS
-instances. On a Pi it is slow at best. Build on a laptop and carry the result:
+**A Pi 5 builds this fine.** Memory is not the constraint it is usually assumed
+to be: a cold `next build` peaks around 550 MB across the whole Node process
+tree and still completes with the JS heap capped at 256 MB. `deploy.sh` adds
+swap only below 2 GB of RAM, aimed at the 1 GB VPS instances this is commonly
+deployed on — and those build the app on every deploy without trouble. A 4 GB
+or 8 GB Pi 5 is well clear of that line.
+
+So build wherever is convenient.
+
+**On the Pi itself** — simplest, and it avoids cross-architecture builds
+entirely:
+
+```bash
+docker compose up -d --build
+```
+
+**On a laptop, carried over** — for a Pi 4 or a 1–2 GB machine, for a Pi with
+no internet of its own, and as the only way to get `postgres:16` onto a machine
+that can never pull it:
 
 ```bash
 # On the laptop, for the Pi's architecture:
@@ -84,13 +101,20 @@ gunzip -c ezfd-images.tar.gz | docker load
 docker compose up -d          # uses the loaded image, builds nothing
 ```
 
-`docker save` takes the images you already have, so it is also how you carry
-`postgres:16` to a machine that will never be able to pull it.
+Cross-building arm64 on an x86 laptop runs the whole build under QEMU
+emulation, so this path is for *reach* rather than speed — a native build on a
+Pi 5 is the faster of the two. Reach is often the point: `docker save` is what
+gets images onto a machine with no registry access.
 
-**Building needs internet even when running does not.** `npm ci` fetches the
-dependency tree, and `next/font/google` fetches the two typefaces at build
-time. Neither is needed once the image exists — but both mean "build at the
-site" is not a plan.
+**What stops you building at the site is the network, not the hardware.**
+`npm ci` fetches the dependency tree and `next/font/google` fetches the two
+typefaces at build time. Neither is needed once the image exists, but both mean
+"build when we get there" is not a plan — on a Pi 5 as much as on anything.
+
+The Pi-specific thing worth planning for is **storage, not RAM**. `npm ci`
+unpacks about 22,000 files, which is precisely what a cheap microSD card is
+worst at. An A2-rated card or an NVMe HAT changes build time far more than the
+RAM size does.
 
 ---
 

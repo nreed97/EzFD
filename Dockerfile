@@ -7,10 +7,11 @@
 # image is pulled or loaded once, while connectivity exists, and then runs
 # forever without asking anyone for anything.
 #
-# It is also how you avoid building on the Pi. `next build` is memory-hungry
-# enough that `deploy.sh` adds swap for small VPS instances; on a 1–2 GB Pi it
-# is slow at best. Build on a laptop, `docker save` the result, `docker load`
-# it on the Pi. See docs/field-server.md.
+# It is also what makes the build portable. A Pi 5 can build this itself — the
+# build peaks around 550 MB and completes with the JS heap capped at 256 MB, so
+# memory is not the obstacle it is often assumed to be. Building on a laptop and
+# carrying the image over is for a Pi 4 or a 1-2 GB machine, and for getting
+# postgres:16 onto a host that can never pull it. See docs/field-server.md.
 #
 # Node 22 to match .github/workflows/ci.yml, so the image runs what CI tested.
 
