@@ -1,9 +1,14 @@
+# Build context hygiene: everything here is either rebuilt inside the image,
+# irrelevant to it, or a secret that must not be baked into a layer.
 .git
+.github
 .next
 node_modules
+.cache
 .env
-.env.local
-.env*.local
-Dockerfile
-docker-compose.yml
-*.md
+.env.*
+!.env.example
+npm-debug.log*
+tsconfig.tsbuildinfo
+# The rig bridge runs on the operator's own machine, never on the server.
+ezfd-rig-bridge.py

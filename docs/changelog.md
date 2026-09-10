@@ -23,6 +23,37 @@ only run events.
 
 ---
 
+## 2026-09-10
+
+### Added
+
+- **Run a whole event on a Pi with no internet** `Setup` — `docker compose up
+  -d` is now the entire install for a field server: the app and PostgreSQL in
+  two containers, pulled once while you still have a network and never needing
+  one again. Operators join over local WiFi and everything behaves normally,
+  because from the app's point of view nothing is offline — dupes, band
+  coordination and the live score are all server-side and the server is at the
+  site. `deploy.sh` cannot do this job and is not meant to; it reaches for apt
+  repositories and certbot at the moment you run it. ([#95])
+  Docs: [Offline field servers → Set it up at home](field-server.md#set-it-up-at-home), [Configuration → The container stack](configuration.md#the-container-stack)
+- **The admin console knows what is keeping time** `Setup` — **Server time /
+  clock** now reports a hardware RTC or a GPS receiver alongside NTP, and calls
+  `fake-hwclock` out by name rather than counting it. It also offers to write
+  the system clock back to the RTC, which is the step people forget after
+  setting the time by hand — without it the correction lives only in RAM and
+  the next reboot restores the old, wrong value over the top of it. ([#95])
+  Docs: [Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites), [Administration → Server time](administration.md#server-time)
+
+### Fixed
+
+- **A field server with an RTC fitted was told its clock was broken** `Setup` —
+  the clock screen asked one question, whether NTP was synchronised, and told
+  anyone who answered no to fit an RTC module. That is aimed squarely at the
+  operator most likely to have already fitted one: an offline field server with
+  a working RTC answers no by definition. It now says the clock is being held
+  by the RTC and what to check instead. ([#95])
+  Docs: [Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites)
+
 ## 2026-09-06
 
 ### Added
@@ -565,3 +596,4 @@ continuous enough to be worth summarising.
 [#92]: https://github.com/nreed97/EzFD/pull/92
 [#93]: https://github.com/nreed97/EzFD/pull/93
 [#94]: https://github.com/nreed97/EzFD/pull/94
+[#95]: https://github.com/nreed97/EzFD/pull/95

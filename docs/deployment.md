@@ -129,34 +129,21 @@ directly.
 
 ## Offline field servers
 
-A field server with no internet — typically a Raspberry Pi at the site — works,
-with one hardware caveat: **a Pi has no battery-backed real-time clock.**
-Without NTP it restores the time from its last shutdown or falls back to an
-epoch date, and since QSOs are timestamped by the database, every contact is
-then silently logged at the wrong time. Contest logs are cross-checked against
-other stations' logs by time, so that costs QSOs at checking time, and it
-cannot be repaired after the event.
+A Pi at the site with no internet is a different deployment from this one, and
+it has its own guide: **[Offline field servers](field-server.md)**.
 
-Two fixes, in order of preference:
+`deploy.sh` is not the tool for it. Everything on this page assumes the machine
+can reach apt repositories and Let's Encrypt at the moment you run it, which is
+exactly what a field site cannot do. The container stack in that guide needs
+the network once, to fetch images, and never again.
 
-1. **Fit an RTC module.** They cost a few dollars (DS3231 and similar), hold
-   time across a power cycle, and remove the problem outright. This is the
-   recommended setup for anything more than a casual activation.
-2. **Set the clock by hand before the event.** `bash ezfd-admin.sh` →
-   **Server time / clock** → *Set the clock by hand (UTC)*. Read the time off a
-   phone or a GPS receiver.
-
-Either way the app will tell you when it's wrong: the logging page shows a
-standing banner whenever the server's clock and the operator's device disagree
-by more than a minute. Operators should report that rather than log through it.
-
-Also worth doing on an offline server:
-
-- Create the event **while still online** if you can. The N1MM call history and
-  `MASTER.SCP` downloads happen at event creation and are best-effort — a
-  failed fetch never blocks the event, it just means no callsign prefill.
-- Take a backup to removable media before packing up, since the machine going
-  home in a car is a worse failure mode than a disk.
+The one thing worth repeating here, because it is unrecoverable rather than
+merely inconvenient: **a Pi earlier than a 5 has no battery-backed clock**, and
+QSOs are timestamped by the server. With no NTP it comes up holding the time of
+its last shutdown or an epoch date, and every contact gets a plausible-looking
+wrong time that costs QSOs at checking time. Fit an RTC or a GPS receiver, or
+set the clock by hand before the first contact — `bash ezfd-admin.sh` →
+**Server time / clock**, which reports which of those is actually keeping time.
 
 ## Backups
 

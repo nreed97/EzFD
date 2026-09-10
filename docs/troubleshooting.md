@@ -189,6 +189,32 @@ and the tooltips keep their own colours.
 Switch to light mode from **☰ → Light / dark** if you would rather have the
 unfiltered map. Nothing about the data changes either way.
 
+## On the field server there is no "install app", and Web Serial is missing
+
+Both are the same cause, and neither costs you a contact.
+
+A field server runs on plain HTTP — there is no public domain to certify on a
+field LAN, and a self-signed certificate would just teach everyone to click
+through browser warnings. Browsers treat a plain-HTTP page as a *non-secure
+origin* and withhold a handful of APIs on it. Two of them are visible:
+
+- **Install to home screen (PWA)** and the offline page cache both need a
+  service worker, which needs a secure origin. On a field server this costs
+  little in practice: the service worker exists to keep pages loading when a
+  device leaves the network, and on a field server the server *is* the network.
+- **Rig control over Web Serial** is unavailable. Use
+  [the Python bridge](rig-control.md), which is the default transport and works
+  the same on any origin.
+
+**Nothing that touches a contact is affected.** Logging, the offline queue, live
+updates between operators and the bridge all work normally over plain HTTP —
+measured against a running server, not assumed. See
+[Offline field servers → What plain HTTP costs](field-server.md#what-plain-http-costs).
+
+If you want the missing pieces back, put the server behind a name you control
+with a real certificate; there is no way to get a secure origin on a bare LAN
+address without one.
+
 ## The menu opens behind the map
 
 On the dashboard's **Map** view, the slide-out menu appeared under the map:

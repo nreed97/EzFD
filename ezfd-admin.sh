@@ -1097,6 +1097,56 @@ update_app() {
 # is unrecoverable after the fact, and an operator with no shell has no way to
 # fix it. Hence this.
 # ─────────────────────────────────────────────────────────────────────────────
+# What is actually keeping this machine's time, rather than merely whether NTP
+# happens to be running.
+#
+# Sets RTC_DEVICE, RTC_DRIVER, RTC_TIME, GPS_SOURCE and FAKE_HWCLOCK. Globals
+# rather than a return value because bash gives one exit status and this
+# answers five questions; every caller reads them immediately after the call.
+detect_clock_sources() {
+  RTC_DEVICE=""; RTC_DRIVER=""; RTC_TIME=""; GPS_SOURCE=""; FAKE_HWCLOCK="no"
+
+  # A real RTC registers a device. A Pi 5 has one built in; earlier Pis have
+  # one only if somebody fitted a DS3231 or similar. Read the driver name too,
+  # because "rtc0 exists" is worth little next to "rtc0 is an rtc-ds3231".
+  local dev=""
+  for dev in /dev/rtc /dev/rtc0 /dev/rtc1; do
+    if [[ -e "$dev" ]]; then
+      RTC_DEVICE="$dev"
+      break
+    fi
+  done
+  if [[ -n "$RTC_DEVICE" ]]; then
+    local sysname="/sys/class/rtc/${RTC_DEVICE##*/}/name"
+    [[ -r "$sysname" ]] && RTC_DRIVER="$(tr -d '\n' < "$sysname" 2>/dev/null)"
+    if command -v hwclock >/dev/null 2>&1; then
+      RTC_TIME="$(hwclock --show --utc 2>/dev/null | head -1)"
+    fi
+  fi
+
+  # fake-hwclock is not a clock and must never be counted as one. It writes the
+  # time to a file on shutdown and restores it on boot, so a machine carrying
+  # it comes up with a plausible-looking timestamp that is wrong by exactly how
+  # long it was switched off. That is the precise failure #17 existed to make
+  # visible, so reporting it as a time source would undo that work.
+  if [[ -f /etc/fake-hwclock.data ]] || systemctl is-enabled fake-hwclock >/dev/null 2>&1; then
+    FAKE_HWCLOCK="yes"
+  fi
+
+  # GPS is the best time source a field site can have: no internet needed, and
+  # Field Day is outdoors by definition. chrony exposes a receiver as a
+  # reference clock, which its sources listing marks with a leading '#'.
+  if command -v chronyc >/dev/null 2>&1; then
+    GPS_SOURCE="$(chronyc -n sources 2>/dev/null \
+      | awk '/^#[*+]/ { print $2; exit }')"
+  fi
+  if [[ -z "$GPS_SOURCE" ]] && pgrep -x gpsd >/dev/null 2>&1; then
+    # gpsd running without chrony disciplining the clock is a receiver nothing
+    # is listening to, which is worth distinguishing from a working setup.
+    GPS_SOURCE="gpsd running (not disciplining the system clock)"
+  fi
+}
+
 server_time() {
   banner
   echo -e "  ${BOLD}Server Time / Clock${NC}"
@@ -1121,28 +1171,74 @@ server_time() {
   else
     label "NTP:"; echo "timedatectl not available"
   fi
+
+  detect_clock_sources
+  label "Hardware RTC:"
+  if [[ -n "$RTC_DEVICE" ]]; then
+    echo "$RTC_DEVICE (${RTC_DRIVER:-driver unknown})${RTC_TIME:+ — reads ${RTC_TIME}}"
+  else
+    echo "none detected"
+  fi
+  if [[ -n "$GPS_SOURCE" ]]; then
+    label "GPS time source:"; echo "$GPS_SOURCE"
+  fi
+  if [[ "$FAKE_HWCLOCK" == "yes" ]]; then
+    label "fake-hwclock:"; echo "installed"
+  fi
   echo
 
   if [[ "$synced" == "yes" ]]; then
-    log "Clock is synchronised with NTP — nothing to do."
+    if [[ -n "$GPS_SOURCE" ]]; then
+      log "Clock is synchronised from GPS — nothing to do."
+    else
+      log "Clock is synchronised with a time source — nothing to do."
+    fi
+  elif [[ -n "$RTC_DEVICE" ]]; then
+    # The case the old version of this screen got wrong. A field server with an
+    # RTC fitted and no internet answers "no" to NTPSynchronized and is
+    # nonetheless keeping perfectly good time. Telling that operator their
+    # clock is broken and that they should fit the part already in front of
+    # them is how a warning trains people to skip warnings.
+    log "No NTP, but a hardware RTC is fitted — expected on an offline field server."
+    echo -e "    ${DIM}The RTC holds the time across a power cycle, so this machine${NC}"
+    echo -e "    ${DIM}comes up with the time you last set rather than an epoch date.${NC}"
+    echo -e "    ${DIM}It does not check itself: confirm the clock above against a${NC}"
+    echo -e "    ${DIM}phone or a GPS before the event, and if you correct it, write${NC}"
+    echo -e "    ${DIM}it back to the RTC so the correction survives a reboot.${NC}"
   else
-    warn "Clock is NOT synchronised with a time source."
+    warn "Clock is NOT synchronised, and no hardware RTC was found."
+    if [[ "$FAKE_HWCLOCK" == "yes" ]]; then
+      # Worth saying out loud, because it is the failure that looks like a fix.
+      echo -e "    ${DIM}fake-hwclock is installed. That is not a clock: it restores the${NC}"
+      echo -e "    ${DIM}time this machine was last shut down at, so the clock will look${NC}"
+      echo -e "    ${DIM}plausible and be wrong by however long the box was switched off.${NC}"
+    fi
     echo -e "    ${DIM}On a server with no internet this is expected. Set it by hand${NC}"
     echo -e "    ${DIM}before operating, or fit a hardware RTC module — see${NC}"
-    echo -e "    ${DIM}docs/deployment.md for the offline field-server setup.${NC}"
+    echo -e "    ${DIM}docs/field-server.md for the offline field-server setup.${NC}"
   fi
   echo
   hr
 
-  local choice=""
-  menu_pick choice \
-    "Set the clock by hand (UTC)" \
-    "Re-enable NTP synchronisation" \
-    "Back"
+  # The RTC entry only exists when there is an RTC to write to, so the option
+  # numbers shift. Naming the chosen action rather than switching on its index
+  # keeps that from becoming a silent off-by-one the day someone adds a third
+  # entry — this menu writes to the system clock, so picking the wrong branch
+  # is not a cosmetic bug.
+  local -a actions=("set" "ntp")
+  local -a labels=("Set the clock by hand (UTC)" "Re-enable NTP synchronisation")
+  if [[ -n "$RTC_DEVICE" ]]; then
+    actions+=("rtc")
+    labels+=("Write the system clock to the RTC")
+  fi
+  actions+=("back")
+  labels+=("Back")
 
-  case "$choice" in
-    1) set_clock_manually ;;
-    2)
+  local choice=""
+  menu_pick choice "${labels[@]}"
+  case "${actions[$((choice - 1))]:-back}" in
+    set) set_clock_manually ;;
+    ntp)
       if ! command -v timedatectl >/dev/null 2>&1; then
         err "timedatectl is not available on this system."
       elif timedatectl set-ntp true; then
@@ -1152,7 +1248,18 @@ server_time() {
       fi
       pause
       ;;
-    3) return ;;
+    rtc)
+      # `hwclock -w` is the step people forget after setting the time by hand:
+      # without it the correction lives only in RAM, and the next boot restores
+      # the RTC's older, wrong value over the top of it.
+      if hwclock -w 2>/dev/null; then
+        log "System clock written to the RTC — the correction survives a reboot now."
+      else
+        err "Could not write to the RTC. Run as root, and check ${RTC_DEVICE} is writable."
+      fi
+      pause
+      ;;
+    back) return ;;
   esac
 }
 
