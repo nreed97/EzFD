@@ -53,6 +53,14 @@ and ESM. The server is never involved.
 or bulk-import any ADIF file. Imports are idempotent, so re-importing can't
 double your log.
 
+**Runs at a site with no internet at all.** A `docker compose up -d` on a
+Raspberry Pi is the whole install: the app and PostgreSQL, pulled once while
+you still have a network and never needing one again. Operators join over local
+WiFi at `http://ezfd.local/` and everything works normally, because from the
+app's point of view nothing is offline — dupes, band coordination and the live
+score are all server-side. The log survives losing power and survives being
+upgraded, both asserted by a test that actually kills the stack.
+
 **One log, even when the event ran in two places.** A whole event exports as
 JSON — settings, contacts, roster, checkout history — and imports either as a
 new event or *merged into* one that already exists. That second mode is for
@@ -164,7 +172,8 @@ $ npm run dev
 **Running the server**
 [Deployment](docs/deployment.md) ·
 [Administration](docs/administration.md) ·
-[Configuration](docs/configuration.md)
+[Configuration](docs/configuration.md) ·
+[Offline field servers](docs/field-server.md)
 
 **Working on the code**
 [Development](docs/development.md) ·

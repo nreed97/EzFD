@@ -82,8 +82,12 @@ Setting the clock only fixes contacts logged from that point on. **QSOs already
 in the log keep the timestamps they were given** — they aren't rewritten.
 So check the clock before an event starts, not after.
 
-For anything more than a casual activation, fit a hardware RTC module. See
-[Deployment](deployment.md#offline-field-servers).
+For anything more than a casual activation, give the machine a clock of its
+own — a GPS receiver or an RTC module. This screen reports which of those is
+keeping time, so a field server with an RTC fitted is no longer told its clock
+is unsynchronised, and `fake-hwclock` is called out for what it is rather than
+counted as a time source. See
+[Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites).
 
 ## The event list
 

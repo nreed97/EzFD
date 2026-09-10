@@ -88,6 +88,26 @@ not the server. Each has a matching command-line flag that takes precedence.
 
 See [Digital modes](digital-modes.md).
 
+## The container stack
+
+Read from `.env` by `docker compose`, not by the app process, and used only by
+the offline field-server deployment. Copy `.env.example` and fill them in.
+
+| Variable | Used by | Default |
+|---|---|---|
+| `POSTGRES_PASSWORD` | the database superuser, for provisioning only | *required* |
+| `EZFD_DB_PASSWORD` | the app's own database role — becomes half of `DATABASE_URL` | *required* |
+| `EZFD_PORT` | the port operators connect to on the host | `80` |
+
+`EZFD_ENCRYPTION_KEY` and `EZFD_ADMIN_KEY` are read from the same file and mean
+what they mean everywhere else, above.
+
+There is no `DATABASE_URL` to set here: compose builds it from
+`EZFD_DB_PASSWORD` and the database service's name, so the two cannot drift
+apart.
+
+See [Offline field servers](field-server.md).
+
 ## Applying changes
 
 ```bash
