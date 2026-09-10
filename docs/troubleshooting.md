@@ -64,6 +64,31 @@ approves them in the admin console: **List / manage events** → open the event
 At the event list, type the join code to open it straight away rather than
 finding its row — the operator asking you can read it to you.
 
+## "Nothing is holding this server's clock" / "has not been set for N days"
+
+Different from the banner below: nothing currently *disagrees*, but the server
+has no way to know its time is right. No network time, no GPS, and no hardware
+clock — so the time it is showing came from its last shutdown rather than from
+a source.
+
+This shows before anyone has logged anything, which is the point. A clock can
+be badly wrong and nothing will contradict it until an operator connects, and
+by then contacts may already carry the wrong time.
+
+Fix it the same way: `bash ezfd-admin.sh` → **Server time / clock**. If the
+machine will be offline for a whole event, fit a hardware clock or a GPS
+receiver — see
+[Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites).
+After setting the time by hand, **write it to the RTC** if you have one, or the
+correction lives only in RAM and the next reboot restores the old value.
+
+> **This never fires just because NTP is off.** An offline field server has no
+> NTP by definition, and a warning that fires on that would shout loudest at
+> whoever fitted an RTC and did everything right. It reports how long since the
+> clock was last set by *anything* — a GPS-fed server is fine, an RTC-held one
+> is fine until it has gone a long time unset, and a server that cannot answer
+> the question at all says nothing rather than guessing.
+
 ## "This server's clock is N ahead of / behind this device"
 
 The server and the browser disagree about the time by more than a minute. QSOs
@@ -77,6 +102,14 @@ and no NTP. Fix it from the admin console: `bash ezfd-admin.sh` → **Server tim
 It can also be the operator's device that's wrong, if their laptop has been
 offline a long time. If one operator sees the banner and the others don't, it's
 that device.
+
+**You usually don't have to work that out yourself.** With three or more
+operators connected, the banner compares what every device reports and says so
+outright — *"9 of 11 connected devices agree"* — because a dozen phones, most
+of them synchronised by a carrier within the last day, are collectively a
+better authority than a field server asking itself. Below three devices it
+keeps the both-ways wording, since with one or two there genuinely isn't enough
+to convict either side.
 
 Either way, **QSOs already logged keep the timestamps they were given.** Fixing
 the clock only corrects contacts from that point on.

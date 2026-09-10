@@ -43,6 +43,26 @@ only run events.
   setting the time by hand — without it the correction lives only in RAM and
   the next reboot restores the old, wrong value over the top of it. ([#95])
   Docs: [Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites), [Administration → Server time](administration.md#server-time)
+- **The app says when the server's clock cannot be trusted** `Display` `Setup` —
+  Two new warnings on the logging page, both about the thing that cannot be
+  repaired after an event: QSOs are stamped by the server, so a wrong server
+  clock quietly corrupts every contact's time. It now says when *nothing* is
+  holding the clock — no network time, no GPS, no hardware clock — and when
+  whatever is holding it has gone a long time unset. Those show before anyone
+  logs anything, which is the point: a wrong clock is silent until it has
+  already cost you contacts. Neither fires merely because NTP is off, which on
+  an offline field server is true by design.
+  Docs: [Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites), [Troubleshooting → Nothing is holding this server's clock](troubleshooting.md#nothing-is-holding-this-servers-clock-has-not-been-set-for-n-days)
+- **The skew banner now names which clock is wrong** `Display` — It could only
+  ever say the server and your device disagreed, and deliberately would not say
+  which was right — honest, and no help to the operator deciding what to fix.
+  With three or more devices connected it compares what all of them report and
+  says so outright: *"9 of 11 connected devices agree"*. A dozen phones, most
+  synchronised by a carrier within the last day, are collectively a better
+  authority than a field server asking itself. With one or two devices it keeps
+  the old both-ways wording, because that genuinely is not enough to convict
+  either side.
+  Docs: [Troubleshooting → This server's clock is N ahead of / behind this device](troubleshooting.md#this-servers-clock-is-n-ahead-of-behind-this-device), [API → GET /api/time](api.md#get-apitime)
 
 ### Changed
 

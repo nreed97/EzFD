@@ -208,9 +208,21 @@ check, and it needs no decoder at all.
 
 ### Either way, the app will tell you
 
-The logging page shows a standing banner whenever the server's clock and the
-operator's device disagree by more than a minute. Operators should report that
-rather than log through it.
+Two different warnings, and the distinction matters:
+
+- **Before anyone connects**, the logging page says if nothing is holding the
+  server's clock at all, or if it has gone a long time since anything set it.
+  That is the one worth catching, because a wrong clock is silent until it has
+  already cost you contacts.
+- **Once operators are on**, a standing banner appears when the server and a
+  device disagree by more than a minute. With three or more devices connected
+  it compares all of them and names the culprit outright — *"9 of 11 connected
+  devices agree"* — rather than leaving you to guess whether it is the server
+  or somebody's laptop.
+
+Neither fires merely because NTP is off. An offline field server has no NTP by
+definition, and a warning built on that would shout loudest at whoever fitted
+an RTC and did everything right.
 
 ---
 
