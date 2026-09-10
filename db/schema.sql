@@ -1,5 +1,6 @@
 -- EzFD Field Day Logger — PostgreSQL schema
--- Run once on a fresh database (docker-entrypoint-initdb.d auto-runs this on first start)
+-- Run once on a fresh database. deploy.sh applies it on first install and
+-- ezfd-admin.sh re-applies it on update, both as the postgres superuser.
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
 
