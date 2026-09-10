@@ -25,9 +25,9 @@ nothing is offline.
 | A clock | See [The clock is the part that bites](#the-clock-is-the-part-that-bites). This is not optional |
 | Power | Whatever runs the rest of the site. The stack comes back on its own after losing it — see [Losing power](#losing-power) |
 
-There is **one way to install EzFD** and this is the same one: `deploy.sh`. It
-is not a separate field-server mode, and there is no container stack to learn.
-The only thing that makes a field server different is *when* you run it.
+There is **one way to install EzFD** and this is the same one: `deploy.sh`.
+There is no separate field-server mode to learn. The only thing that makes a
+field server different is *when* you run it.
 
 ---
 

@@ -27,15 +27,20 @@ only run events.
 
 ### Added
 
-- **Run a whole event on a Pi with no internet** `Setup` — `docker compose up
-  -d` is now the entire install for a field server: the app and PostgreSQL in
-  two containers, pulled once while you still have a network and never needing
-  one again. Operators join over local WiFi and everything behaves normally,
-  because from the app's point of view nothing is offline — dupes, band
-  coordination and the live score are all server-side and the server is at the
-  site. `deploy.sh` cannot do this job and is not meant to; it reaches for apt
-  repositories and certbot at the moment you run it. ([#95])
-  Docs: [Offline field servers → Set it up at home](field-server.md#set-it-up-at-home)
+- **Run a whole event on a Pi with no internet** `Setup` — A machine you carry
+  to the site can be the central log for the weekend with no uplink at all.
+  Operators join over local WiFi and everything behaves normally, because from
+  the app's point of view nothing is offline — dupes, band coordination and the
+  live score are all server-side and the server is at the site. The install is
+  the same `deploy.sh` as any other server, run in a different order: run it at
+  home while you still have a network, leave the domain blank so it skips
+  Let's Encrypt, and nothing it needs afterwards is on the internet. A Pi 4 or
+  5 builds the app itself; below 2 GB of RAM it leans on the swap file
+  `deploy.sh` adds and takes longer, which is a one-time cost paid at home. A
+  new guide covers the parts that only bite offline — the clock, plain HTTP,
+  giving the machine a name, power cuts, and merging the log back
+  afterwards. ([#95])
+  Docs: [Offline field servers → Set it up at home](field-server.md#set-it-up-at-home), [Offline field servers → What the machine has to be](field-server.md#what-the-machine-has-to-be)
 - **The admin console knows what is keeping time** `Setup` — **Server time /
   clock** now reports a hardware RTC or a GPS receiver alongside NTP, and calls
   `fake-hwclock` out by name rather than counting it. It also offers to write
@@ -86,32 +91,6 @@ only run events.
   a working RTC answers no by definition. It now says the clock is being held
   by the RTC and what to check instead. ([#95])
   Docs: [Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites)
-- **The field-server guide told Pi 5 owners to build somewhere else** `Setup` —
-  It said "Don't build on the Pi", citing the swap file `deploy.sh` adds as
-  evidence that the build is memory-hungry. That had the evidence backwards:
-  the swap only triggers below 2 GB of RAM, so it is a threshold a 4 GB or 8 GB
-  Pi 5 is clear of, and the 1 GB droplets that do trip it build the app on
-  every deploy regardless. Measured, a cold build peaks around 550 MB and still
-  completes with the JS heap capped at 256 MB. A Pi 4 or 5 builds it directly;
-  a Pi 3 or a 1 GB machine leans on the swap file and takes longer, but that is
-  a one-time cost paid at home. The one real constraint is unchanged and now
-  stated as the constraint: building needs a network, so it happens before you
-  leave, on whichever machine you like. ([#95])
-  Docs: [Offline field servers → What the machine has to be](field-server.md#what-the-machine-has-to-be)
-
-### Removed
-
-- **The container stack, in favour of one way to install** `Setup` — The
-  `Dockerfile` and `compose.yaml` added earlier today are gone. They were
-  solving a problem `deploy.sh` mostly did not have: it already offers a blank
-  domain for IP-only access with no certbot, and its whole apt/NodeSource/PGDG
-  block only runs on a fresh install, so the only network dependency left on a
-  field-server install is `npm ci` and the font fetch — exactly what the
-  containers needed too. Two deployment paths would have drifted, and this
-  codebase has paid for that several times. Install with `deploy.sh` at home,
-  leave the domain blank, carry the machine to the site.
-  Docs: [Offline field servers → Set it up at home](field-server.md#set-it-up-at-home), [Deployment → Offline field servers](deployment.md#offline-field-servers)
-
 ## 2026-09-06
 
 ### Added
