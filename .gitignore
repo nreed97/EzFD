@@ -32,9 +32,6 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
-# ...but the template is the one thing here that must be committed: it is how
-# anyone knows which secrets the compose stack expects.
-!.env.example
 
 # vercel
 .vercel

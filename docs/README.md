@@ -32,7 +32,7 @@ Start with whichever describes you.
 | [Deployment](deployment.md) | One-command install on a VPS, TLS, updates |
 | [Administration](administration.md) | `ezfd-admin.sh`, backups, restores, recovery |
 | [Configuration](configuration.md) | Every environment variable |
-| [Offline field servers](field-server.md) | A Pi at the site with no internet — containers, the clock, mDNS, merging back |
+| [Offline field servers](field-server.md) | A machine at the site with no internet — installing at home, the clock, mDNS, merging back |
 
 ## I want to work on the code
 

@@ -1,7 +1,7 @@
 # Offline field servers
 
-Running EzFD on a Raspberry Pi at a site with **no internet at all**, as the
-central log for the event.
+Running EzFD on a machine you bring to a site with **no internet at all**, as
+the central log for the event.
 
 This is a different problem from a flaky uplink. The offline queue already
 handles a connection that comes and goes: each browser keeps logging and
@@ -10,9 +10,9 @@ every operator is isolated from every other one — duplicate checking degrades
 to "only the contacts I typed", and band coordination stops working entirely,
 because none of it is a browser feature. It all lives on the server.
 
-A server at the site fixes that properly. Operators connect to the Pi over
-local WiFi and everything behaves normally, because from the app's point of
-view nothing is offline.
+A server at the site fixes that properly. Operators connect to it over local
+WiFi and everything behaves normally, because from the app's point of view
+nothing is offline.
 
 ---
 
@@ -20,101 +20,74 @@ view nothing is offline.
 
 | | |
 |---|---|
-| A Linux box | A Raspberry Pi 4 or 5 is the usual choice. 2 GB of RAM is plenty to *run* EzFD, and a Pi 5 builds it too; see [Where to build](#where-to-build) |
-| Docker | Installed once, at home, with `curl -fsSL https://get.docker.com \| sh` |
+| A Linux box | A Raspberry Pi is the usual choice, but an old laptop or any other SBC works. See [What the machine has to be](#what-the-machine-has-to-be) |
 | A network | A travel router, an old home router with no uplink, or a phone hotspot. It does not need internet — it only needs to put everyone on one LAN |
 | A clock | See [The clock is the part that bites](#the-clock-is-the-part-that-bites). This is not optional |
-| Power | Whatever runs the rest of the site. The stack survives losing it — that is tested — but see [Losing power](#losing-power) |
+| Power | Whatever runs the rest of the site. The stack comes back on its own after losing it — see [Losing power](#losing-power) |
 
-`deploy.sh` is **not** the tool for this job. It adds the NodeSource and PGDG
-apt repositories, installs packages and runs certbot, all at the moment you run
-it. That is the right shape for a VPS and impossible in a field. Use the
-container stack below instead.
+There is **one way to install EzFD** and this is the same one: `deploy.sh`. It
+is not a separate field-server mode, and there is no container stack to learn.
+The only thing that makes a field server different is *when* you run it.
 
 ---
 
 ## Set it up at home
 
-Do all of this while you still have internet.
+`deploy.sh` needs the network — it adds the NodeSource and PGDG apt
+repositories, installs PostgreSQL, Node and nginx, and builds the app. Every
+one of those is an install-time job. Do them while you still have internet, and
+the result runs offline forever after.
 
 ```bash
 git clone https://github.com/nreed97/EzFD.git
 cd EzFD
-cp .env.example .env
+sudo bash deploy.sh
 ```
 
-Fill in the three secrets:
+**Leave the domain blank** when it asks. That is the field-server answer: it
+skips Let's Encrypt entirely, and nginx serves on port 80 to whatever address
+the machine has. There is no certificate to renew and nothing that expires
+while you are out of contact.
 
-```bash
-{ echo "POSTGRES_PASSWORD=$(openssl rand -hex 16)"
-  echo "EZFD_DB_PASSWORD=$(openssl rand -hex 16)"
-  echo "EZFD_ENCRYPTION_KEY=$(openssl rand -hex 32)"; } >> .env
-```
+Everything else can take its defaults — the script generates the database
+password and the encryption key and writes them to `/opt/ezfd/.env`.
 
-Then edit `.env` to remove the now-empty duplicates of those three lines, and
-start it:
-
-```bash
-docker compose up -d
-```
-
-That builds the app image, starts PostgreSQL, creates the role and database,
-applies the schema, and brings the app up on port 80. `docker compose ps`
-should show `db` and `app` both `healthy`.
-
-Open `http://localhost/`, create your event, and log a test contact.
+When it finishes you have `ezfd.service` under systemd, enabled at boot, with
+`Requires=postgresql.service` so the database is up before the app is. Open
+`http://localhost/`, create your event, and log a test contact.
 
 > **Create the event before you leave.** The N1MM call history and `MASTER.SCP`
 > downloads happen at event creation and are best-effort — a failed fetch never
 > blocks the event, it just means no callsign prefill for the whole weekend.
 > Creating it at home is the difference between having that and not.
 
-### Where to build
+### What the machine has to be
 
-**A Pi 5 builds this fine.** Memory is not the constraint it is usually assumed
-to be: a cold `next build` peaks around 550 MB across the whole Node process
-tree and still completes with the JS heap capped at 256 MB. `deploy.sh` adds
-swap only below 2 GB of RAM, aimed at the 1 GB VPS instances this is commonly
-deployed on — and those build the app on every deploy without trouble. A 4 GB
-or 8 GB Pi 5 is well clear of that line.
+| | |
+|---|---|
+| OS | Debian or Ubuntu gets the automatic package install. Anything else works if Node 20+, PostgreSQL, nginx and systemd are already installed — `deploy.sh` will check and carry on |
+| RAM | 1 GB is enough. `deploy.sh` adds a 2 GB swap file below that line, which is what the $6 VPS instances this is commonly deployed on run with |
+| Disk | A few GB. `node_modules` alone is 614 MB and is only needed at build time |
+| Arch | arm64 and x86-64 both fine. A 32-bit-only machine is not — NodeSource no longer ships armhf for current Node |
 
-So build wherever is convenient.
-
-**On the Pi itself** — simplest, and it avoids cross-architecture builds
-entirely:
-
-```bash
-docker compose up -d --build
-```
-
-**On a laptop, carried over** — for a Pi 4 or a 1–2 GB machine, for a Pi with
-no internet of its own, and as the only way to get `postgres:16` onto a machine
-that can never pull it:
-
-```bash
-# On the laptop, for the Pi's architecture:
-docker buildx build --platform linux/arm64 -t ezfd:local --load .
-docker save ezfd:local postgres:16 | gzip > ezfd-images.tar.gz
-
-# Copy that file to the Pi, then there:
-gunzip -c ezfd-images.tar.gz | docker load
-docker compose up -d          # uses the loaded image, builds nothing
-```
-
-Cross-building arm64 on an x86 laptop runs the whole build under QEMU
-emulation, so this path is for *reach* rather than speed — a native build on a
-Pi 5 is the faster of the two. Reach is often the point: `docker save` is what
-gets images onto a machine with no registry access.
-
-**What stops you building at the site is the network, not the hardware.**
-`npm ci` fetches the dependency tree and `next/font/google` fetches the two
-typefaces at build time. Neither is needed once the image exists, but both mean
-"build when we get there" is not a plan — on a Pi 5 as much as on anything.
+**The build is not the obstacle people expect.** A cold `next build` peaks
+around 550 MB across the whole Node process tree, takes well under a minute on
+a modern four-core machine, and still completes with the JS heap capped at
+256 MB. A Pi 4 or 5 handles it comfortably. A Pi 3 or a 1 GB machine will lean
+on the swap file and take a good while longer, but it is a one-time cost paid
+at home with a mains lead attached.
 
 The Pi-specific thing worth planning for is **storage, not RAM**. `npm ci`
 unpacks about 22,000 files, which is precisely what a cheap microSD card is
-worst at. An A2-rated card or an NVMe HAT changes build time far more than the
-RAM size does.
+worst at. An A2-rated card or an NVMe HAT changes install time far more than
+the RAM size does.
+
+### Updating later
+
+Re-running `deploy.sh` on a machine that already has EzFD is an *update*, and
+it skips the entire package-install block — no apt, no NodeSource, no PGDG. It
+still runs `npm ci` and `next build`, so an update needs the network even
+though running does not. Update at home, between events, not at the site.
 
 ---
 
@@ -125,23 +98,28 @@ whole point.
 
 ```bash
 sudo nmcli networking off        # or: unplug the cable and forget the WiFi
-docker compose down
-docker compose up -d
+sudo reboot
 ```
 
-Then load the app from another device on the LAN and log a contact. If it
-works with the machine's internet genuinely off, it will work in a field.
+When it comes back, load the app from another device on the LAN and log a
+contact. A reboot rather than a service restart is deliberate: it is the boot
+ordering you are testing, and boot is what happens after a generator dies.
 
-Two things this catches that reasoning does not: an image that was never
-actually pulled, and anything you added that quietly reaches out on startup.
+Two things this catches that reasoning does not: a service that was running but
+never `enable`d, and anything you added that quietly reaches out on startup.
+
+```bash
+systemctl is-enabled ezfd postgresql    # both should say "enabled"
+journalctl -u ezfd -b --no-pager | tail
+```
 
 ---
 
 ## Give it a name
 
 Typing an IP address is miserable to communicate to twelve people across a
-field site, and it changes when the router hands out a different lease.
-Install avahi on the Pi and it answers to a name instead:
+field site, and it changes when the router hands out a different lease. Install
+avahi and the machine answers to a name instead:
 
 ```bash
 sudo apt install -y avahi-daemon
@@ -152,11 +130,8 @@ Everyone then uses **`http://ezfd.local/`**. That works out of the box on
 iOS, macOS and Android 12+, and on Windows 10 and newer. It is the single
 cheapest improvement to the experience of running one of these.
 
-avahi runs on the Pi itself, not in a container — mDNS needs to see the LAN's
-multicast traffic directly, which a bridged container network does not.
-
 If a device cannot resolve `.local`, fall back to the IP: `hostname -I` on the
-Pi. Writing it on a whiteboard is a perfectly good backup plan.
+server. Writing it on a whiteboard is a perfectly good backup plan.
 
 ---
 
@@ -201,7 +176,8 @@ at home and it stays right.
 sudo apt remove -y fake-hwclock
 ```
 
-A Raspberry Pi 5 has an RTC built in; it needs only the battery.
+A Raspberry Pi 5 has an RTC built in; it needs only the battery. An old laptop
+has had one all along, which is one of the better arguments for using one.
 
 After setting the clock by hand, **write it to the RTC** or the correction only
 lives in RAM: `ezfd-admin.sh` → **Server time / clock** → *Write the system
@@ -273,16 +249,13 @@ normally, which is the reason it is not going away.
 
 ## Losing power
 
-A generator coughs at 3am and nobody is awake. The stack is configured for
-that: both containers carry `restart: unless-stopped`, so Docker brings them
-back when the machine boots, and PostgreSQL replays its write-ahead log.
+A generator coughs at 3am and nobody is awake. Nothing needs doing: `deploy.sh`
+enables `ezfd.service` and PostgreSQL at boot, the unit carries
+`Requires=postgresql.service` so the database is up first, and `Restart=on-failure`
+covers the app dying on its own. PostgreSQL replays its write-ahead log.
 
-This is tested rather than assumed — `scripts/test-compose.sh` hard-kills the
-whole stack mid-event, brings it back, and asserts every contact is still
-there. It also asserts the log survives the containers being *replaced*, which
-is a different failure: a power cut restarts the same containers and the log
-would survive even with no volume configured, while an ordinary upgrade
-recreates them and would lose everything.
+That is worth *checking* rather than trusting, which is what the reboot in
+[Verify it actually works offline](#verify-it-actually-works-offline) is for.
 
 What you should still do: **take a backup to removable media before packing
 up.** A machine going home in a car is a worse failure mode than a disk.
@@ -293,13 +266,14 @@ curl -s 'http://ezfd.local/api/export/JOINCODE?format=json' > event-backup.json
 
 That is the whole event — settings, contacts, roster and checkout history — in
 one file, and it restores into any other instance. Copy it to a USB stick, not
-just to the laptop sitting next to the Pi.
+just to the laptop sitting next to the server. `ezfd-admin.sh` → **Backup** does
+the same thing from the console.
 
 ---
 
 ## At the site
 
-1. Power up the Pi and the router. Wait for `http://ezfd.local/` to answer.
+1. Power up the machine and the router. Wait for `http://ezfd.local/` to answer.
 2. Check the clock — `ezfd-admin.sh` → **Server time / clock**, or just look at
    whether any operator's browser is showing the skew banner.
 3. Give people the join code. They connect to the WiFi and open
@@ -330,16 +304,3 @@ cannot prove. Running it twice is safe. See
 
 If the field server was the only server, there is nothing to merge: export
 ADIF and Cabrillo from it directly.
-
----
-
-## Testing the stack
-
-```bash
-bash scripts/test-compose.sh
-```
-
-Builds the image, starts everything, logs contacts through the API, hard-kills
-the stack, brings it back and checks the log survived — then does it again
-across a container replacement. Runs in CI on every change. If you are
-modifying `compose.yaml`, `Dockerfile` or `docker/db-init.sh`, run it.

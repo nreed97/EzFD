@@ -105,13 +105,6 @@ $ DATABASE_URL=postgres://localhost/ezfd node scripts/test-merge.cjs
 $ BASE_URL=http://localhost:3000 bash scripts/test-e2e.sh
 ```
 
-**One needs Docker:**
-
-```bash
-# The field-server container stack, built and run for real
-$ bash scripts/test-compose.sh
-```
-
 ### What each is for
 
 **`db/test-ses-constraint.sql`** asserts rather than prints, so a broken
@@ -131,25 +124,6 @@ definitions rather than a copy — the same ones the HTTP API and the console
 call. It used to carry its own third variant of the backup query, and so
 round-tripped a shape the console's menu action never produced, staying green
 while that action silently dropped the SES roster.
-
-**`scripts/test-compose.sh`** builds and runs the field-server container stack
-for real, because everything that can go wrong with it is a runtime problem and
-because the machine it runs on is the least debuggable one this project has: a
-Pi in a field, no internet, no shell, and a club's only log inside it.
-
-It asserts the schema is applied before the app is allowed to start, that a
-contact logged through the API comes back out of the export, that the export
-still omits the QRZ credentials when reached over a plain-HTTP LAN, and that
-the log survives two different kinds of restart.
-
-Those two are worth separating, because only one of them needs the named
-volume. A power cut restarts the *same* containers, and the log survives that
-even with no volume configured at all — the postgres image declares a `VOLUME`
-and Docker quietly supplies an anonymous one. Recreating the containers is what
-orphans that anonymous volume, and recreating them is what an ordinary upgrade
-between events does. So a stack missing `db-data:` looks fine through every
-power cut and loses the log the first time someone updates it. The
-down/up check is the one that catches it; the kill/restart check cannot.
 
 **`scripts/build-section-geo.mjs`** is not a test but belongs next to them:
 it regenerates `public/sections.geo.json`, the section boundaries the map

@@ -132,10 +132,12 @@ directly.
 A Pi at the site with no internet is a different deployment from this one, and
 it has its own guide: **[Offline field servers](field-server.md)**.
 
-`deploy.sh` is not the tool for it. Everything on this page assumes the machine
-can reach apt repositories and Let's Encrypt at the moment you run it, which is
-exactly what a field site cannot do. The container stack in that guide needs
-the network once, to fetch images, and never again.
+It is the same `deploy.sh`, run in a different order. Everything on this page
+needs the network *at install time* — apt repositories, and Let's Encrypt if
+you asked for a domain — so a field server is installed at home and carried to
+the site. Leave the domain blank and certbot never runs at all. What the guide
+covers is the rest: the clock, mDNS, verifying it boots with the network off,
+and merging the log back afterwards.
 
 The one thing worth repeating here, because it is unrecoverable rather than
 merely inconvenient: **a Pi earlier than a 5 has no battery-backed clock**, and

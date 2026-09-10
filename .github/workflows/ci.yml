@@ -268,22 +268,3 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
           shellcheck $(git ls-files '*.sh')
-
-  # The field server is the one deployment nobody can debug when it goes wrong:
-  # a Pi in a field, no internet, no shell, and a club's only log inside it. So
-  # the container stack gets exercised for real rather than linted — built,
-  # started, written to, killed, and brought back — because every failure that
-  # matters here is a runtime one.
-  compose:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      # Builds the image from the same Dockerfile a club would, then asserts
-      # the log survives both a hard kill (a generator coughing) and a
-      # down/up cycle (an ordinary upgrade between events). Those are two
-      # different failure modes: the first survives even with no volume
-      # configured, because Docker supplies an anonymous one; only the second
-      # notices when `db-data:` goes missing.
-      - name: Container stack end to end
-        run: bash scripts/test-compose.sh
