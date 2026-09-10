@@ -2,14 +2,23 @@
 
 `deploy.sh` takes a fresh Ubuntu or Debian machine to a running, TLS-secured
 install. It is also the update path — re-running it is safe and preserves
-configuration.
+configuration. It is the **only** way EzFD is installed; there is no second
+path to choose between.
 
 ## Requirements
 
-- Ubuntu or Debian with root access
-- A DNS record pointing at the machine, if you want TLS
-- 1 GB RAM is enough; the script adds swap because `next build` gets
-  OOM-killed at that size otherwise
+- **Root access, and systemd.** The service unit is how EzFD starts, and how
+  it starts again after a power cut, so systemd is not optional.
+- **Ubuntu or Debian for the automatic package install** — including
+  derivatives that declare it, such as Raspberry Pi OS, Mint and Pop!_OS.
+- **Any other distribution also works**, but installs nothing: the script
+  checks that Node 20+, PostgreSQL, nginx, rsync and openssl are already
+  present and tells you which are missing. It will not configure a firewall
+  there either, because it only knows `ufw` — open 80 and 443 yourself.
+- A DNS record pointing at the machine, if you want TLS. Leave the domain
+  blank and certbot never runs, which is the field-server answer.
+- 1 GB RAM is enough; the script adds swap below 2 GB because `next build`
+  can get OOM-killed at that size otherwise.
 
 ## First install
 
@@ -132,10 +141,12 @@ directly.
 A Pi at the site with no internet is a different deployment from this one, and
 it has its own guide: **[Offline field servers](field-server.md)**.
 
-`deploy.sh` is not the tool for it. Everything on this page assumes the machine
-can reach apt repositories and Let's Encrypt at the moment you run it, which is
-exactly what a field site cannot do. The container stack in that guide needs
-the network once, to fetch images, and never again.
+It is the same `deploy.sh`, run in a different order. Everything on this page
+needs the network *at install time* — apt repositories, and Let's Encrypt if
+you asked for a domain — so a field server is installed at home and carried to
+the site. Leave the domain blank and certbot never runs at all. What the guide
+covers is the rest: the clock, mDNS, verifying it boots with the network off,
+and merging the log back afterwards.
 
 The one thing worth repeating here, because it is unrecoverable rather than
 merely inconvenient: **a Pi earlier than a 5 has no battery-backed clock**, and

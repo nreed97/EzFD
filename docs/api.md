@@ -291,10 +291,27 @@ The station's usual class and section from the N1MM file, plus
 
 ### `GET /api/time`
 
-The server's current time, so a client can tell when its own clock disagrees.
+The server's current time, what is holding its clock, and what the connected
+operators' devices make of it.
 
 ```json
-{ "app_time": "2026-06-27T18:04:11.204Z", "db_time": "2026-06-27T18:04:11.207Z" }
+{
+  "app_time": "2026-06-27T18:04:11.204Z",
+  "db_time":  "2026-06-27T18:04:11.207Z",
+  "clock": {
+    "source": "gps",
+    "synchronized": false,
+    "last_sync": "2026-06-27T18:03:42.000Z",
+    "age_ms": 29204,
+    "stale": false,
+    "unaccounted_for": false,
+    "rtc": true
+  },
+  "quorum": {
+    "devices": 11, "agreeing": 9,
+    "median_skew_ms": -240000, "server_is_wrong": true
+  }
+}
 ```
 
 `db_time` is PostgreSQL's clock — the one that actually stamps QSOs — and is
@@ -302,9 +319,49 @@ The server's current time, so a client can tell when its own clock disagrees.
 two are reported separately because the app process and the database need not
 be on the same host.
 
+**`clock`** describes what is keeping the server's time. `source` is one of
+`gps`, `chrony`, `timesyncd`, `rtc` or `null`; `last_sync` is when something
+last disciplined the clock, and `age_ms` how long ago that was. `stale` means
+that age is past thirty days. `unaccounted_for` means no NTP, no reference and
+no RTC — the time it is showing came from its last shutdown.
+
+**Every field here can be `null`, and `null` means nothing could be asked, not
+that the answer is no.** A container with no `timedatectl` reports nulls, and
+rendering those as a warning is the exact false alarm this replaced: it asked
+whether NTP was synchronised, which on an offline field server is "no"
+permanently and by design, so it fired hardest at the operator who had fitted
+an RTC and done everything right. Both `stale` and `unaccounted_for` therefore
+require positive evidence and are `false` when the server could not look.
+
+**`quorum`** is the connected devices' opinion. `server_is_wrong` is only true
+with at least three distinct devices reporting and a two-thirds majority
+agreeing in the same direction; below that there is a disagreement but no
+verdict, and the UI says so rather than blaming either side.
+
 This doesn't change who is authoritative: QSOs are still stamped by the server.
 It exists so a wrong server clock is visible rather than silent. Clients should
 halve the round-trip time when comparing, so a slow link doesn't read as skew.
+
+### `POST /api/time`
+
+The same payload, and a chance to contribute an observation to the quorum.
+
+```json
+{ "skew_ms": -240000, "device_id": "8f14e45fceea167a" }
+```
+
+`skew_ms` is the server's clock minus this device's, as the *client* computed
+it — only the client can halve the round trip, so the server cannot derive this
+from a timestamp it is handed. `device_id` is a stable per-device id, not
+per-window: the CW popout is a second document on the same machine with the
+same clock, and counting it twice would let one operator carry double weight.
+
+Observations are held in memory for fifteen minutes and only the newest from
+each device counts, so a browser left open overnight cannot outvote the field.
+A malformed body, an unparseable `skew_ms` or a missing `device_id` is ignored
+rather than rejected — the caller still wants the time — and a `skew_ms` beyond
+24 hours is discarded as a device with no clock at all rather than evidence
+about the server.
 
 ## Downloads
 

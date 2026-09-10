@@ -35,7 +35,7 @@ only run events.
   coordination and the live score are all server-side and the server is at the
   site. `deploy.sh` cannot do this job and is not meant to; it reaches for apt
   repositories and certbot at the moment you run it. ([#95])
-  Docs: [Offline field servers → Set it up at home](field-server.md#set-it-up-at-home), [Configuration → The container stack](configuration.md#the-container-stack)
+  Docs: [Offline field servers → Set it up at home](field-server.md#set-it-up-at-home)
 - **The admin console knows what is keeping time** `Setup` — **Server time /
   clock** now reports a hardware RTC or a GPS receiver alongside NTP, and calls
   `fake-hwclock` out by name rather than counting it. It also offers to write
@@ -43,6 +43,39 @@ only run events.
   setting the time by hand — without it the correction lives only in RAM and
   the next reboot restores the old, wrong value over the top of it. ([#95])
   Docs: [Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites), [Administration → Server time](administration.md#server-time)
+- **The app says when the server's clock cannot be trusted** `Display` `Setup` —
+  Two new warnings on the logging page, both about the thing that cannot be
+  repaired after an event: QSOs are stamped by the server, so a wrong server
+  clock quietly corrupts every contact's time. It now says when *nothing* is
+  holding the clock — no network time, no GPS, no hardware clock — and when
+  whatever is holding it has gone a long time unset. Those show before anyone
+  logs anything, which is the point: a wrong clock is silent until it has
+  already cost you contacts. Neither fires merely because NTP is off, which on
+  an offline field server is true by design.
+  Docs: [Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites), [Troubleshooting → Nothing is holding this server's clock](troubleshooting.md#nothing-is-holding-this-servers-clock-has-not-been-set-for-n-days)
+- **The skew banner now names which clock is wrong** `Display` — It could only
+  ever say the server and your device disagreed, and deliberately would not say
+  which was right — honest, and no help to the operator deciding what to fix.
+  With three or more devices connected it compares what all of them report and
+  says so outright: *"9 of 11 connected devices agree"*. A dozen phones, most
+  synchronised by a carrier within the last day, are collectively a better
+  authority than a field server asking itself. With one or two devices it keeps
+  the old both-ways wording, because that genuinely is not enough to convict
+  either side.
+  Docs: [Troubleshooting → This server's clock is N ahead of / behind this device](troubleshooting.md#this-servers-clock-is-n-ahead-of-behind-this-device), [API → GET /api/time](api.md#get-apitime)
+
+### Changed
+
+- **`deploy.sh` runs on more than Ubuntu and Debian** `Setup` — It refused
+  outright on anything else, which ruled out the old laptops and spare SBCs a
+  club is most likely to have available for a field server. It now separates
+  "can I install packages here" from "can this machine run EzFD": Debian
+  derivatives such as Raspberry Pi OS, Mint and Pop!_OS are recognised through
+  `ID_LIKE`, and anything else installs nothing and is told precisely which of
+  Node, PostgreSQL, nginx, rsync and openssl it still needs. systemd is now the
+  one hard requirement, since the service unit is what brings EzFD back after a
+  power cut.
+  Docs: [Deployment → Requirements](deployment.md#requirements)
 
 ### Fixed
 
@@ -53,6 +86,31 @@ only run events.
   a working RTC answers no by definition. It now says the clock is being held
   by the RTC and what to check instead. ([#95])
   Docs: [Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites)
+- **The field-server guide told Pi 5 owners to build somewhere else** `Setup` —
+  It said "Don't build on the Pi", citing the swap file `deploy.sh` adds as
+  evidence that the build is memory-hungry. That had the evidence backwards:
+  the swap only triggers below 2 GB of RAM, so it is a threshold a 4 GB or 8 GB
+  Pi 5 is clear of, and the 1 GB droplets that do trip it build the app on
+  every deploy regardless. Measured, a cold build peaks around 550 MB and still
+  completes with the JS heap capped at 256 MB. A Pi 4 or 5 builds it directly;
+  a Pi 3 or a 1 GB machine leans on the swap file and takes longer, but that is
+  a one-time cost paid at home. The one real constraint is unchanged and now
+  stated as the constraint: building needs a network, so it happens before you
+  leave, on whichever machine you like. ([#95])
+  Docs: [Offline field servers → What the machine has to be](field-server.md#what-the-machine-has-to-be)
+
+### Removed
+
+- **The container stack, in favour of one way to install** `Setup` — The
+  `Dockerfile` and `compose.yaml` added earlier today are gone. They were
+  solving a problem `deploy.sh` mostly did not have: it already offers a blank
+  domain for IP-only access with no certbot, and its whole apt/NodeSource/PGDG
+  block only runs on a fresh install, so the only network dependency left on a
+  field-server install is `npm ci` and the font fetch — exactly what the
+  containers needed too. Two deployment paths would have drifted, and this
+  codebase has paid for that several times. Install with `deploy.sh` at home,
+  leave the domain blank, carry the machine to the site.
+  Docs: [Offline field servers → Set it up at home](field-server.md#set-it-up-at-home), [Deployment → Offline field servers](deployment.md#offline-field-servers)
 
 ## 2026-09-06
 

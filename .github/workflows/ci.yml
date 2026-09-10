@@ -115,6 +115,15 @@ jobs:
       - name: Last position tests
         run: node scripts/test-last-position.cjs
 
+      # What the server says about its own clock, and what the operators'
+      # devices say about it. QSOs are stamped by the server, so a wrong clock
+      # corrupts every contact's time and cannot be repaired afterwards. Both
+      # halves guard the same trap: an unknown must stay quiet, because the
+      # check this replaced warned everyone whose NTP said no — which on an
+      # offline field server is everyone who did the right thing.
+      - name: Clock source and quorum tests
+        run: node scripts/test-clock.cjs
+
       # The changelog points a reader at the guide for each change. A link to a
       # renamed section resolves to the top of the page instead — invisible in
       # a diff, and nothing else here would catch it.
@@ -269,21 +278,10 @@ jobs:
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
           shellcheck $(git ls-files '*.sh')
 
-  # The field server is the one deployment nobody can debug when it goes wrong:
-  # a Pi in a field, no internet, no shell, and a club's only log inside it. So
-  # the container stack gets exercised for real rather than linted — built,
-  # started, written to, killed, and brought back — because every failure that
-  # matters here is a runtime one.
-  compose:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-
-      # Builds the image from the same Dockerfile a club would, then asserts
-      # the log survives both a hard kill (a generator coughing) and a
-      # down/up cycle (an ordinary upgrade between events). Those are two
-      # different failure modes: the first survives even with no volume
-      # configured, because Docker supplies an anonymous one; only the second
-      # notices when `db-data:` goes missing.
-      - name: Container stack end to end
-        run: bash scripts/test-compose.sh
+      # Which machines deploy.sh will install on. It used to refuse anything
+      # but Ubuntu and Debian, which ruled out the old laptops and SBCs a club
+      # is most likely to bring to a field. Getting the classification wrong is
+      # quiet in both directions: run apt where there is none and the install
+      # dies half-written, or refuse a Debian derivative that would have worked.
+      - name: deploy.sh distro detection
+        run: bash scripts/test-deploy-detect.sh

@@ -103,13 +103,9 @@ $ DATABASE_URL=postgres://localhost/ezfd node scripts/test-merge.cjs
 
 # The API end to end, against a running server
 $ BASE_URL=http://localhost:3000 bash scripts/test-e2e.sh
-```
 
-**One needs Docker:**
-
-```bash
-# The field-server container stack, built and run for real
-$ bash scripts/test-compose.sh
+# Which machines deploy.sh will install on
+$ bash scripts/test-deploy-detect.sh
 ```
 
 ### What each is for
@@ -132,24 +128,19 @@ call. It used to carry its own third variant of the backup query, and so
 round-tripped a shape the console's menu action never produced, staying green
 while that action silently dropped the SES roster.
 
-**`scripts/test-compose.sh`** builds and runs the field-server container stack
-for real, because everything that can go wrong with it is a runtime problem and
-because the machine it runs on is the least debuggable one this project has: a
-Pi in a field, no internet, no shell, and a club's only log inside it.
+**`scripts/test-deploy-detect.sh`** covers the one decision `deploy.sh` makes
+before it touches anything: whether this machine gets the automatic package
+install. It reads the detection block back out of `deploy.sh` rather than
+keeping a copy, and drives it with real `/etc/os-release` contents from nine
+distributions.
 
-It asserts the schema is applied before the app is allowed to start, that a
-contact logged through the API comes back out of the export, that the export
-still omits the QRZ credentials when reached over a plain-HTTP LAN, and that
-the log survives two different kinds of restart.
-
-Those two are worth separating, because only one of them needs the named
-volume. A power cut restarts the *same* containers, and the log survives that
-even with no volume configured at all — the postgres image declares a `VOLUME`
-and Docker quietly supplies an anonymous one. Recreating the containers is what
-orphans that anonymous volume, and recreating them is what an ordinary upgrade
-between events does. So a stack missing `db-data:` looks fine through every
-power cut and loses the log the first time someone updates it. The
-down/up check is the one that catches it; the kill/restart check cannot.
+Both directions are quiet failures. Believe a claimed Debian heritage on a
+machine with no apt and the install dies halfway through, having already
+written part of a configuration; refuse a derivative like Mint or Pop!_OS and
+an operator is told their perfectly capable machine is unsupported. The suite
+also asserts the system user is created outside the apt-only block — if it
+drifts back inside, a non-apt install silently creates no `ezfd` user and then
+fails at the systemd unit with nothing pointing at the cause.
 
 **`scripts/build-section-geo.mjs`** is not a test but belongs next to them:
 it regenerates `public/sections.geo.json`, the section boundaries the map
