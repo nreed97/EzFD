@@ -268,3 +268,11 @@ jobs:
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq shellcheck
           shellcheck $(git ls-files '*.sh')
+
+      # Which machines deploy.sh will install on. It used to refuse anything
+      # but Ubuntu and Debian, which ruled out the old laptops and SBCs a club
+      # is most likely to bring to a field. Getting the classification wrong is
+      # quiet in both directions: run apt where there is none and the install
+      # dies half-written, or refuse a Debian derivative that would have worked.
+      - name: deploy.sh distro detection
+        run: bash scripts/test-deploy-detect.sh

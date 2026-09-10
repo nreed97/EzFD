@@ -103,6 +103,9 @@ $ DATABASE_URL=postgres://localhost/ezfd node scripts/test-merge.cjs
 
 # The API end to end, against a running server
 $ BASE_URL=http://localhost:3000 bash scripts/test-e2e.sh
+
+# Which machines deploy.sh will install on
+$ bash scripts/test-deploy-detect.sh
 ```
 
 ### What each is for
@@ -124,6 +127,20 @@ definitions rather than a copy — the same ones the HTTP API and the console
 call. It used to carry its own third variant of the backup query, and so
 round-tripped a shape the console's menu action never produced, staying green
 while that action silently dropped the SES roster.
+
+**`scripts/test-deploy-detect.sh`** covers the one decision `deploy.sh` makes
+before it touches anything: whether this machine gets the automatic package
+install. It reads the detection block back out of `deploy.sh` rather than
+keeping a copy, and drives it with real `/etc/os-release` contents from nine
+distributions.
+
+Both directions are quiet failures. Believe a claimed Debian heritage on a
+machine with no apt and the install dies halfway through, having already
+written part of a configuration; refuse a derivative like Mint or Pop!_OS and
+an operator is told their perfectly capable machine is unsupported. The suite
+also asserts the system user is created outside the apt-only block — if it
+drifts back inside, a non-apt install silently creates no `ezfd` user and then
+fails at the systemd unit with nothing pointing at the cause.
 
 **`scripts/build-section-geo.mjs`** is not a test but belongs next to them:
 it regenerates `public/sections.geo.json`, the section boundaries the map

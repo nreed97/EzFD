@@ -35,6 +35,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-last-position.cjs` | What the position picker preselects — a claim outranks a remembered position, and a remembered one is validated against the event's bands |
 | `scripts/test-changelog-links.cjs` | Every guide and `#anchor` the changelog points at resolves — a renamed section is otherwise invisible — and every `[#nn]` citation has a definition, or it renders as literal brackets |
 | `scripts/test-docs-nav.cjs` | The `/docs` sidebar — every guide appears exactly once, grouped and ordered by the index |
+| `scripts/test-deploy-detect.sh` | Which machines `deploy.sh` will install on — Debian derivatives via `ID_LIKE`, a claimed heritage checked against whether apt is really there, and the system user created on every path |
 | `scripts/test-cat-protocol.cjs` | The Kenwood CAT decode — framing, mode letters, and that the native path's band and mode tables still match the bridge's |
 
 When adding a test, check it can actually fail — break the thing it guards and

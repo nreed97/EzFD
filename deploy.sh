@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # EzFD — Production deployment script
-# Tested on Ubuntu 22.04 LTS and Ubuntu 24.04 LTS (Debian 12 also works)
+# Tested on Ubuntu 22.04 LTS and Ubuntu 24.04 LTS (Debian 12 also works).
+# Other distributions are supported too: the script installs nothing on them
+# and checks Node, PostgreSQL and nginx are already present instead. systemd
+# is required everywhere -- the service unit is how EzFD starts and restarts.
 #
 # Usage (run from the root of the cloned repository):
 #   sudo bash deploy.sh
@@ -41,11 +44,36 @@ confirm() {
 [[ $EUID -ne 0 ]] && die "Run with root privileges: sudo bash deploy.sh"
 [[ ! -f "package.json" ]] && die "Must be run from the root of the EzFD repository."
 
-# Supported distros: Ubuntu 22/24, Debian 11/12
-DISTRO_ID="$(grep '^ID=' /etc/os-release | cut -d= -f2 | tr -d '"')"
-DISTRO_CODENAME="$(grep '^VERSION_CODENAME=' /etc/os-release | cut -d= -f2 | tr -d '"')"
-[[ "$DISTRO_ID" != "ubuntu" && "$DISTRO_ID" != "debian" ]] && \
-  die "Unsupported OS: $DISTRO_ID. This script supports Ubuntu and Debian."
+# Debian and Ubuntu (and derivatives, which declare it in ID_LIKE) get the
+# automatic package install below. Anything else is still supported and is not
+# a hard failure: a field server is often whatever hardware a club already has,
+# an old laptop running something else included. On those the script installs
+# nothing and checks the prerequisites are present instead, which is a far more
+# useful answer than refusing to run on a machine that is perfectly capable.
+# OS_RELEASE is overridable so scripts/test-deploy-detect.sh can drive this
+# block with real /etc/os-release files from distros this machine is not.
+OS_RELEASE="${OS_RELEASE:-/etc/os-release}"
+DISTRO_ID=""; DISTRO_CODENAME=""; DISTRO_LIKE=""
+if [[ -r "$OS_RELEASE" ]]; then
+  DISTRO_ID="$(grep '^ID=' "$OS_RELEASE" | cut -d= -f2 | tr -d '"' || true)"
+  DISTRO_CODENAME="$(grep '^VERSION_CODENAME=' "$OS_RELEASE" | cut -d= -f2 | tr -d '"' || true)"
+  DISTRO_LIKE="$(grep '^ID_LIKE=' "$OS_RELEASE" | cut -d= -f2 | tr -d '"' || true)"
+fi
+
+APT_OS=false
+if [[ "$DISTRO_ID" == "ubuntu" || "$DISTRO_ID" == "debian" ]] ||
+   [[ " $DISTRO_LIKE " == *" debian "* || " $DISTRO_LIKE " == *" ubuntu "* ]]; then
+  APT_OS=true
+fi
+# ID_LIKE can claim a heritage the machine does not actually have the tooling
+# for, so the deciding question is whether apt-get is really there.
+command -v apt-get >/dev/null 2>&1 || APT_OS=false
+# ── end of distro detection (scripts/test-deploy-detect.sh reads to here) ────
+
+# systemd is not negotiable — the service unit this script writes is the whole
+# mechanism by which EzFD starts, and starts again after a power cut.
+command -v systemctl >/dev/null 2>&1 || \
+  die "systemd is required (no systemctl found). EzFD runs as a systemd service."
 
 REPO_DIR="$(pwd)"
 APP_DIR="/opt/ezfd"
@@ -132,7 +160,8 @@ echo
 hr
 echo -e "${BOLD}Summary${NC}"
 echo
-printf "  %-22s %s\n" "OS:"      "$DISTRO_ID $DISTRO_CODENAME"
+printf "  %-22s %s\n" "OS:"      "${DISTRO_ID:-unknown} ${DISTRO_CODENAME:-}"
+printf "  %-22s %s\n" "Packages:" "$([[ $APT_OS == true ]] && echo 'installed automatically (apt)' || echo 'must already be present')"
 printf "  %-22s %s\n" "Mode:"    "$([[ $UPDATING == true ]] && echo 'Update existing install' || echo 'Fresh install')"
 printf "  %-22s %s\n" "Domain:"  "${DOMAIN:-"(none — IP access only)"}"
 printf "  %-22s %s\n" "SSL:"     "$([[ $SETUP_SSL == true ]] && echo "Let's Encrypt ($CERT_EMAIL)" || echo 'No')"
@@ -144,7 +173,7 @@ confirm "Proceed with deployment?"
 echo
 
 # ── Install system packages (skip on update) ──────────────────────────────────
-if [[ "$UPDATING" == "false" ]]; then
+if [[ "$UPDATING" == "false" && "$APT_OS" == "true" ]]; then
   info "Installing system packages..."
   export DEBIAN_FRONTEND=noninteractive
   # Remove any PGDG source left over from a previous partial run so the
@@ -203,15 +232,46 @@ https://apt.postgresql.org/pub/repos/apt ${DISTRO_CODENAME}-pgdg main" \
   ufw --force enable         >/dev/null 2>&1
   log "Firewall: SSH + HTTP(S) allowed, all else blocked"
 
-  # ── System user ───────────────────────────────────────────────────────────
-  if ! id "$APP_USER" &>/dev/null; then
-    useradd --system \
-            --shell /usr/sbin/nologin \
-            --home-dir "$APP_DIR" \
-            --create-home \
-            "$APP_USER"
-    log "System user '$APP_USER' created"
+fi
+
+# On a distro this script cannot install for, everything above has to be there
+# already. Say exactly what is missing rather than failing later on a cryptic
+# "command not found" halfway through a build.
+if [[ "$UPDATING" == "false" && "$APT_OS" == "false" ]]; then
+  info "No apt on this system (${DISTRO_ID:-unknown}) — checking prerequisites instead"
+  MISSING=()
+  command -v node    >/dev/null 2>&1 || MISSING+=("node (20 or newer)")
+  command -v npm     >/dev/null 2>&1 || MISSING+=("npm")
+  command -v psql    >/dev/null 2>&1 || MISSING+=("postgresql (server and client)")
+  command -v nginx   >/dev/null 2>&1 || MISSING+=("nginx")
+  command -v rsync   >/dev/null 2>&1 || MISSING+=("rsync")
+  command -v openssl >/dev/null 2>&1 || MISSING+=("openssl")
+  if [[ ${#MISSING[@]} -gt 0 ]]; then
+    echo
+    warn "Install these with your system's package manager, then re-run:"
+    for m in "${MISSING[@]}"; do echo "    - $m"; done
+    echo
+    die "Missing prerequisites on a distro this script cannot install for."
   fi
+  # Node's major version matters: the build and the standalone server are
+  # tested on 20 and 22, and an older one fails in ways that look like app bugs.
+  NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+  [[ "$NODE_MAJOR" -lt 20 ]] && \
+    die "Node $NODE_MAJOR is too old — EzFD needs 20 or newer."
+  log "Prerequisites present (node $(node -v), $(psql --version | awk '{print $1, $3}'), nginx)"
+  warn "Firewall not configured — this script only knows ufw. Open 80/443 yourself."
+fi
+
+# ── System user ───────────────────────────────────────────────────────────────
+# Not Debian-specific, and needed on every path, so it sits outside the block
+# above rather than inside it.
+if [[ "$UPDATING" == "false" ]] && ! id "$APP_USER" &>/dev/null; then
+  useradd --system \
+          --shell /usr/sbin/nologin \
+          --home-dir "$APP_DIR" \
+          --create-home \
+          "$APP_USER"
+  log "System user '$APP_USER' created"
 fi
 
 # ── certbot (runs every deploy — needed before SSL step below) ───────────────
@@ -219,12 +279,17 @@ if [[ "$SETUP_SSL" == "true" ]]; then
   NEED_CERTBOT=false
   ! command -v certbot &>/dev/null && NEED_CERTBOT=true
   ! dpkg -l python3-certbot-nginx 2>/dev/null | grep -q '^ii' && NEED_CERTBOT=true
-  if [[ "$NEED_CERTBOT" == "true" ]]; then
+  if [[ "$NEED_CERTBOT" == "true" && "$APT_OS" == "true" ]]; then
     info "Installing certbot and nginx plugin..."
     export DEBIAN_FRONTEND=noninteractive
     apt-get update -qq
     apt-get install -y -qq certbot python3-certbot-nginx >/dev/null
     log "certbot $(certbot --version 2>&1 | awk '{print $NF}')"
+  elif [[ "$NEED_CERTBOT" == "true" ]]; then
+    warn "certbot is not installed and this script cannot install it here."
+    warn "Install certbot and its nginx plugin, then re-run to obtain a certificate."
+    warn "Continuing without SSL — the site will serve over plain HTTP."
+    SETUP_SSL=false
   else
     log "certbot + nginx plugin already installed — $(certbot --version 2>&1 | awk '{print $NF}')"
   fi

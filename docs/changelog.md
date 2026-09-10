@@ -44,6 +44,19 @@ only run events.
   the next reboot restores the old, wrong value over the top of it. ([#95])
   Docs: [Offline field servers → The clock is the part that bites](field-server.md#the-clock-is-the-part-that-bites), [Administration → Server time](administration.md#server-time)
 
+### Changed
+
+- **`deploy.sh` runs on more than Ubuntu and Debian** `Setup` — It refused
+  outright on anything else, which ruled out the old laptops and spare SBCs a
+  club is most likely to have available for a field server. It now separates
+  "can I install packages here" from "can this machine run EzFD": Debian
+  derivatives such as Raspberry Pi OS, Mint and Pop!_OS are recognised through
+  `ID_LIKE`, and anything else installs nothing and is told precisely which of
+  Node, PostgreSQL, nginx, rsync and openssl it still needs. systemd is now the
+  one hard requirement, since the service unit is what brings EzFD back after a
+  power cut.
+  Docs: [Deployment → Requirements](deployment.md#requirements)
+
 ### Fixed
 
 - **A field server with an RTC fitted was told its clock was broken** `Setup` —
