@@ -9,16 +9,53 @@ path to choose between.
 
 - **Root access, and systemd.** The service unit is how EzFD starts, and how
   it starts again after a power cut, so systemd is not optional.
-- **Ubuntu or Debian for the automatic package install** — including
-  derivatives that declare it, such as Raspberry Pi OS, Mint and Pop!_OS.
-- **Any other distribution also works**, but installs nothing: the script
-  checks that Node 20+, PostgreSQL, nginx, rsync and openssl are already
-  present and tells you which are missing. It will not configure a firewall
-  there either, because it only knows `ufw` — open 80 and 443 yourself.
+- **Debian, Ubuntu or Raspberry Pi OS** — including derivatives that declare
+  that heritage, such as Mint and Pop!_OS. The script stops on anything else.
+  See [Other distributions](#other-distributions).
 - A DNS record pointing at the machine, if you want TLS. Leave the domain
   blank and certbot never runs, which is the field-server answer.
 - 1 GB RAM is enough; the script adds swap below 2 GB because `next build`
   can get OOM-killed at that size otherwise.
+
+## Other distributions
+
+`deploy.sh` stops on anything that is not Debian, Ubuntu or Raspberry Pi OS.
+That is a statement about the script, not about the app: EzFD is an ordinary
+Node standalone build against PostgreSQL behind a reverse proxy, and runs
+anywhere those do.
+
+The reason the script is narrow is that everything it does after the pre-flight
+assumes Debian's layout — that nginx reads server blocks from `sites-enabled`,
+that the PostgreSQL package creates and starts a cluster, that the firewall is
+`ufw`, that `nologin` lives in `/usr/sbin`. Where those do not hold, the
+failures are **silent**: a server block written to a directory nginx never
+includes still passes `nginx -t`, because a file nobody includes is not a
+syntax error, so the deploy reports success and the site serves nginx's welcome
+page. One narrow path that is correct is worth more than a wide one that is
+quietly wrong, particularly while the app is changing quickly.
+
+Deploying by hand on another distribution is not difficult, and the script
+prints this shape when it stops:
+
+- Node 20+, PostgreSQL, nginx, rsync and openssl from your package manager.
+  On Fedora and RHEL the cluster needs `postgresql-setup --initdb` first; on
+  Arch, `initdb` as the `postgres` user
+- Create the role and database, then apply `db/schema.sql` **once**. It is
+  complete on its own — the `apply_migration` steps in `deploy.sh` exist only
+  to upgrade installs that predate a column, and CI builds its entire test
+  database from `schema.sql` alone
+- `npm ci && npm run build`, then run `.next/standalone/server.js` under
+  whatever supervisor you use, with `static/` and `public/` alongside it
+- Point a reverse proxy at it with **`proxy_buffering off`** — without that,
+  SSE never streams and the log silently stops updating on other screens
+- With SELinux enforcing, `setsebool -P httpd_can_network_connect on`, or
+  every request 502s
+
+The environment variables are listed in
+[Configuration](configuration.md); only `DATABASE_URL` is strictly required.
+
+This path is unsupported in the sense that nothing here tests it. It is not
+discouraged.
 
 ## First install
 

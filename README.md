@@ -125,7 +125,7 @@ date-filtered ADIF slices.
 
 ## Quick start
 
-On a fresh Ubuntu or Debian machine with a DNS record pointing at it:
+On a fresh Debian, Ubuntu or Raspberry Pi OS machine with a DNS record pointing at it:
 
 ```bash
 # git clone https://github.com/nreed97/EzFD.git /opt/ezfd-src

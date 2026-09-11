@@ -129,18 +129,24 @@ round-tripped a shape the console's menu action never produced, staying green
 while that action silently dropped the SES roster.
 
 **`scripts/test-deploy-detect.sh`** covers the one decision `deploy.sh` makes
-before it touches anything: whether this machine gets the automatic package
-install. It reads the detection block back out of `deploy.sh` rather than
-keeping a copy, and drives it with real `/etc/os-release` contents from nine
-distributions.
+before it touches anything: whether this is a machine it supports. It reads the
+detection block back out of `deploy.sh` rather than keeping a copy, and drives
+it with real `/etc/os-release` contents from nine distributions.
 
 Both directions are quiet failures. Believe a claimed Debian heritage on a
 machine with no apt and the install dies halfway through, having already
 written part of a configuration; refuse a derivative like Mint or Pop!_OS and
-an operator is told their perfectly capable machine is unsupported. The suite
-also asserts the system user is created outside the apt-only block — if it
-drifts back inside, a non-apt install silently creates no `ezfd` user and then
-fails at the systemd unit with nothing pointing at the cause.
+an operator is told their perfectly capable machine is unsupported.
+
+The suite also holds the scope in place. Everything `deploy.sh` does after the
+pre-flight assumes Debian's layout, so an unsupported machine has to be turned
+away rather than carried along — and carrying it along fails silently, since a
+server block written where nginx never looks still passes `nginx -t`. So the
+suite asserts the refusal is fatal rather than a warning, that it happens
+*before* the operator has answered four prompts, and that no second
+prerequisite-checking path has reappeared below it. That last one is the drift
+this design can have: a path that quietly supports what the script says it
+does not.
 
 **`scripts/build-section-geo.mjs`** is not a test but belongs next to them:
 it regenerates `public/sections.geo.json`, the section boundaries the map

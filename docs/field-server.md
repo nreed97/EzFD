@@ -65,7 +65,7 @@ When it finishes you have `ezfd.service` under systemd, enabled at boot, with
 
 | | |
 |---|---|
-| OS | Debian or Ubuntu gets the automatic package install. Anything else works if Node 20+, PostgreSQL, nginx and systemd are already installed — `deploy.sh` will check and carry on |
+| OS | Debian, Ubuntu or Raspberry Pi OS — `deploy.sh` stops on anything else. The app itself runs anywhere; see [Deployment → Other distributions](deployment.md#other-distributions) if the machine you have is something else |
 | RAM | 1 GB is enough. `deploy.sh` adds a 2 GB swap file below that line, which is what the $6 VPS instances this is commonly deployed on run with |
 | Disk | A few GB. `node_modules` alone is 614 MB and is only needed at build time |
 | Arch | arm64 and x86-64 both fine. A 32-bit-only machine is not — NodeSource no longer ships armhf for current Node |
