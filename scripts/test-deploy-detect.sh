@@ -3,18 +3,26 @@
 #
 #   bash scripts/test-deploy-detect.sh
 #
-# deploy.sh used to refuse outright on anything that was not Ubuntu or Debian.
-# A field server is frequently whatever hardware a club already owns — an old
-# laptop being the obvious case — so refusing to run on a perfectly capable
-# machine was the wrong answer. It now decides two separate things:
+# deploy.sh supports Debian, Ubuntu and Raspberry Pi OS, and stops on anything
+# else. That scope is deliberate. Everything the script does after the
+# pre-flight assumes Debian's layout — that nginx reads server blocks from
+# sites-enabled, that the PostgreSQL package creates and starts a cluster, that
+# the firewall is ufw, that nologin is in /usr/sbin. Carrying on where those do
+# not hold produced a deploy that reported success and a site that served
+# nginx's welcome page, because `nginx -t` passes on a file nobody includes.
+# One narrow path that is correct beats a wide one that is quietly wrong, and
+# the app itself is an ordinary Node build that runs anywhere by hand.
 #
-#   APT_OS     whether it can install packages here
+# So the pre-flight decides two things:
+#
+#   APT_OS     whether this is a machine the script supports
 #   systemd    whether the service model it depends on exists at all
 #
-# Getting that classification wrong is quiet and nasty in both directions: run
-# apt on a machine without it and the install dies halfway through, having
-# already written half a config; refuse a Debian derivative and the operator is
-# told their machine is unsupported when it is the exact platform this targets.
+# Getting APT_OS wrong is quiet and nasty in both directions: believe a claimed
+# Debian heritage on a machine with no apt and the install dies halfway
+# through, having already written half a config; refuse a derivative like Mint
+# or Pop!_OS and an operator is told their machine is unsupported when it is
+# the exact platform this targets.
 #
 # The block is read back out of deploy.sh rather than copied here. A second
 # copy of the logic would pass this suite forever while deploy.sh drifted.
@@ -110,7 +118,7 @@ expect mint     yes true "Linux Mint is caught by ID_LIKE=ubuntu"
 expect pop      yes true "Pop!_OS is caught by a multi-value ID_LIKE"
 
 echo
-echo "── distros that are supported but install nothing ──"
+echo "── distros the script stops on ──"
 expect fedora   yes false "Fedora is not an apt system"
 expect arch     yes false "Arch is not an apt system"
 expect alpine   yes false "Alpine is not an apt system"
@@ -152,12 +160,34 @@ if grep -q 'NEED_CERTBOT" == "true" && "$APT_OS" == "true"' deploy.sh; then
 else
   no "the certbot install requires APT_OS"
 fi
-# The system user is not Debian-specific. If it drifts back inside the apt
-# block, a non-apt install creates no ezfd user and fails at the systemd unit.
-if awk '/^# ── System user/,/^fi$/' deploy.sh | grep -q 'APT_OS'; then
-  no "the system user is created on every path, not only the apt one"
+# An unsupported machine has to be turned away, not carried along. Everything
+# after the pre-flight assumes Debian's layout, and the failure of assuming it
+# elsewhere is silent: the deploy reports success and nginx serves its welcome
+# page, because a server block nobody includes is not a syntax error.
+REFUSAL="$(awk '/^if \[\[ "\$APT_OS" == "false" \]\]; then/,/^fi$/' deploy.sh)"
+if [[ -n "$REFUSAL" ]] && grep -q '^  die ' <<<"$REFUSAL"; then
+  ok "an unsupported distribution is refused, not carried along"
 else
-  ok "the system user is created on every path, not only the apt one"
+  no "an unsupported distribution is refused, not carried along"
+fi
+
+# Refusing after the domain, the password and the confirmation prompt is a
+# worse version of refusing: the operator has answered four questions to be
+# told no. The pre-flight has to come first.
+REFUSE_AT="$(grep -n 'Unsupported distribution for automatic deployment' deploy.sh | cut -d: -f1)"
+PROMPT_AT="$(grep -n '^prompt DOMAIN' deploy.sh | cut -d: -f1)"
+if [[ -n "$REFUSE_AT" && -n "$PROMPT_AT" && "$REFUSE_AT" -lt "$PROMPT_AT" ]]; then
+  ok "it refuses before asking the operator anything"
+else
+  no "it refuses before asking the operator anything"
+fi
+
+# The refusal is the whole non-apt path. If a prerequisite-checking branch
+# comes back, the script is quietly supporting what it says it does not.
+if grep -q 'APT_OS" == "false"' <<<"$(awk '/^# ── Install system packages/,0' deploy.sh)"; then
+  no "no second non-apt path survives below the pre-flight"
+else
+  ok "no second non-apt path survives below the pre-flight"
 fi
 
 echo

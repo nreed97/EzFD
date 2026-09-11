@@ -23,6 +23,27 @@ only run events.
 
 ---
 
+## 2026-09-11
+
+### Changed
+
+- **`deploy.sh` supports Debian, Ubuntu and Raspberry Pi OS, and stops on
+  anything else** `Setup` — It used to carry on, installing nothing and
+  checking the prerequisites were present. The trouble was everything it does
+  *after* that check: the nginx server block, the database cluster, the
+  firewall and the service user all assume Debian's layout, and where those
+  assumptions do not hold they fail silently rather than loudly. The clearest
+  case is nginx — a server block written to `sites-available` on a distribution
+  whose `nginx.conf` only includes `conf.d/*.conf` is never read, and
+  `nginx -t` still passes, because a file nobody includes is not a syntax
+  error. The deploy reported success and the site served nginx's welcome page.
+  It now stops at the pre-flight, before asking you anything, and prints what
+  a by-hand deployment involves. EzFD itself is unchanged and still runs
+  anywhere: what is narrow is the script. ([#96])
+  Docs: [Deployment → Other distributions](deployment.md#other-distributions)
+
+---
+
 ## 2026-09-10
 
 ### Added
@@ -634,3 +655,4 @@ continuous enough to be worth summarising.
 [#93]: https://github.com/nreed97/EzFD/pull/93
 [#94]: https://github.com/nreed97/EzFD/pull/94
 [#95]: https://github.com/nreed97/EzFD/pull/95
+[#96]: https://github.com/nreed97/EzFD/issues/96

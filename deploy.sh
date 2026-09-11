@@ -1,10 +1,14 @@
 #!/usr/bin/env bash
 # ─────────────────────────────────────────────────────────────────────────────
 # EzFD — Production deployment script
-# Tested on Ubuntu 22.04 LTS and Ubuntu 24.04 LTS (Debian 12 also works).
-# Other distributions are supported too: the script installs nothing on them
-# and checks Node, PostgreSQL and nginx are already present instead. systemd
-# is required everywhere -- the service unit is how EzFD starts and restarts.
+# Supports Debian, Ubuntu and Raspberry Pi OS only, plus derivatives that
+# declare that heritage (Mint, Pop!_OS). It stops on anything else.
+#
+# That is a deliberately small surface, not a judgement about other
+# distributions: the app is an ordinary Node standalone build against
+# PostgreSQL and runs anywhere. What is narrow is this script, and keeping it
+# narrow is what keeps it correct while the app changes underneath it. On
+# another distribution, build and deploy by hand.
 #
 # Usage (run from the root of the cloned repository):
 #   sudo bash deploy.sh
@@ -74,6 +78,29 @@ command -v apt-get >/dev/null 2>&1 || APT_OS=false
 # mechanism by which EzFD starts, and starts again after a power cut.
 command -v systemctl >/dev/null 2>&1 || \
   die "systemd is required (no systemctl found). EzFD runs as a systemd service."
+
+# Everything past this point assumes Debian's layout — where nginx reads server
+# blocks from, that the PostgreSQL package creates and starts a cluster, that
+# the firewall is ufw, where nologin lives. Those assumptions used to be made
+# silently on machines that did not hold them, which produced a deploy that
+# reported success and a site that served nginx's welcome page. Stopping here
+# is the honest version of the same scope.
+if [[ "$APT_OS" == "false" ]]; then
+  echo
+  warn "This script supports Debian, Ubuntu and Raspberry Pi OS."
+  warn "This machine reports '${DISTRO_ID:-unknown}', so it stops here."
+  echo
+  warn "EzFD itself runs anywhere — it is a Node standalone build against"
+  warn "PostgreSQL, behind any reverse proxy. What is Debian-specific is this"
+  warn "script. To deploy by hand, the shape is:"
+  warn "  • Node 20+, PostgreSQL, nginx, rsync, openssl from your package manager"
+  warn "  • createuser/createdb, then apply db/schema.sql once — it is complete,"
+  warn "    and the migrations in this script are only for upgrading older installs"
+  warn "  • npm ci && npm run build, then run .next/standalone/server.js"
+  warn "  • a reverse proxy with proxy_buffering off, or SSE will not stream"
+  echo
+  die "Unsupported distribution for automatic deployment."
+fi
 
 REPO_DIR="$(pwd)"
 APP_DIR="/opt/ezfd"
@@ -161,7 +188,7 @@ hr
 echo -e "${BOLD}Summary${NC}"
 echo
 printf "  %-22s %s\n" "OS:"      "${DISTRO_ID:-unknown} ${DISTRO_CODENAME:-}"
-printf "  %-22s %s\n" "Packages:" "$([[ $APT_OS == true ]] && echo 'installed automatically (apt)' || echo 'must already be present')"
+printf "  %-22s %s\n" "Packages:" "installed automatically (apt)"
 printf "  %-22s %s\n" "Mode:"    "$([[ $UPDATING == true ]] && echo 'Update existing install' || echo 'Fresh install')"
 printf "  %-22s %s\n" "Domain:"  "${DOMAIN:-"(none — IP access only)"}"
 printf "  %-22s %s\n" "SSL:"     "$([[ $SETUP_SSL == true ]] && echo "Let's Encrypt ($CERT_EMAIL)" || echo 'No')"
@@ -232,34 +259,6 @@ https://apt.postgresql.org/pub/repos/apt ${DISTRO_CODENAME}-pgdg main" \
   ufw --force enable         >/dev/null 2>&1
   log "Firewall: SSH + HTTP(S) allowed, all else blocked"
 
-fi
-
-# On a distro this script cannot install for, everything above has to be there
-# already. Say exactly what is missing rather than failing later on a cryptic
-# "command not found" halfway through a build.
-if [[ "$UPDATING" == "false" && "$APT_OS" == "false" ]]; then
-  info "No apt on this system (${DISTRO_ID:-unknown}) — checking prerequisites instead"
-  MISSING=()
-  command -v node    >/dev/null 2>&1 || MISSING+=("node (20 or newer)")
-  command -v npm     >/dev/null 2>&1 || MISSING+=("npm")
-  command -v psql    >/dev/null 2>&1 || MISSING+=("postgresql (server and client)")
-  command -v nginx   >/dev/null 2>&1 || MISSING+=("nginx")
-  command -v rsync   >/dev/null 2>&1 || MISSING+=("rsync")
-  command -v openssl >/dev/null 2>&1 || MISSING+=("openssl")
-  if [[ ${#MISSING[@]} -gt 0 ]]; then
-    echo
-    warn "Install these with your system's package manager, then re-run:"
-    for m in "${MISSING[@]}"; do echo "    - $m"; done
-    echo
-    die "Missing prerequisites on a distro this script cannot install for."
-  fi
-  # Node's major version matters: the build and the standalone server are
-  # tested on 20 and 22, and an older one fails in ways that look like app bugs.
-  NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
-  [[ "$NODE_MAJOR" -lt 20 ]] && \
-    die "Node $NODE_MAJOR is too old — EzFD needs 20 or newer."
-  log "Prerequisites present (node $(node -v), $(psql --version | awk '{print $1, $3}'), nginx)"
-  warn "Firewall not configured — this script only knows ufw. Open 80/443 yourself."
 fi
 
 # ── System user ───────────────────────────────────────────────────────────────
