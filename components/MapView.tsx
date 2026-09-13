@@ -108,24 +108,82 @@ export default function MapView({ workedSections }: Props) {
   const lightMode = useLightMode();
   const shapes = useSectionShapes();
 
-  // Amber for worked, matching the label boxes and the Scoreboard, so the
-  // fill and the label agree at a glance rather than being two colour
-  // languages on one screen.
-  const shapeStyle = useMemo(() => (feature?: SectionFeature): PathOptions => {
-    // Worked is the thing being read, so it is the only strong fill. Unworked
-    // is a wash light enough to leave the basemap legible underneath — the
-    // shape and its border are what carry the information there, not the
-    // fill, and 85 opaque polygons would just be a map of nothing.
+  // The fill says whether a section has been worked. The border says where the
+  // section ends. They are two different questions and they get two different
+  // channels, which is why this does not need a colour per section the way a
+  // map that puts identity in the fill does.
+  //
+  // They used to share one: worked drew an amber fill under a hardcoded amber
+  // `#b45309` border, while every other state flipped its border with the
+  // theme. The fill is translucent over a basemap whose lightness *inverts*
+  // between themes — dark mode is a filter on the tile pane and the overlay is
+  // not filtered — so in dark mode the amber fill blended toward the dark
+  // tiles and landed on the border's own luminance: **1.02:1**, the same
+  // lightness, an invisible line. Light mode measured 3.59:1, which is why it
+  // only looked broken in the theme that is the default. Two adjacent worked
+  // sections read as one blob.
+  //
+  // So every border is now a neutral chosen against the *page* rather than
+  // against the fill, and it flips with the theme like the others always did.
+  // No constant works: near-black is 4.05 on dark worked but 1.17 on dark
+  // unworked, whose fill is itself near-black, and near-white is the mirror.
+  // A darker amber does not rescue it either — `#78350f` is 1.85 in dark. Nor
+  // does any mid-grey: `#71717a` scores the same 1.02 the amber did.
+  //
+  // Two shades rather than one, because a single strong neutral made the
+  // *empty* half of the map the loudest thing on it — 85 bright hairlines over
+  // nothing, which is the glare this interface avoids after sunset. Worked
+  // sections get the strong shade and unworked the dim one; the unworked fill
+  // sits at the extreme of the lightness range, so it needs far less to read.
+  // Measured: dark 3.87 worked / 6.66 unworked, light 14.21 / 6.78 — every one
+  // clear of 3:1, with the bright line where the eye is meant to go.
+  const strongBorder = lightMode ? '#09090b' : '#e4e4e7';
+  const dimBorder    = lightMode ? '#52525b' : '#a1a1aa';
+
+  // Worked is the thing being read, so it is the only strong fill. Unworked is
+  // a wash light enough to leave the basemap legible underneath — the shape and
+  // its border carry the information there, not the fill, and 85 opaque
+  // polygons would just be a map of nothing.
+  const fillStyle = useMemo(() => (feature?: SectionFeature): PathOptions => {
     if (feature?.properties?.kind === 'pending') {
-      return { color: lightMode ? '#a1a1aa' : '#52525b', weight: 1, dashArray: '4 3',
+      return { stroke: false,
                fillColor: lightMode ? '#e4e4e7' : '#18181b', fillOpacity: 0.2 };
     }
     const worked = !!feature?.id && workedSet.has(String(feature.id));
     return worked
-      ? { color: '#b45309', weight: 1, fillColor: '#fbbf24', fillOpacity: 0.5 }
-      : { color: lightMode ? '#a1a1aa' : '#52525b', weight: 0.6,
+      ? { stroke: false, fillColor: '#fbbf24', fillOpacity: 0.5 }
+      : { stroke: false,
           fillColor: lightMode ? '#f4f4f5' : '#27272a', fillOpacity: 0.15 };
   }, [workedSet, lightMode]);
+
+  // Borders are their own layers, drawn after every fill, because Leaflet
+  // renders all 85 polygons into one SVG group in document order and a stroke
+  // is centred on its path — so half of each border sat inside the neighbour
+  // drawn after it and was washed by that neighbour's 50% amber. That alone
+  // took light mode from 3.59 to 2.00.
+  //
+  // Dim first, strong second, and that order is load-bearing rather than
+  // incidental: a worked section and an unworked neighbour both draw the
+  // boundary between them, so with one layer the shade of every shared edge
+  // would depend on which polygon the file happened to list last. Drawing the
+  // strong tier afterwards makes the outline of the worked region always the
+  // strong line, which is also what it should be.
+  const borderStyle = useMemo(() => (feature?: SectionFeature): PathOptions => {
+    const pending = feature?.properties?.kind === 'pending';
+    const worked = !pending && !!feature?.id && workedSet.has(String(feature.id));
+    return {
+      fill: false,
+      color: worked ? strongBorder : dimBorder,
+      weight: pending ? 1 : 0.8,
+      // "We do not know where this boundary runs" still reads as a dashed
+      // line rather than a colour of its own.
+      ...(pending ? { dashArray: '4 3' } : {}),
+    };
+  }, [workedSet, strongBorder, dimBorder]);
+
+  const isWorked = useMemo(() => (feature: SectionFeature) =>
+    feature.properties?.kind !== 'pending' &&
+    !!feature.id && workedSet.has(String(feature.id)), [workedSet]);
 
   // OpenStreetMap's own tiles, which need no account and no key.
   //
@@ -174,9 +232,9 @@ export default function MapView({ workedSections }: Props) {
           Leaflet caches path styles otherwise. */}
       {shapes && (
         <GeoJSON
-          key={`${workedSections.length}-${lightMode}`}
+          key={`fill-${workedSections.length}-${lightMode}`}
           data={shapes}
-          style={shapeStyle as never}
+          style={fillStyle as never}
           onEachFeature={(feature, layer) => {
             const p = (feature as SectionFeature).properties;
             if (p?.kind !== 'pending' || !p.name) return;
@@ -184,6 +242,27 @@ export default function MapView({ workedSections }: Props) {
               `${p.name} — ${(p.sections ?? []).join(' or ')}`,
               { sticky: true });
           }}
+        />
+      )}
+      {/* After every fill, so strokes are painted over them. Non-interactive:
+          the fill layer above owns the hover, and a stroke that swallowed it
+          would make the pending tooltip depend on hitting a hairline. */}
+      {shapes && (
+        <GeoJSON
+          key={`dim-${workedSections.length}-${lightMode}`}
+          data={shapes}
+          filter={f => !isWorked(f as SectionFeature)}
+          style={borderStyle as never}
+          interactive={false}
+        />
+      )}
+      {shapes && (
+        <GeoJSON
+          key={`strong-${workedSections.length}-${lightMode}`}
+          data={shapes}
+          filter={f => isWorked(f as SectionFeature)}
+          style={borderStyle as never}
+          interactive={false}
         />
       )}
       <MapBounds />

@@ -23,6 +23,25 @@ only run events.
 
 ---
 
+## 2026-09-13
+
+### Fixed
+
+- **Worked sections on the map ran together into one amber blob** `Display` —
+  The border between two worked sections was amber over an amber fill, and
+  because that fill is translucent over a basemap whose lightness inverts
+  between themes, in dark mode — the default — the border ended up at exactly
+  the same lightness as the fill it was meant to separate. It was not faint,
+  it was invisible, and a run of worked sections stopped being countable.
+  Borders are now a neutral that flips with the theme, with worked sections
+  carrying the stronger one so the outline of what you have done is what
+  stands out. A second cause was quieter still: each section's fill was
+  painting over its neighbour's border, so half of every boundary on the map
+  was washed out even in light mode.
+  Docs: [Operating → The Map view](operating.md#the-map-view)
+
+---
+
 ## 2026-09-11
 
 ### Changed

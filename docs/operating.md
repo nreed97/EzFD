@@ -286,6 +286,12 @@ a count. The label boxes stay on top — Rhode Island and Delaware are smaller
 than their own names at this zoom, and the whole US Pacific section is a few
 specks off the left edge.
 
+The **fill** tells you whether a section is worked; the **border** tells you
+where it ends. Those are separate, which is why a run of worked sections still
+reads as a row of sections rather than one amber blob, and why the map needs no
+colour of its own per section. Worked sections carry the stronger border, so
+the outline of what you have done is the line that stands out.
+
 Ontario's four — GH, ONE, ONN and ONS — are drawn from RAC's own boundaries,
 which are census divisions rather than the counties ARRL uses everywhere else.
 
