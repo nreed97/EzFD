@@ -148,6 +148,22 @@ prerequisite-checking path has reappeared below it. That last one is the drift
 this design can have: a path that quietly supports what the script says it
 does not.
 
+**`scripts/test-map-labels.cjs`** covers which section labels the map draws at
+which zoom. At the default zoom 54 of the 85 labels overlapped another one, so
+`lib/mapLabels.ts` keeps a label only when its box clears the ones already
+placed.
+
+Two of its properties are worth a suite and neither shows up in a screenshot.
+Placement must not read whether a section is worked, or the map twitches while
+people are logging — so the module has no notion of it, and the test greps for
+that as a substring, since `\bworked\b` matches neither `isWorked` nor
+`workedFirst`. And zooming in must never take a label away, which does *not*
+fall out of greedy placement: a label blocked at one zoom becomes placeable at
+the next and can evict one that had been drawn all along. VT and DE vanished
+between zoom 3 and 4 in the first implementation, and ENY between 4 and 5, so
+zooming in to read a label made it disappear. Each level now starts from the
+previous level's set and only fills the gaps around it.
+
 **`scripts/build-section-geo.mjs`** is not a test but belongs next to them:
 it regenerates `public/sections.geo.json`, the section boundaries the map
 draws. Run it after changing the section list, the county table or the Ontario

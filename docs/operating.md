@@ -292,6 +292,15 @@ reads as a row of sections rather than one amber blob, and why the map needs no
 colour of its own per section. Worked sections carry the stronger border, so
 the outline of what you have done is the line that stands out.
 
+**Hover or tap any section** to get its name and whether you have worked it.
+That works on the shape itself, not only on the small label.
+
+**Labels thin out when they would overlap.** At the opening zoom a dozen
+north-eastern sections are smaller than their own abbreviations, so drawing
+every label there produced a pile of boxes rather than anything readable. Zoom
+in and the rest appear — nothing you have seen disappears as you go in, and no
+section is ever unidentifiable, because the shape answers on hover regardless.
+
 Ontario's four — GH, ONE, ONN and ONS — are drawn from RAC's own boundaries,
 which are census divisions rather than the counties ARRL uses everywhere else.
 

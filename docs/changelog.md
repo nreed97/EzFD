@@ -25,8 +25,33 @@ only run events.
 
 ## 2026-09-13
 
+### Changed
+
+- **The map stops stacking labels it cannot draw legibly** `Display` — At the
+  zoom the map opens at, 54 of its 85 section labels overlapped another one,
+  worst through the Northeast where a dozen sections are smaller than their own
+  abbreviations, so what should have been a reference was a pile of boxes. A
+  label is now drawn only where it fits, and the rest appear as you zoom in —
+  nothing you can already see disappears as you go further in. No section
+  becomes unidentifiable either, because hovering or tapping the shape itself
+  now names it and says whether you have worked it, which it never did before:
+  the only way to identify a section used to be hitting its 9px label.
+  Docs: [Operating → The Map view](operating.md#the-map-view)
+
 ### Fixed
 
+- **Section labels for what you still need were the hardest to read**
+  `Display` — Unworked labels were dark grey on a near-black box, at a contrast
+  of 2.32:1 for 9px text, while worked labels sat at 10.48:1 — so the labels an
+  operator is actually hunting were the ones they could not read, and only in
+  dark mode, which is the default. Both are legible now.
+  Docs: [Operating → The Map view](operating.md#the-map-view)
+- **The map could keep drawing a stale set of worked sections** `Display` — It
+  redrew when the *number* of worked sections changed, so a recompute that
+  removed one section and added another — one operator deleting a mistaken
+  contact while another logs a new section — left the map showing the old set
+  with nothing to say it was out of date. It now tracks the sections
+  themselves.
 - **Worked sections on the map ran together into one amber blob** `Display` —
   The border between two worked sections was amber over an amber fill, and
   because that fill is translucent over a basemap whose lightness inverts

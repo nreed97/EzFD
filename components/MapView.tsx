@@ -7,6 +7,7 @@ import type { LatLngExpression, PathOptions } from 'leaflet';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
 import 'leaflet/dist/leaflet.css';
 import { SECTION_DATA } from '@/lib/sections';
+import { placeLabels, BASE_ZOOM } from '@/lib/mapLabels';
 import { useLightMode } from '@/lib/useLightMode';
 
 interface Props {
@@ -59,22 +60,81 @@ function useSectionShapes() {
   return shapes;
 }
 
-function MapBounds() {
+/**
+ * The zoom, as state, so label placement can respond to it.
+ *
+ * This replaces a component that called `map.setView([39.5, -98.35], 3)` on
+ * mount — the same centre and zoom `MapContainer` is already given as props,
+ * so it re-did on mount exactly what had just been done.
+ */
+function useMapZoom() {
   const map = useMap();
+  const [zoom, setZoom] = useState(() => map.getZoom());
   useEffect(() => {
-    map.setView([39.5, -98.35], 3);
+    const onZoom = () => setZoom(map.getZoom());
+    map.on('zoomend', onZoom);
+    return () => { map.off('zoomend', onZoom); };
   }, [map]);
-  return null;
+  return zoom;
 }
 
+/** Renders the section labels for the current zoom. Inside the map, because
+ *  that is where the zoom lives. */
+function SectionLabels({ workedSet, lightMode }: {
+  workedSet: Set<string>; lightMode: boolean;
+}) {
+  const zoom = useMapZoom();
+  // Placement order is SECTION_DATA's, which is fixed, which is what keeps a
+  // label from moving because somebody logged a contact. See lib/mapLabels.ts.
+  const points = useMemo(() => Object.entries(SECTION_DATA)
+    .map(([section, info]) => ({ section, lat: info.lat, lon: info.lon })), []);
+  const shown = useMemo(() => placeLabels(points, zoom), [points, zoom]);
+
+  return (
+    <>
+      {Object.entries(SECTION_DATA).map(([section, info]) => {
+        if (!shown.has(section)) return null;
+        const worked = workedSet.has(section);
+        return (
+          <Marker
+            key={section}
+            position={[info.lat, info.lon] as LatLngExpression}
+            icon={sectionIcon(section, worked, lightMode)}
+          >
+            <Tooltip>
+              <span className="font-mono font-bold">{section}</span>
+              {' — '}{info.name}
+              {worked ? ' ✓' : ''}
+            </Tooltip>
+          </Marker>
+        );
+      })}
+    </>
+  );
+}
+
+/**
+ * A section's label box.
+ *
+ * The unworked label used to be `#52525b` on a near-black box: **2.32:1** for
+ * 9px monospace, under even the 3:1 floor for large text, while the worked
+ * label sat at 10.48:1. That is exactly backwards — the sections an operator
+ * is hunting are the unworked ones, so the labels that mattered most were the
+ * ones that could not be read, and only in dark mode, which is the default.
+ * `#a1a1aa` measures 6.99:1 and is the same zinc the dim section border uses.
+ *
+ * The worked box's own border was `#d97706` on `#fbbf24` — 1.91:1, the same
+ * mistake as the section borders, in miniature. The text carries the box, so
+ * this only ever cost the box its edge, but there is no reason to keep it.
+ */
 function sectionIcon(section: string, worked: boolean, lightMode: boolean) {
   let bg: string, color: string, border: string;
   if (worked) {
-    bg = '#fbbf24'; color = '#1c1917'; border = '#d97706';
+    bg = '#fbbf24'; color = '#1c1917'; border = '#92400e';
   } else if (lightMode) {
-    bg = 'rgba(255,255,255,0.9)'; color = '#52525b'; border = '#a1a1aa';
+    bg = 'rgba(255,255,255,0.9)'; color = '#3f3f46'; border = '#a1a1aa';
   } else {
-    bg = 'rgba(24,24,27,0.85)'; color = '#52525b'; border = '#3f3f46';
+    bg = 'rgba(24,24,27,0.85)'; color = '#a1a1aa'; border = '#52525b';
   }
   const weight = worked ? '700' : '500';
   return L.divIcon({
@@ -105,6 +165,9 @@ function sectionIcon(section: string, worked: boolean, lightMode: boolean) {
 export default function MapView({ workedSections }: Props) {
   const workedSet = useMemo(
     () => new Set(workedSections.map(s => s.toUpperCase())), [workedSections]);
+  // What the layers are keyed on. Sorted so a reordering of the same sections
+  // is not mistaken for a change.
+  const workedKey = useMemo(() => [...workedSet].sort().join(','), [workedSet]);
   const lightMode = useLightMode();
   const shapes = useSectionShapes();
 
@@ -215,7 +278,9 @@ export default function MapView({ workedSections }: Props) {
       // after sunset, and a white map at 2am undoes that.
       className={lightMode ? undefined : 'map-dark'}
       center={[39.5, -98.35]}
-      zoom={3}
+      // The same constant label placement builds up from, so the zoom the map
+      // opens at and the zoom placement treats as the floor cannot drift apart.
+      zoom={BASE_ZOOM}
       style={{ height: '100%', width: '100%', background: lightMode ? '#e8e8e8' : '#111' }}
       zoomControl={true}
     >
@@ -229,17 +294,37 @@ export default function MapView({ workedSections }: Props) {
       {/* Under the markers: Leaflet draws vector overlays below the marker
           pane, so the section labels stay legible on top of their own fill.
           Keyed on what it is drawn from, so a change to either redraws it —
-          Leaflet caches path styles otherwise. */}
+          Leaflet caches path styles otherwise.
+          The key is the set, not its size. A count is not the state: delete
+          the last QSO for one section while another operator logs a new one
+          and the recompute hands back a set of the same length with different
+          members, which left the map drawing the old one with nothing to say
+          it was stale. */}
       {shapes && (
         <GeoJSON
-          key={`fill-${workedSections.length}-${lightMode}`}
+          key={`fill-${workedKey}-${lightMode}`}
           data={shapes}
           style={fillStyle as never}
           onEachFeature={(feature, layer) => {
             const p = (feature as SectionFeature).properties;
-            if (p?.kind !== 'pending' || !p.name) return;
+            if (p?.kind === 'pending') {
+              if (p.name) {
+                layer.bindTooltip(
+                  `${p.name} — ${(p.sections ?? []).join(' or ')}`,
+                  { sticky: true });
+              }
+              return;
+            }
+            // The shape answers for itself. It used to say nothing, so the
+            // only way to identify a section was to hit its label — a 9px box
+            // about 20px wide, which on a phone is most of the reason to give
+            // up. Now that the shapes carry the map, they carry the question
+            // too, and a label hidden by placement costs nothing.
+            const id = feature.id ? String(feature.id) : '';
+            const info = id ? SECTION_DATA[id as keyof typeof SECTION_DATA] : undefined;
+            if (!info) return;
             layer.bindTooltip(
-              `${p.name} — ${(p.sections ?? []).join(' or ')}`,
+              `${id} — ${info.name}${workedSet.has(id) ? ' ✓' : ''}`,
               { sticky: true });
           }}
         />
@@ -249,7 +334,7 @@ export default function MapView({ workedSections }: Props) {
           would make the pending tooltip depend on hitting a hairline. */}
       {shapes && (
         <GeoJSON
-          key={`dim-${workedSections.length}-${lightMode}`}
+          key={`dim-${workedKey}-${lightMode}`}
           data={shapes}
           filter={f => !isWorked(f as SectionFeature)}
           style={borderStyle as never}
@@ -258,31 +343,15 @@ export default function MapView({ workedSections }: Props) {
       )}
       {shapes && (
         <GeoJSON
-          key={`strong-${workedSections.length}-${lightMode}`}
+          key={`strong-${workedKey}-${lightMode}`}
           data={shapes}
           filter={f => isWorked(f as SectionFeature)}
           style={borderStyle as never}
           interactive={false}
         />
       )}
-      <MapBounds />
+      <SectionLabels workedSet={workedSet} lightMode={lightMode} />
 
-      {Object.entries(SECTION_DATA).map(([section, info]) => {
-        const worked = workedSet.has(section);
-        return (
-          <Marker
-            key={section}
-            position={[info.lat, info.lon] as LatLngExpression}
-            icon={sectionIcon(section, worked, lightMode)}
-          >
-            <Tooltip>
-              <span className="font-mono font-bold">{section}</span>
-              {' — '}{info.name}
-              {worked ? ' ✓' : ''}
-            </Tooltip>
-          </Marker>
-        );
-      })}
     </MapContainer>
   );
 }

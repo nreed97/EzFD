@@ -124,6 +124,15 @@ jobs:
       - name: Clock source and quorum tests
         run: node scripts/test-clock.cjs
 
+      # At the map's default zoom, 54 of its 85 section labels overlapped
+      # another one. Placement thins them, and the two properties worth
+      # guarding are invisible in a screenshot: it must not read the log (or
+      # the map twitches while people log), and zooming in must never take a
+      # label away (the first implementation did exactly that to VT, DE and
+      # ENY).
+      - name: Map label placement tests
+        run: node scripts/test-map-labels.cjs
+
       # The changelog points a reader at the guide for each change. A link to a
       # renamed section resolves to the top of the page instead — invisible in
       # a diff, and nothing else here would catch it.
