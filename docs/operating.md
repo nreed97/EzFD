@@ -256,7 +256,7 @@ through it, Enter opens an entry, and focus returns to **☰** when it closes.
 
 ## The dashboard
 
-![The dashboard on the Map tab: sections worked plotted across North America, with the view tabs and the menu button in the header, and live rate, claimed score and the sections list down the right](images/dashboard.png)
+![The dashboard on the Map tab: worked sections filled amber across North America with their boundaries drawn, unworked ones left as outlines, and live rate, claimed score and the sections list down the right](images/dashboard.png)
 
 A separate read-only view for a second screen. It opens on the **Log**:
 
