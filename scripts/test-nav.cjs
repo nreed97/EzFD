@@ -318,6 +318,32 @@ console.log('\n-- the map needs no account to draw --');
   // the map's corners are already at 1000 — the containment is the fix.
   truthy(/\.leaflet-container\s*\{[^}]*isolation:\s*isolate/.test(css),
     'and the map is a stacking context, so its panes cannot outrank the menu');
+
+  // The fill says whether a section is worked; the border says where it ends.
+  // They shared one colour once — an amber `#b45309` stroke under an amber
+  // fill — and because the fill is translucent over a basemap whose lightness
+  // inverts between themes, the dark-mode blend landed on the border's own
+  // luminance: 1.02:1, the same lightness, an invisible line. Adjacent worked
+  // sections read as one blob, and light mode measured 3.59:1, so it only
+  // looked broken in the theme that is the default.
+  truthy(!/#b45309/.test(src),
+    'the worked border is not the amber that was invisible against its own fill');
+  truthy(/lightMode \? '#09090b' : '#e4e4e7'/.test(src),
+    'borders are a neutral chosen against the page, and flip with the theme');
+
+  // Order is load-bearing three times over, and every one of them fails
+  // quietly. Leaflet draws all 85 polygons into one SVG group in document
+  // order and centres a stroke on its path, so fills after borders wash half
+  // of every border away, and one border tier lets the shade of a shared
+  // worked/unworked edge depend on which polygon the file lists last.
+  const at = (k) => src.indexOf('key={`' + k + '-');
+  const [fill, dim, strong] = ['fill', 'dim', 'strong'].map(at);
+  truthy(fill >= 0 && dim >= 0 && strong >= 0,
+    'fills and both border tiers are separate layers');
+  truthy(fill >= 0 && dim > fill,
+    'borders are drawn after every fill, so no neighbour washes them');
+  truthy(dim >= 0 && strong > dim,
+    'the strong tier is drawn last, so a worked region always owns its outline');
 }
 
 console.log('\n-- no source file carries a literal unicode escape --');

@@ -256,7 +256,7 @@ through it, Enter opens an entry, and focus returns to **☰** when it closes.
 
 ## The dashboard
 
-![The dashboard on the Map tab: sections worked plotted across North America, with the view tabs and the menu button in the header, and live rate, claimed score and the sections list down the right](images/dashboard.png)
+![The dashboard on the Map tab: worked sections filled amber across North America with their boundaries drawn, unworked ones left as outlines, and live rate, claimed score and the sections list down the right](images/dashboard.png)
 
 A separate read-only view for a second screen. It opens on the **Log**:
 
@@ -285,6 +285,21 @@ them, so "what have we got, and where are the gaps" is one glance rather than
 a count. The label boxes stay on top — Rhode Island and Delaware are smaller
 than their own names at this zoom, and the whole US Pacific section is a few
 specks off the left edge.
+
+The **fill** tells you whether a section is worked; the **border** tells you
+where it ends. Those are separate, which is why a run of worked sections still
+reads as a row of sections rather than one amber blob, and why the map needs no
+colour of its own per section. Worked sections carry the stronger border, so
+the outline of what you have done is the line that stands out.
+
+**Hover or tap any section** to get its name and whether you have worked it.
+That works on the shape itself, not only on the small label.
+
+**Labels thin out when they would overlap.** At the opening zoom a dozen
+north-eastern sections are smaller than their own abbreviations, so drawing
+every label there produced a pile of boxes rather than anything readable. Zoom
+in and the rest appear — nothing you have seen disappears as you go in, and no
+section is ever unidentifiable, because the shape answers on hover regardless.
 
 Ontario's four — GH, ONE, ONN and ONS — are drawn from RAC's own boundaries,
 which are census divisions rather than the counties ARRL uses everywhere else.
