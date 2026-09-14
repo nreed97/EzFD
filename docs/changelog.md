@@ -23,6 +23,44 @@ only run events.
 
 ---
 
+## 2026-09-14
+
+### Changed
+
+- **The map draws its own coastlines instead of fetching them** `Display` — The
+  land under the sections used to come from a tile service: CARTO's, then
+  OpenStreetMap's. It now ships with the application, as a 56 KB outline of the
+  world's coastlines built from Natural Earth's public-domain data, so the map
+  is complete the moment the app loads and no EzFD install fetches anything
+  from a third party. Nothing to configure, no account, no key. The background
+  is coastlines and land only — there were never roads or towns on it at the
+  zooms this map uses, and there are none now. ([#101])
+  Docs: [Operating → The Map view](operating.md#the-map-view),
+  [Troubleshooting → The map has no roads, towns or terrain](troubleshooting.md#the-map-has-no-roads-towns-or-terrain)
+
+### Fixed
+
+- **The map was jerky to pan in Firefox** `Display` — Panning dropped 11 of 319
+  frames at a worst case of 30ms, enough to feel like the map was fighting you,
+  while the same map in a Chromium browser was smooth. The cause was Firefox
+  repainting the raster background tiles as the map moved; with the background
+  now drawn as shapes rather than images, the same measurement is 0 dropped
+  frames of 517 at 6.1ms. ([#101])
+  Docs: [Operating → The Map view](operating.md#the-map-view)
+- **The map had no ground under it on a field server with no internet**
+  `Display` `Setup` — Sections drew correctly but floated on empty grey,
+  because the background was fetched and there was nothing to fetch it from.
+  The whole map now ships with the app, so a site with no uplink gets the same
+  map as a hosted instance. Worth one look when you test yours offline before
+  an event. ([#101])
+  Docs: [Offline field servers → Verify it actually works offline](field-server.md#verify-it-actually-works-offline)
+- **The sample data script only half-did what it documented** — It said it
+  spread the demo contacts across a weekend and did not, leaving that as a
+  manual step; a screenshot taken hours later showed a rate of 0 QSO/hr over a
+  260-contact log. Only affects documentation screenshots. ([#101])
+
+---
+
 ## 2026-09-13
 
 ### Changed
@@ -310,7 +348,7 @@ only run events.
   which need no account and no key, so there is nothing to configure and a
   field server with no credentials works the same as a hosted one. Dark mode
   filters the tiles rather than loading a second style. ([#91])
-  Docs: [Troubleshooting → The map says "API key required" on every tile](troubleshooting.md#the-map-says-api-key-required-on-every-tile)
+  Docs: [Troubleshooting → The map says "API key required"](troubleshooting.md#the-map-says-api-key-required-or-is-blank-behind-the-sections)
 - **The dashboard scrolls like a page on a phone** `Display` — It was two
   stacked panes that each scrolled inside a screen that did not: a window onto
   the log, and under it a window about two lines tall onto the score, bonuses,
@@ -700,3 +738,4 @@ continuous enough to be worth summarising.
 [#94]: https://github.com/nreed97/EzFD/pull/94
 [#95]: https://github.com/nreed97/EzFD/pull/95
 [#96]: https://github.com/nreed97/EzFD/issues/96
+[#101]: https://github.com/nreed97/EzFD/pull/101

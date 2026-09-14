@@ -105,6 +105,11 @@ When it comes back, load the app from another device on the LAN and log a
 contact. A reboot rather than a service restart is deliberate: it is the boot
 ordering you are testing, and boot is what happens after a generator dies.
 
+Open the dashboard's **Map** view while you are there. It should draw the
+coastlines as well as the sections: the whole map ships with the application,
+so there is nothing left for it to fetch. It used to draw its background from
+a tile service, which meant sections floating on empty grey out here.
+
 Two things this catches that reasoning does not: a service that was running but
 never `enable`d, and anything you added that quietly reaches out on startup.
 

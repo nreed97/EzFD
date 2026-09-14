@@ -12,10 +12,15 @@
  *
  *   * Contacts go in through the real API, so scoring, dupe detection and
  *     section counting are computed the way an event computes them.
- *   * `datetime_utc` is then spread across a plausible weekend in SQL, because
- *     posting 240 contacts in a loop stamps them within two seconds and the
+ *   * `datetime_utc` is then spread across a plausible weekend, because
+ *     posting 260 contacts in a loop stamps them within two seconds and the
  *     rolling-hour rate panel reads the total instead of a rate. Note it is
- *     `datetime_utc` the panel and the log read, not `created_at`.
+ *     `datetime_utc` the panel and the log read, not `created_at`, and that
+ *     both have to move together or the log orders by one and the rate reads
+ *     the other. The spread is anchored to `NOW()`, so the last hour of the
+ *     weekend is the hour the screenshot is taken in and the rate panel shows
+ *     a rate rather than a zero -- it read 0 QSO/hr once because the spread
+ *     had been applied by hand hours before the capture.
  *   * Bands and modes are weighted the way a weekend actually falls. Cycling
  *     them with a fixed stride gives every band an identical count, which is
  *     as obviously synthetic as one timestamp.
@@ -26,7 +31,13 @@
  * what a screenshot should imply, and the gaps are what the Needed view and
  * the map's unworked fill are for.
  */
+import pg from 'pg';
+
 const BASE = process.argv[2] ?? 'http://127.0.0.1:3000';
+// The spread needs the database directly -- there is no route that backdates a
+// contact, and there should not be one.
+const DB = process.argv[3] ?? process.env.DATABASE_URL;
+if (!DB) throw new Error('set DATABASE_URL (or pass it as the second argument) so the contacts can be spread across the weekend');
 
 // Deterministic, so re-running produces the same log and a re-taken
 // screenshot differs only where the app changed.
@@ -106,4 +117,51 @@ for (let s = 1; s <= 3; s++) {
   }).catch(() => {});
 }
 
-console.log(JSON.stringify({ join_code: join, event_id: full.id, qsos: n }));
+// Spread the log across the twenty hours ending now. The weights are a Field
+// Day weekend's shape rather than a flat rate: a run after the 1800Z start, a
+// long quiet overnight, a pickup in the morning. Flat would be as obviously
+// synthetic as one timestamp.
+const HOURLY = [9, 11, 10, 8, 7, 5, 4, 3, 2, 2, 2, 3, 4, 6, 7, 8, 9, 10, 9, 8];
+const offsets = [];
+{
+  const total = HOURLY.reduce((a, b) => a + b, 0);
+  for (let i = 0; i < n; i++) {
+    let r = rnd() * total, h = 0;
+    for (; h < HOURLY.length - 1; h++) { if ((r -= HOURLY[h]) < 0) break; }
+    // Hour 0 is the oldest, so the offset counts back from now.
+    offsets.push((HOURLY.length - 1 - h + rnd()) * 3600);
+  }
+  // Ascending, so the log reads in the order the contacts were made.
+  offsets.sort((a, b) => b - a);
+}
+
+const client = new pg.Client({ connectionString: DB });
+await client.connect();
+// Ordered by created_at, not by id: the primary key is a UUID, so ordering by
+// it is ordering at random and the log would read with its sections and
+// callsigns shuffled against the clock. created_at is still the insertion order
+// here -- the CTE is evaluated before the UPDATE rewrites it.
+await client.query(
+  `WITH ordered AS (
+     SELECT id, row_number() OVER (ORDER BY created_at, id) - 1 AS n
+       FROM qsos WHERE event_id = $1
+   )
+   UPDATE qsos q
+      SET datetime_utc = NOW() - (($2::float8[])[ordered.n + 1] || ' seconds')::interval,
+          created_at   = NOW() - (($2::float8[])[ordered.n + 1] || ' seconds')::interval
+     FROM ordered
+    WHERE q.id = ordered.id`,
+  [full.id, offsets],
+);
+const { rows: [span] } = await client.query(
+  `SELECT count(*) FILTER (WHERE datetime_utc > NOW() - interval '1 hour') AS last_hour,
+          min(datetime_utc) AS first, max(datetime_utc) AS last
+     FROM qsos WHERE event_id = $1`,
+  [full.id],
+);
+await client.end();
+
+console.log(JSON.stringify({
+  join_code: join, event_id: full.id, qsos: n,
+  last_hour: Number(span.last_hour), first: span.first, last: span.last,
+}));
