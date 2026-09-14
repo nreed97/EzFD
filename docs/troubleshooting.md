@@ -196,31 +196,49 @@ and log back in.
 
 More detail in [Rig control](rig-control.md#troubleshooting).
 
-## The map says "API key required" on every tile
+## The map says "API key required", or is blank behind the sections
 
-The map used to draw from CARTO's basemap CDN, which was open to anyone and
-then stopped being: unauthenticated tiles come back with *"API key required"*
-rendered **into the image**. So the map still drew, still placed every section
-marker in the right place, and was still unreadable — nothing failed, no
-request errored, and there was nothing on screen to say what had happened.
+Both are symptoms of the map fetching its background from somebody else's
+server, and it no longer does.
 
-Fixed by moving to OpenStreetMap's own tiles, which need no account and no
-key. **Update the application** and the map draws again; there is nothing to
-configure.
+The map used to draw CARTO's tiles, which were open to anyone and then stopped
+being: unauthenticated tiles came back with *"API key required"* rendered
+**into the image**, so the map still drew, still placed every section in the
+right place, and was still unreadable — nothing failed, no request errored and
+nothing on screen said what had happened. Moving to OpenStreetMap's tiles
+removed the key, but not the dependency: a field server with no internet got
+sections floating on an empty background, and every EzFD install in the world
+pointed at a volunteer service.
 
-If you are still on an older build and can't update yet, the map is the only
-thing affected — the section grid, **Sections Needed**, scoring and every
-export read from the same data and are unaffected.
+**The map now ships with the application.** The land underneath and the
+section boundaries on top are both files the app serves itself, so the map
+draws in full on a field server with no internet, and no install fetches
+anything from a third party. **Update the application** and there is nothing
+to configure.
+
+On an older build the map is the only thing affected — the section grid,
+**Sections Needed**, scoring and every export read the same data and are
+unaffected.
+
+## The map has no roads, towns or terrain
+
+By design. The background is coastlines and land, drawn from Natural Earth's
+public-domain outlines, and the sections are drawn on top of it. Street-level
+detail would mean fetching tiles from a map service, which is what this
+replaced — and it would compete with the thing the map is actually for, which
+is seeing at a glance which sections are worked.
+
+Zooming in gives you more section labels, not more ground detail.
 
 ## The map is very dark, or the labels look wrong
 
-OpenStreetMap publishes one tile style and it is a light one, so dark mode
-inverts the tiles with a CSS filter rather than loading a second style. The
-filter is scoped to the tile layer alone, so the amber worked-section labels
-and the tooltips keep their own colours.
+Dark is the default, and the map follows it: the land is drawn dark and the
+worked sections amber on top of it, so the map does not glare next to the rest
+of the interface at 2am.
 
-Switch to light mode from **☰ → Light / dark** if you would rather have the
-unfiltered map. Nothing about the data changes either way.
+Switch with **☰ → Light / dark** if you would rather have the light map. The
+border colours flip with the theme so that worked and unworked sections stay
+distinguishable in both; nothing about the data changes either way.
 
 ## On the field server there is no "install app", and Web Serial is missing
 
@@ -252,7 +270,7 @@ address without one.
 
 On the dashboard's **Map** view, the slide-out menu appeared under the map:
 the map stayed bright where the rest of the screen dimmed, and its zoom
-buttons and the OpenStreetMap credit line drew on top of the menu entries. The
+buttons and the map's own credit line drew on top of the menu entries. The
 menu was still there and still worked — it was just unreadable where the two
 overlapped.
 

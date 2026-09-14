@@ -231,6 +231,59 @@ section present exactly once, `DX` absent, no ring wrapping the antimeridian
 (the symptom of a source that does not split at 180°, which renders as a band
 smeared across the world), and the asset under 400 KB.
 
+**`scripts/build-basemap.mjs`** regenerates `public/basemap.geo.json`, the land
+the sections are drawn on. Run it only if you change the tolerance or the
+source.
+
+```bash
+$ node scripts/build-basemap.mjs
+  unwrapped 3 ring(s) across the antimeridian, dropped 8 below -60°
+public/basemap.geo.json — 1 feature(s), 118 rings, 3900 vertices, 56 KB
+```
+
+The map used to fetch raster tiles — CARTO's, then OpenStreetMap's. Carrying
+its own ground instead answered three separate problems at once:
+
+- **A distributed app should not point every install at a third party.**
+  CARTO was open and then was not, and the refusal arrived as *"API key
+  required" rendered into the tile image* — a failure that is a picture rather
+  than an error. OSM removed the key but not the dependency: theirs is a
+  volunteer service with a usage policy, and EzFD is cloned and deployed by
+  whoever wants it.
+- **Firefox.** Measured on a running event, panning the map with tiles dropped
+  11 of 319 frames at a p95 of 30 ms; with no tiles and everything else
+  identical, 0 of 517 at 6.1 ms. Neither the renderer (SVG and Canvas measured
+  the same), nor Leaflet's tile options, nor forcing the tile pane onto its own
+  compositor layer moved it. The cost is Firefox repainting raster tiles under
+  a pan transform.
+- **Offline field servers**, where the tiles never loaded at all.
+
+The source is Natural Earth 110m *land* via the `world-atlas` npm package,
+pinned in `package.json` — public-domain, and the same shape of source the
+sections come from. Land rather than countries: `countries-110m` is 145 KB and
+177 features against 56 KB and one, it would draw Mexico's border as if it
+meant something here, and one feature is one SVG path.
+
+`BASEMAP_TOLERANCE` is an absolute tolerance for the same reason
+`SECTION_GEO_TOLERANCE` is.
+
+The one subtlety is the antimeridian, and it bit twice. Natural Earth keeps
+every longitude inside ±180, so the ring carrying Afro-Eurasia steps straight
+from +179 to -179 where Russia crosses the date line — drawn literally, that
+is a line back across the whole world. Walking each ring and carrying an
+offset fixes it, and then the offset has to be taken back out: that ring starts
+in Chukotka, so every point after the crossing picks up -360 and Europe and
+Africa end up written at around -350°, which Leaflet draws exactly where it
+says — one world-width to the left, leaving an empty Eastern Hemisphere behind.
+`scripts/test-sections.cjs` asserts both: no step over 180° between
+consecutive vertices, and no longitude outside ±200° (a little overrun is real,
+since Chukotka reaches 190°).
+
+The colours are in `components/MapView.tsx`, not here, and two of them are not
+free choices: `#f2efe9` and `#1c1a16` are what the old raster basemap
+*rendered as* underneath the section fills, and the worked/unworked border
+contrast was calibrated against those exact values.
+
 **`scripts/test-merge.cjs`** covers `ezfd_merge_event()` and
 `ezfd_recompute_dupes()` — reconciling an event that ran in two places at once
 into one log. Every case that matters is a way to silently change what a club

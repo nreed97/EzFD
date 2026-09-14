@@ -275,41 +275,63 @@ console.log('\n-- slot wording is not written into a component --');
   else no('no surface writes a panel heading or empty-state of its own', offenders.join(', '));
 }
 
-console.log('\n-- the map needs no account to draw --');
+console.log('\n-- the map fetches nothing from anybody --');
 {
-  // CARTO's basemap CDN was open, then wasn't: unauthenticated tiles came
-  // back with "API key required" rendered into the image. The map still drew
-  // and still placed every section correctly, so nothing looked broken except
-  // the picture — no console error, no failed request to notice.
-  //
-  // A key is the wrong shape here whatever it costs. There is no account to
-  // attach one to, the field servers this supports run on plain HTTP with no
-  // internet guarantee, and cloning the repo has to give you a working map.
+  // Cloning the repo has to give you a working map: no account to attach a key
+  // to, no signup, and a field server with no internet gets the same map a
+  // hosted one does. The map carries its own ground for that reason, and for
+  // two more measured ones -- see components/MapView.tsx and AGENTS.md.
   const src = readCode('components/MapView.tsx');
 
-  const KEYED = [
+  // No third-party tile host at all, keyed or not.
+  //
+  // This started as "the tile source must need no account", because CARTO was
+  // open and then was not and the refusal arrived as *"API key required"
+  // rendered into the tile image* — the map still drew, still placed all 85
+  // sections correctly, and reported nothing. Moving to OpenStreetMap moved
+  // that risk rather than removing it: theirs is a volunteer service with a
+  // usage policy, and EzFD is cloned and deployed by whoever wants it, so
+  // every install pointed at their servers. The map now carries its own
+  // ground, so the rule is stronger and simpler than it was.
+  const HOSTS = [
     [/cartocdn\.com/i, 'CARTO'],
+    [/tile\.openstreetmap\.org/i, 'OpenStreetMap tiles'],
     [/api\.mapbox\.com/i, 'Mapbox'],
     [/tiles\.stadiamaps\.com/i, 'Stadia'],
     [/thunderforest\.com/i, 'Thunderforest'],
     [/maptiler\.com/i, 'MapTiler'],
+    [/basemaps\.arcgis\.com/i, 'ArcGIS'],
     [/api[_-]?key|access[_-]?token|\bapikey\b/i, 'a key or token in the URL'],
   ];
-  const found = KEYED.filter(([re]) => re.test(src)).map(([, name]) => name);
-  if (found.length === 0) ok('the tile source needs no account or key');
-  else no('the tile source needs no account or key', found.join(', '));
+  const found = HOSTS.filter(([re]) => re.test(src)).map(([, name]) => name);
+  if (found.length === 0) ok('the map fetches no tiles from anybody');
+  else no('the map fetches no tiles from anybody', found.join(', '));
 
-  truthy(/tile\.openstreetmap\.org/.test(src), 'it is OpenStreetMap');
-  truthy(/openstreetmap\.org\/copyright/.test(src),
-    'and it is attributed, which their tile policy asks for');
+  // A TileLayer at all is the thing to catch: it is how a tile host comes
+  // back, whoever it points at.
+  truthy(!/<TileLayer/.test(src) && !/\bL\.tileLayer\(/.test(src),
+    'and there is no tile layer left to point at one');
 
-  // Dark is a filter over the one published style, not a second URL. Scoped
-  // to the tile pane: inverting the whole container would turn the amber
-  // worked-section labels an unreadable blue.
-  truthy(/map-dark/.test(src), 'dark mode is a class on the container');
+  // The ground is a file the app ships, so it draws on a field server with no
+  // internet -- which is where the sections already came from.
+  truthy(/basemap\.geo\.json/.test(src), 'the ground is served from the app itself');
+  truthy(read('public/basemap.geo.json').length < 120 * 1024,
+    'and the basemap file stays small enough to ship to a phone on a hotspot');
+
+  // These two are not free choices. They are what the old raster basemap
+  // rendered as under the section fills -- OSM's land, and what the dark-mode
+  // filter turned it into -- and the worked/unworked border contrast was
+  // calibrated against exactly those values. Changing them silently invalidates
+  // that calibration, which is a thing no screenshot would show.
+  truthy(/'#f2efe9'/.test(src), "light mode keeps the land colour the borders were measured against");
+  truthy(/'#1c1a16'/.test(src), "and dark mode keeps its own");
+
+  // Dark mode used to be a CSS filter over somebody else's raster. With the
+  // ground drawn from our own data it is a colour, and the filter rule has to
+  // go with the tiles or it is dead CSS that reads as live.
   const css = read('app/globals.css');
-  truthy(/\.map-dark \.leaflet-tile-pane\s*\{/.test(css),
-    'and the filter applies to the tile pane alone, not the whole map');
+  truthy(!/leaflet-tile-pane/.test(css),
+    'the dark-mode tile filter is gone along with the tiles');
 
   // Leaflet's panes run from z-index 200 to 1000 and its container declares
   // none, so without a stacking context of its own the map competes with the

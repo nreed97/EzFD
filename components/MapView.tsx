@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { MapContainer, TileLayer, Marker, Tooltip, GeoJSON, useMap } from 'react-leaflet';
+import { MapContainer, Marker, Tooltip, GeoJSON, useMap, AttributionControl } from 'react-leaflet';
 import L from 'leaflet';
 import type { LatLngExpression, PathOptions } from 'leaflet';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
@@ -43,6 +43,29 @@ interface SectionProps {
   sections?: string[];
 }
 type SectionFeature = Feature<Geometry, SectionProps>;
+
+/**
+ * World land, so the map has ground under it without a raster tile.
+ *
+ * 56 KB, one feature, built by scripts/build-basemap.mjs from Natural Earth
+ * via `world-atlas`. Fetched rather than bundled for the same reason the
+ * sections are: only this view needs it, and a club logging from a phone on a
+ * hotspot should not pay for a map they never open.
+ */
+function useBasemap() {
+  const [land, setLand] = useState<FeatureCollection<Geometry> | null>(null);
+  useEffect(() => {
+    let live = true;
+    // A failure here costs the ground, not the map: the sections still draw,
+    // which is the half that carries the information.
+    fetch('/basemap.geo.json')
+      .then(r => (r.ok ? r.json() : null))
+      .then(j => { if (live) setLand(j); })
+      .catch(() => {});
+    return () => { live = false; };
+  }, []);
+  return land;
+}
 
 function useSectionShapes() {
   const [shapes, setShapes] = useState<FeatureCollection<Geometry, SectionProps> | null>(null);
@@ -170,6 +193,7 @@ export default function MapView({ workedSections }: Props) {
   const workedKey = useMemo(() => [...workedSet].sort().join(','), [workedSet]);
   const lightMode = useLightMode();
   const shapes = useSectionShapes();
+  const basemap = useBasemap();
 
   // The fill says whether a section has been worked. The border says where the
   // section ends. They are two different questions and they get two different
@@ -248,49 +272,77 @@ export default function MapView({ workedSections }: Props) {
     feature.properties?.kind !== 'pending' &&
     !!feature.id && workedSet.has(String(feature.id)), [workedSet]);
 
-  // OpenStreetMap's own tiles, which need no account and no key.
+  // The map carries its own ground rather than fetching raster tiles.
   //
-  // This used to be CARTO's basemap CDN, which had a light and a dark style
-  // and was open to anyone. It is not any more: unauthenticated tiles come
-  // back with "API key required" rendered into the image, so the map still
-  // drew, still placed every section marker correctly, and was still useless
-  // — the failure is a picture, not an error, and nothing on screen said what
-  // had happened.
+  // It drew OpenStreetMap's tiles until 2026-09-14, and CARTO's before that.
+  // CARTO was open and then was not, and the refusal arrived as *"API key
+  // required" rendered into the tile image* — the map still drew, still placed
+  // all 85 sections correctly, and reported nothing. Moving to OSM moved that
+  // risk rather than removing it: theirs is a volunteer service with a usage
+  // policy, and EzFD is cloned and deployed by whoever wants it, so every
+  // install pointed at their servers.
   //
-  // A key is the wrong shape for this app whatever CARTO charges. There is no
-  // account to attach one to, the field servers this supports run on plain
-  // HTTP with no internet guarantee, and a club that clones the repo has to
-  // get a working map without signing up for anything.
+  // Firefox settled it. Measured on a real event, panning with tiles dropped
+  // 11 of 319 frames at a p95 of 30ms; with no tiles and everything else
+  // identical, 0 of 517 at 6.1ms. Not the renderer — SVG and Canvas measured
+  // the same. Not Leaflet's tile options, nor forcing the tile pane onto its
+  // own compositor layer; none of those moved it. The cost is Firefox
+  // repainting raster tiles under a pan transform, and removing the tiles is
+  // what removed it.
   //
-  // No {s} subdomain: OSM deprecated the a/b/c split, and modern browsers
-  // multiplex over one HTTP/2 connection anyway. No {r} either — the standard
-  // tile server has no @2x tiles, so asking for them is a wasted 404 per tile.
-  const tileUrl = 'https://tile.openstreetmap.org/{z}/{x}/{y}.png';
+  // These two colours are not chosen freshly. They are what the old basemap
+  // *rendered as* underneath the section fills — OSM's land is #f2efe9, and
+  // #1c1a16 is what the dark-mode filter turned that into. The worked/unworked
+  // border contrast was calibrated against those exact values, so keeping them
+  // means that calibration still holds rather than quietly needing redoing.
+  const land  = lightMode ? '#f2efe9' : '#1c1a16';
+
+  // The ocean cannot be chosen freely either, but for the opposite reason: the
+  // land is pinned, so the ocean is what has to make a coastline visible.
+  // Light mode manages it by lightness -- #9ab8d2 sits 1.80:1 from the land.
+  // Dark mode cannot: the land is already so dark that even pure black reaches
+  // only 1.21:1, so there the coast reads as a *line* rather than as an edge
+  // between two fills, which is what dark basemaps generally do anyway.
+  const ocean = lightMode ? '#9ab8d2' : '#08090b';
+  // Quieter than the dim section border in both themes, and blue-grey in light
+  // so it reads as a water edge rather than one more section line. Coast is
+  // context; the sections are the content, and the hierarchy should say so.
+  const coast = lightMode ? '#7d8794' : '#52525b';
+  const basemapStyle = useMemo((): PathOptions => ({
+    fillColor: land, fillOpacity: 1, color: coast, weight: 0.6,
+  }), [land, coast]);
 
   return (
     <MapContainer
-      // Only one tile style is published, so dark is a filter over it rather
-      // than a second URL. `.map-dark` inverts the tile pane alone — markers,
-      // tooltips and the zoom control are separate panes and keep their own
-      // colours, which is what stops the worked-section labels inverting into
-      // something unreadable. Dark matters here beyond taste: this interface
-      // is dark by default and has a night mode for keeping dark adaptation
-      // after sunset, and a white map at 2am undoes that.
-      className={lightMode ? undefined : 'map-dark'}
+      // Dark mode used to be a CSS filter over the one published tile style.
+      // With the ground drawn from our own data it is just a colour, which is
+      // both cheaper and more controllable — and it still matters beyond
+      // taste: this interface is dark by default and has a night mode for
+      // keeping dark adaptation after sunset, and a white map at 2am undoes
+      // that.
       center={[39.5, -98.35]}
       // The same constant label placement builds up from, so the zoom the map
       // opens at and the zoom placement treats as the floor cannot drift apart.
       zoom={BASE_ZOOM}
-      style={{ height: '100%', width: '100%', background: lightMode ? '#e8e8e8' : '#111' }}
+      // The container background is the ocean: everything not drawn is water.
+      style={{ height: '100%', width: '100%', background: ocean }}
       zoomControl={true}
+      attributionControl={false}
     >
-      <TileLayer
-        key={tileUrl}
-        url={tileUrl}
-        // OSM's tile usage policy asks for attribution; it is also the only
-        // thing on screen naming where the map came from.
-        attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-      />
+      {/* Natural Earth is public domain and asks for nothing, but naming where
+          the shapes came from is the honest thing to do and it is the only
+          line on screen that says this map is the app's own. */}
+      <AttributionControl position="bottomright" prefix={false} />
+      {/* The ground, under everything. One feature, so one path. */}
+      {basemap && (
+        <GeoJSON
+          key={`land-${lightMode}`}
+          data={basemap}
+          style={basemapStyle as never}
+          interactive={false}
+          attribution="Land: Natural Earth · Sections: ARRL/RAC"
+        />
+      )}
       {/* Under the markers: Leaflet draws vector overlays below the marker
           pane, so the section labels stay legible on top of their own fill.
           Keyed on what it is drawn from, so a change to either redraws it —

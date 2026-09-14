@@ -58,7 +58,9 @@ leave the domain blank, and carry the machine to the field — a Raspberry Pi, a
 old laptop, any SBC. Operators join over local WiFi at `http://ezfd.local/` and
 everything works normally, because from the app's point of view nothing is
 offline: dupes, band coordination and the live score are all server-side, and
-the server is at the site. It comes back on its own after a power cut.
+the server is at the site. Even the section map draws in full — the coastlines
+under it ship with the app, so nothing is fetched from a tile service. It comes
+back on its own after a power cut.
 
 **One log, even when the event ran in two places.** A whole event exports as
 JSON — settings, contacts, roster, checkout history — and imports either as a

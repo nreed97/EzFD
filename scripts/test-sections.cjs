@@ -265,6 +265,60 @@ console.log('\nThe map covers every section');
   }
 }
 
+// public/basemap.geo.json is the ground the sections are drawn on, and it is
+// generated from the same kind of source by the same kind of script. It gets
+// the same two guards, because it can fail in the same two ways -- and the
+// antimeridian one already bit it twice: first as rings that stepped straight
+// across the date line and drew as bands smeared over the whole world, and
+// then, after that was fixed, as an Afro-Eurasia written one world-width to
+// the left because the unwrapping offset was never taken back out.
+console.log('\nThe basemap draws as a map');
+{
+  const mapPath = path.join(root, 'public', 'basemap.geo.json');
+  if (!fs.existsSync(mapPath)) {
+    no('public/basemap.geo.json exists', 'run: node scripts/build-basemap.mjs');
+  } else {
+    const base = JSON.parse(fs.readFileSync(mapPath, 'utf8'));
+
+    // The section file asserts that no *ring* spans 180 degrees. That rule does
+    // not transfer: Afro-Eurasia is one connected landmass genuinely 208 wide,
+    // and no amount of splitting makes it narrower. So assert the symptom
+    // directly instead. A step of more than 180 degrees between two
+    // consecutive vertices is the date-line jump itself, and it draws as a
+    // line all the way back across the world.
+    let jump = 0, lo = Infinity, hi = -Infinity;
+    for (const f of base.features ?? []) {
+      const polys = f.geometry.type === 'Polygon' ? [f.geometry.coordinates] : f.geometry.coordinates;
+      for (const poly of polys) {
+        for (const ring of poly) {
+          for (let i = 0; i < ring.length; i++) {
+            lo = Math.min(lo, ring[i][0]);
+            hi = Math.max(hi, ring[i][0]);
+            if (i) jump = Math.max(jump, Math.abs(ring[i][0] - ring[i - 1][0]));
+          }
+        }
+      }
+    }
+    if (jump < 180) ok(`no ring jumps the date line (widest step ${jump.toFixed(0)}°)`);
+    else no('no ring jumps the date line', `a step of ${jump.toFixed(0)}° — it will smear across the map`);
+
+    // And that unwrapping a ring across the date line put it back where it
+    // belongs. Carrying the offset and never removing it wrote Europe and
+    // Africa at around -350, which Leaflet draws a whole world-width to the
+    // left: the map still renders, the Eastern Hemisphere is simply empty.
+    // A little overrun past the date line is real -- Chukotka reaches 190.
+    if (lo > -200 && hi < 200) ok(`the world is where it belongs (${lo.toFixed(0)}° to ${hi.toFixed(0)}°)`);
+    else no('the world is where it belongs',
+      `longitudes run ${lo.toFixed(0)}° to ${hi.toFixed(0)}° — a ring is offset by a whole world`);
+
+    // Fetched on opening the map view, alongside the sections. It is context,
+    // not content, so it should cost a fraction of what they do.
+    const kb = fs.statSync(mapPath).size / 1024;
+    if (kb < 120) ok(`the basemap is ${kb.toFixed(0)} KB`);
+    else no('the basemap stays under 120 KB', `${kb.toFixed(0)} KB — re-run the build with a higher BASEMAP_TOLERANCE`);
+  }
+}
+
 console.log('');
 if (failures) {
   console.log(`\x1b[31m${failures} check(s) failed\x1b[0m`);

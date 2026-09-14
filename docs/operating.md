@@ -256,7 +256,7 @@ through it, Enter opens an entry, and focus returns to **☰** when it closes.
 
 ## The dashboard
 
-![The dashboard on the Map tab: worked sections filled amber across North America with their boundaries drawn, unworked ones left as outlines, and live rate, claimed score and the sections list down the right](images/dashboard.png)
+![The dashboard on the Map tab: worked sections filled amber across North America with their boundaries drawn, unworked ones left as outlines over dark land and coastline, and live rate, claimed score and the sections list down the right](images/dashboard.png)
 
 A separate read-only view for a second screen. It opens on the **Log**:
 
@@ -317,9 +317,11 @@ Nothing about this changes what a contact counts for. If you worked a station
 in Nipissing, log the section they sent you; the grid, **Sections Needed**,
 the score and every export use that and are unaffected.
 
-The boundaries are a file the app ships, not something it fetches from a map
-service, so they draw on a field server with no internet. The basemap
-underneath is the part that needs the network.
+**The whole map ships with the app.** The section boundaries and the land
+underneath them are both files in the application, not tiles fetched from a
+map service, so the map draws in full on a field server with no internet — the
+same map it draws on a hosted one. There is nothing to configure, no account
+to sign up for and no key to hold.
 
 ### The Log view
 
