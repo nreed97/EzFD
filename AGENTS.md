@@ -29,6 +29,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-adif.cjs` | ADIF parse and export — the `Date`/string shapes, per-operator `MY_*`, SES vs contest exchange |
 | `scripts/test-cabrillo.cjs` | Cabrillo submission — `CLAIMED-SCORE`, transmitter numbering, ordering, null class/section |
 | `scripts/test-log-filters.cjs` | The dashboard log view — filters combine, an empty filter restricts nothing, column defaults per event type |
+| `scripts/test-overview.cjs` | The site display — coverage outranks a claim, a booked-but-empty band is its own state, the summary counts the rows drawn under it, and the band rows are the event's own bands in frequency order |
 | `scripts/test-nav.cjs` | The menu behind the hamburger — one list for every surface and width, every action wired up, no component keeping its own copy |
 | `scripts/test-op-stats.cjs` | Who worked what — the rows sum to the log, a dupe earns nothing, a section belongs to whoever reached it first, and rate is a rolling hour |
 | `scripts/test-slot-board.cjs` | The operating position board — released/expired claims, station vs operator attribution, the contest band list, and that the contest vocabulary carries no callsign words |
@@ -337,8 +338,10 @@ Hard-won fixes worth knowing before touching this code:
 | `lib/logColumns.ts` | The log column table and per-event-type defaults |
 | `components/OperatingPosition.tsx` | Sign-in step two — pick a band/mode, optionally check it out |
 | `lib/slotBoard.ts` | What each band/mode is doing, from claims plus presence |
+| `components/SiteOverview.tsx` | The dashboard's Overview — the view you put on a screen at the site |
+| `lib/overview.ts` | The site display's band coverage — one derivation over the slot board |
 | `lib/lastPosition.ts` | What the picker preselects — the remembered position and the claim that outranks it |
-| `lib/bands.ts` | Which bands an event offers — WARC excluded for contests |
+| `lib/bands.ts` | Which bands an event offers, and the one frequency ordering — WARC excluded for contests |
 | `lib/callHistory.ts` | N1MM call history file download/parse, per-event prefill lookup |
 | `lib/masterCallsigns.ts` | `MASTER.SCP` (Super Check Partial) download/parse, shared known-callsign lookup |
 | `ezfd-admin.sh` | Interactive server admin console |

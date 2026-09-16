@@ -70,6 +70,7 @@ first:
 
 ```bash
 $ node scripts/test-sections.cjs        # the ARRL/RAC section list, in all three places
+$ node scripts/test-overview.cjs        # the site display's band coverage
 $ node scripts/test-scoring.cjs         # the ARRL formula, bonuses and their caps
 $ node scripts/test-gota.cjs            # GOTA counts twice, and its count comes from the log
 $ node scripts/test-preflight.cjs       # the pre-submission read, and rule 7.3's class column

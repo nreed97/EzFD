@@ -19,12 +19,13 @@ import SectionsNeeded from './SectionsNeeded';
 import CheckoutBoard from './CheckoutBoard';
 import LogView from './LogView';
 import OperatorStats from './OperatorStats';
+import SiteOverview from './SiteOverview';
 import NavDrawer from './NavDrawer';
 import { slotWords } from '@/lib/slotWords';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
-type MainView = 'map' | 'sections' | 'rate' | 'bands' | 'needed' | 'checkouts' | 'log' | 'ops';
+type MainView = 'overview' | 'map' | 'sections' | 'rate' | 'bands' | 'needed' | 'checkouts' | 'log' | 'ops';
 
 interface StationPresence {
   op_call: string;
@@ -98,14 +99,18 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   // this component having to hold two differently-shaped reservation lists.
   const [reservationVersion, setReservationVersion] = useState(0);
 
+  // Fetched for every event type, not just a special event. Contest claims
+  // live in the same table (they are transmitter assignments rather than
+  // callsign checkouts) and the site overview's band board reads them; before
+  // this the dashboard skipped the fetch entirely on FD and WFD, so every
+  // claimed band there would have drawn as free.
   const refreshReservations = useCallback(async () => {
-    if (!isSes) return;
     const res = await fetch(`/api/ses/reservations?event_id=${event.id}`).catch(() => null);
     if (res?.ok) {
       setReservations(await res.json());
       setReservationVersion(v => v + 1);
     }
-  }, [event.id, isSes]);
+  }, [event.id]);
 
   useEffect(() => {
     const es = new EventSource(`/api/realtime/${event.id}`);
@@ -120,7 +125,6 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   }, [event.id, refreshReservations]);
 
   useEffect(() => {
-    if (!isSes) return;
     // the loader is async: whatever state it sets happens in a promise
     // continuation after an await, never synchronously during the effect, so
     // it cannot cascade a render. The rule cannot see through the async
@@ -129,7 +133,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
     refreshReservations();
     const id = setInterval(refreshReservations, PRESENCE_POLL_MS);
     return () => clearInterval(id);
-  }, [isSes, refreshReservations]);
+  }, [refreshReservations]);
 
   // Live band/mode per operator — same presence table BandActivity uses on
   // the logging page. Dashboard is read-only here: it polls but never
@@ -182,6 +186,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
 
   const VIEW_TABS: { id: MainView; label: string }[] = isSes
     ? [
+        { id: 'overview',  label: 'Overview' },
         { id: 'log',       label: 'Log' },
         { id: 'rate',      label: 'Rate' },
         { id: 'bands',     label: 'Bands' },
@@ -189,6 +194,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         { id: 'checkouts', label: 'Checkouts' },
       ]
     : [
+        { id: 'overview', label: 'Overview' },
         { id: 'log',      label: 'Log' },
         { id: 'map',      label: 'Map' },
         { id: 'sections', label: 'Sections' },
@@ -240,6 +246,12 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
       : mainView === 'log' || mainView === 'ops' || mainView === 'checkouts'
         ? 'h-[70vh] overflow-hidden'
         : 'h-auto';
+
+  // The overview is the one view that takes the whole width. It is a poster
+  // rather than a reference column -- see components/SiteOverview.tsx -- and
+  // it prints the join code itself, so leaving the sidebar beside it would put
+  // the same code on screen twice.
+  const fullBleed = mainView === 'overview';
 
   return (
     <div className="flex min-h-screen flex-col bg-zinc-950 light:bg-white md:h-screen md:overflow-hidden">
@@ -325,6 +337,16 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
             Checkouts is a tall interactive form, so it gets more of the
             viewport than the at-a-glance map/chart views do on mobile. */}
         <div className={`shrink-0 md:h-auto md:flex-1 md:overflow-hidden ${mobilePane}`}>
+          {mainView === 'overview' && (
+            <SiteOverview
+              event={event}
+              score={score}
+              reservations={reservations}
+              presence={presence}
+              nowMs={nowMs}
+              recentQSOs={recentQSOs}
+            />
+          )}
           {mainView === 'log'      && <LogView event={event} qsos={qsos} />}
           {mainView === 'map'      && <MapView workedSections={score.sections} />}
           {mainView === 'sections' && <SectionGrid workedSections={score.sections} />}
@@ -358,6 +380,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
         {/* No scroll of its own on a phone — it is part of the page there, and
             giving it one is what made it a peephole. The desktop pane keeps
             its own, since it sits beside the content rather than under it. */}
+        {!fullBleed && (
         <aside className="flex w-full shrink-0 flex-col gap-3 border-t border-zinc-800 bg-zinc-900 p-4 light:border-zinc-200 light:bg-zinc-50 md:w-72 md:shrink md:overflow-y-auto md:border-t-0 md:border-l">
           <div className="rounded-xl border border-zinc-800 bg-zinc-950 p-3 light:border-zinc-200 light:bg-white">
             <div className="text-xs text-zinc-500 uppercase tracking-wider mb-2">Rate</div>
@@ -499,6 +522,7 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
             <div className="text-xs text-zinc-500 mt-1">Share this with your operators</div>
           </div>
         </aside>
+        )}
       </div>
 
       {showSummary && !isSes && (

@@ -37,6 +37,12 @@ export interface SlotWords {
   /** Heading over the list of live claims. */
   nowHeading: string;
   /**
+   * One word for "somebody holds this", on a board that has no room for a
+   * sentence. The site display's band panel labels a booked-but-empty slot
+   * with it, beside the holder.
+   */
+  heldLabel: string;
+  /**
    * What to say when nothing is claimed.
    *
    * `null` on a contest, and that is the point rather than an omission: an
@@ -68,6 +74,7 @@ const SES: SlotWords = {
   blurb: 'One signal per band and mode under the shared callsign.',
   claim: (band, mode) => `Check out ${band} ${mode}`,
   nowHeading: 'On the air',
+  heldLabel: 'Checked out',
   noneHeld: 'Nobody has the call checked out.',
   nobodyHolds: (band, mode) => `Nobody holds ${band} ${mode} right now`,
   pickHint:
@@ -86,6 +93,7 @@ const CONTEST: SlotWords = {
     'One transmitted signal per band and mode. Claiming is optional — Operators below shows who is actually on air.',
   claim: (band, mode) => `Claim ${band} ${mode}`,
   nowHeading: 'Claimed now',
+  heldLabel: 'Claimed',
   noneHeld: null,
   nobodyHolds: (band, mode) => `No station has claimed ${band} ${mode}`,
   pickHint:

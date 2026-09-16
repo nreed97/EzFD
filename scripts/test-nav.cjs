@@ -259,6 +259,7 @@ console.log('\n-- slot wording is not written into a component --');
     'components/SlotCoordination.tsx',
     'components/OperatingPosition.tsx',
     'components/DashboardClient.tsx',
+    'components/SiteOverview.tsx',
   ];
   for (const file of SURFACES) {
     truthy(read(file).includes("from '@/lib/slotWords'"),
