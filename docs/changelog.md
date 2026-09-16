@@ -23,6 +23,38 @@ only run events.
 
 ---
 
+## 2026-09-16
+
+### Added
+
+- **A dashboard view to put on a screen at the site** `Display` — The new
+  **Overview** tab is laid out to be read from across a tent rather than
+  scanned: contacts, rate, claimed score and sections in large type, the
+  section map, the join code, and a board showing every band in use with which
+  modes have somebody on them, which are booked and which are free. A band
+  somebody is actually on outranks a booking, so the gaps it shows are real
+  gaps rather than paperwork. It is the one view without the side panel — it
+  prints the join code itself. ([#102])
+  Docs: [Operating → The Overview](operating.md#the-overview),
+  [Offline field servers → At the site](field-server.md#at-the-site)
+
+### Fixed
+
+- **The band breakdown silently dropped four bands on a special event**
+  `Display` — 60m, 30m, 17m and 12m are the bands only a special event can
+  log, and the **Bands** view kept its own band list that omitted all four. A
+  special event that worked 30m had those contacts logged, scored and counted
+  everywhere else, and then missing from the band table with nothing on screen
+  to say a row was gone. Contest events were never affected. ([#102])
+  Docs: [Operating → The dashboard](operating.md#the-dashboard)
+- **The dashboard ignored band claims on Field Day and Winter Field Day** —
+  It only ever fetched them for special events, because until now nothing on a
+  contest dashboard displayed one. The new Overview reads them, so a claimed
+  band would have drawn as free there. No effect on any earlier release, where
+  nothing on that screen read them. ([#102])
+
+---
+
 ## 2026-09-14
 
 ### Changed
@@ -739,3 +771,4 @@ continuous enough to be worth summarising.
 [#95]: https://github.com/nreed97/EzFD/pull/95
 [#96]: https://github.com/nreed97/EzFD/issues/96
 [#101]: https://github.com/nreed97/EzFD/pull/101
+[#102]: https://github.com/nreed97/EzFD/pull/102

@@ -299,6 +299,11 @@ the same thing from the console.
 Everything else — dupes, band coordination, the map, the score — works exactly
 as it does on a hosted instance, because it is the same server.
 
+If you have a spare monitor, put a browser on the dashboard's **Overview**: it
+shows the score, the map, the join code and which bands are free, which covers
+most of what people walk up and ask. See
+[Operating → The Overview](operating.md#the-overview).
+
 ---
 
 ## Afterwards: merging back

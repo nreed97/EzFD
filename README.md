@@ -62,6 +62,12 @@ the server is at the site. Even the section map draws in full — the coastlines
 under it ship with the app, so nothing is fetched from a tile service. It comes
 back on its own after a power cut.
 
+**A screen for the site.** The dashboard's **Overview** is built to be read
+from across a tent: score and rate in large type, the section map, the join
+code, and a band board showing which band and mode each operator is on, which
+are booked, and which are free. Somebody on the air outranks a booking, so the
+gaps it shows are real gaps.
+
 **One log, even when the event ran in two places.** A whole event exports as
 JSON — settings, contacts, roster, checkout history — and imports either as a
 new event or *merged into* one that already exists. That second mode is for

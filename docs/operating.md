@@ -260,6 +260,8 @@ through it, Enter opens an entry, and focus returns to **☰** when it closes.
 
 A separate read-only view for a second screen. It opens on the **Log**:
 
+- **Overview** — the one to put on a screen at the site: score, map, join code
+  and which bands are free
 - **Log** — every contact, filterable, with the columns you choose
 - **Map** — worked sections plotted geographically
 - **Sections** / **Needed** — grid of sections worked and the hunt list
@@ -270,6 +272,56 @@ A separate read-only view for a second screen. It opens on the **Log**:
 
 Special events show Log, Rate, Bands, Operators and a live **On The Air**
 list instead of the section-based views, which don't apply.
+
+### The Overview
+
+![The dashboard Overview: contacts, rate, claimed score and sections across the top; the section map filling the left; the join code in large type and a band board showing which band and mode each operator is on, which are booked and which are free](images/overview.png)
+
+The view for a monitor in the tent. Everything else on the dashboard answers a
+question somebody asked; this one is for the person who walked past and has not
+asked anything, so it is laid out to be read from a few feet away rather than
+scanned.
+
+Four things, and nothing else:
+
+- **The figures across the top** — contacts, the rolling-hour rate, the claimed
+  score and sections worked. A special event has no contest score, so it shows
+  contacts split by mode instead.
+- **The map**, so the shape of what you have worked is visible without
+  counting. Special events don't have one.
+- **The join code**, large. It is the most-asked question at a site and the
+  usual reason a screen goes up at all.
+- **The band board** — every band in use, each with its three modes.
+
+**The band board is the part worth explaining.** Each cell is a band and a
+mode, and it is one of three things:
+
+| Cell | Means |
+|---|---|
+| **Green**, with a callsign | Somebody's logging window says they are on it right now |
+| **Amber**, with a holder and a time | Booked, but nobody is there yet |
+| **Grey**, *free* | Nobody has it and nobody is on it |
+
+**Somebody being on the air outranks the booking.** A band that is both
+claimed and occupied shows green with whoever is actually there, because the
+question this view answers is *where are the gaps* — and a band with an
+operator on it is not a gap, whatever the checkout board says. The claim is
+still there; it is simply not the useful fact at that moment.
+
+Bands nobody has touched and nobody has booked are left out, so the board stays
+short enough to read. At the start of an event, when that is every band, the
+first few are shown anyway rather than leaving an empty panel. The line above
+the board — *3 on air · 1 claimed · 11 free* — counts the rows you can see.
+
+On a contest, claiming a band is optional, so most cells read *free* even at a
+busy site; green is the honest picture there, because it comes from operators'
+logging windows rather than from anybody remembering to book a slot. On a
+special event, where the checkout is how the shared callsign is handed around,
+the amber cells are the roster.
+
+**This is the one view without the side panel.** It prints the join code
+itself, and having the same code twice on one screen is how a reader ends up
+trusting neither copy.
 
 **On a phone the dashboard is one scrolling page.** The tabs stay pinned at
 the top as you scroll, and the score, bonuses, sections worked, operators and

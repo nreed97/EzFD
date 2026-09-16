@@ -1,8 +1,11 @@
 'use client';
 
-import type { Score, Band } from '@/lib/types';
-
-const BAND_ORDER: Band[] = ['160m','80m','40m','20m','15m','10m','6m','2m','1.25m','70cm','SAT'];
+import type { Score } from '@/lib/types';
+// The band order is lib/bands.ts's, not a copy. The copy that used to live
+// here was missing 60m, 30m, 17m and 12m -- the four only a special event can
+// log -- so an SES that worked 30m had those contacts scored and counted and
+// then dropped from this table, with nothing on screen to say a row was gone.
+import { BAND_ORDER } from '@/lib/bands';
 
 interface Props {
   score: Score;

@@ -133,6 +133,14 @@ jobs:
       - name: Map label placement tests
         run: node scripts/test-map-labels.cjs
 
+      # The site display tells whoever is standing in front of it which bands
+      # are free. Getting that wrong sends an operator to a band somebody is
+      # already on, or hides one that is genuinely open — and the rule that
+      # prevents it (somebody on the air outranks a booking) is a one-line
+      # ordering nothing else would notice being reversed.
+      - name: Site overview tests
+        run: node scripts/test-overview.cjs
+
       # The changelog points a reader at the guide for each change. A link to a
       # renamed section resolves to the top of the page instead — invisible in
       # a diff, and nothing else here would catch it.
