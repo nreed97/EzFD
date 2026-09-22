@@ -2,7 +2,8 @@
 
 ## Local setup
 
-Requirements: Node 22+, PostgreSQL 16.
+Requirements: Node 24 (the major in `.nvmrc` — CI and `deploy.sh` both read it
+from there), PostgreSQL 16.
 
 ```bash
 $ git clone https://github.com/nreed97/EzFD.git

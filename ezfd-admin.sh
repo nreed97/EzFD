@@ -1031,6 +1031,19 @@ update_app() {
     pause; return
   fi
 
+  # This action rebuilds on whatever Node is installed; only deploy.sh installs
+  # one. Read after the pull, so a raised floor in .nvmrc is seen the same run.
+  # A warning rather than a stop: the build still works on an older Node, and
+  # refusing would leave the server on the old code as well as the old Node.
+  local want_node="" have_node=""
+  want_node="$(tr -d '[:space:]v' < "$REPO_DIR/.nvmrc" 2>/dev/null || true)"
+  have_node="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || true)"
+  if [[ "$want_node" =~ ^[0-9]+$ && "$have_node" =~ ^[0-9]+$ && "$have_node" -lt "$want_node" ]]; then
+    warn "This server runs Node.js ${have_node}; EzFD is built and tested on ${want_node}."
+    echo -e "  ${DIM}Re-run deploy.sh from ${REPO_DIR} to upgrade it — an update keeps all data.${NC}"
+    echo
+  fi
+
   echo -e "  ${DIM}Installing dependencies…${NC}"
   if ! (cd "$REPO_DIR" && npm ci --silent 2>&1 | sed 's/^/    /'); then
     err "npm ci failed."; pause; return

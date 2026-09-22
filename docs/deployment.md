@@ -37,7 +37,7 @@ quietly wrong, particularly while the app is changing quickly.
 Deploying by hand on another distribution is not difficult, and the script
 prints this shape when it stops:
 
-- Node 20+, PostgreSQL, nginx, rsync and openssl from your package manager.
+- Node 24+, PostgreSQL, nginx, rsync and openssl from your package manager.
   On Fedora and RHEL the cluster needs `postgresql-setup --initdb` first; on
   Arch, `initdb` as the `postgres` user
 - Create the role and database, then apply `db/schema.sql` **once**. It is
@@ -81,7 +81,7 @@ generated automatically and stored in `/opt/ezfd/.env`.
 
 | Component | Detail |
 |---|---|
-| Node.js | Current LTS |
+| Node.js | The major in `.nvmrc` (24 LTS), from NodeSource — amd64 and arm64 only |
 | PostgreSQL | Database `ezfd`, role `ezfd` with DML-only grants |
 | nginx | Reverse proxy, with SSE buffering disabled |
 | certbot | TLS certificate and automatic renewal |
@@ -120,8 +120,16 @@ Re-running detects the existing install and preserves the domain, certificate
 email, database password, encryption key and admin key. It re-applies the
 schema, rebuilds, and restarts.
 
+An update also brings Node.js up to the major in `.nvmrc` if the server is
+running an older one. Servers installed before this was added were left on
+Node 20 through every redeploy, and Node 20 stopped receiving security fixes in
+April 2026; re-running `deploy.sh` once moves them to Node 24. A newer Node is
+left alone.
+
 You can also update from the admin console — **Update application** does the
-same `git pull`, rebuild and restart.
+same `git pull`, rebuild and restart, but it does not install Node. If the
+server is below the version in `.nvmrc` it says so and carries on; re-run
+`deploy.sh` to upgrade.
 
 > **The rsync that deploys the build must keep `--exclude='.env'`.** Without
 > it, `rsync --delete` wipes the live secrets file on every redeploy. This is
