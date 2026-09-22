@@ -36,9 +36,9 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -207,9 +207,9 @@ jobs:
         ports:
           - 5432:5432
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version-file: .nvmrc
           cache: npm
@@ -248,7 +248,7 @@ jobs:
   shell:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       # deploy.sh and ezfd-admin.sh are long, interactive, and otherwise
       # unvalidated — a syntax error would only surface on a live server.

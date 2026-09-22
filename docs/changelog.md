@@ -25,6 +25,13 @@ only run events.
 
 ## 2026-09-22
 
+### Changed
+
+- **CI actions moved to their current major versions** — `actions/checkout`
+  and `actions/setup-node` go from v4 to v6. v4 runs on GitHub's Node 20
+  runtime, which is being retired, and would eventually have stopped CI from
+  running at all.
+
 ### Fixed
 
 - **Servers left on Node.js 20 through every update** `Setup` — `deploy.sh`

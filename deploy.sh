@@ -13,9 +13,9 @@
 # Usage (run from the root of the cloned repository):
 #   sudo bash deploy.sh
 #
-# Re-running the script performs an in-place update: packages already
-# installed are skipped, the app is rebuilt and redeployed, and the
-# service is restarted. No data is lost.
+# Re-running the script performs an in-place update: system packages are
+# skipped (except Node.js, which is upgraded if it is older than .nvmrc), the
+# app is rebuilt and redeployed, and the service is restarted. No data is lost.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 IFS=$'\n\t'
@@ -55,11 +55,9 @@ NODE_MAJOR="$(tr -d '[:space:]v' < .nvmrc 2>/dev/null || true)"
 [[ "$NODE_MAJOR" =~ ^[0-9]+$ ]] || die ".nvmrc is missing or does not hold a Node major version."
 
 # Debian and Ubuntu (and derivatives, which declare it in ID_LIKE) get the
-# automatic package install below. Anything else is still supported and is not
-# a hard failure: a field server is often whatever hardware a club already has,
-# an old laptop running something else included. On those the script installs
-# nothing and checks the prerequisites are present instead, which is a far more
-# useful answer than refusing to run on a machine that is perfectly capable.
+# automatic package install below. Anything else is refused a little further
+# down, before a single question is asked — see the comment there for why. This
+# block only decides which case the machine is.
 # OS_RELEASE is overridable so scripts/test-deploy-detect.sh can drive this
 # block with real /etc/os-release files from distros this machine is not.
 OS_RELEASE="${OS_RELEASE:-/etc/os-release}"
