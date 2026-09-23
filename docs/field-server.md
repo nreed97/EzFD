@@ -85,9 +85,10 @@ the RAM size does.
 ### Updating later
 
 Re-running `deploy.sh` on a machine that already has EzFD is an *update*, and
-it skips the entire package-install block — no apt, no NodeSource, no PGDG. It
-still runs `npm ci` and `next build`, so an update needs the network even
-though running does not. Update at home, between events, not at the site.
+it skips the package-install block — no PGDG, no nginx. The one package it may
+touch is Node.js: a server older than the major in `.nvmrc` is upgraded from
+NodeSource. It still runs `npm ci` and `next build`, so an update needs the
+network even though running does not. Update at home, between events, not at the site.
 
 ---
 

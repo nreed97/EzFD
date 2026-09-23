@@ -435,7 +435,9 @@ Field reference in [API → `POST /api/import/event`](api.md#post-apiimportevent
 
 **Update application** runs `git pull` in `EZFD_REPO_DIR`, rebuilds, and
 restarts the service — the same work `deploy.sh` does, without re-checking the
-system packages.
+system packages. That includes Node.js: if the server runs an older major than
+the repository's `.nvmrc`, the action warns and builds anyway, and re-running
+`deploy.sh` is what upgrades it.
 
 If `EZFD_REPO_DIR` isn't set in `/opt/ezfd/.env`, the action can't find the
 source. Add it, or re-run `deploy.sh`, which writes it.

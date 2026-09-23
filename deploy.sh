@@ -13,9 +13,9 @@
 # Usage (run from the root of the cloned repository):
 #   sudo bash deploy.sh
 #
-# Re-running the script performs an in-place update: packages already
-# installed are skipped, the app is rebuilt and redeployed, and the
-# service is restarted. No data is lost.
+# Re-running the script performs an in-place update: system packages are
+# skipped (except Node.js, which is upgraded if it is older than .nvmrc), the
+# app is rebuilt and redeployed, and the service is restarted. No data is lost.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 IFS=$'\n\t'
@@ -48,12 +48,16 @@ confirm() {
 [[ $EUID -ne 0 ]] && die "Run with root privileges: sudo bash deploy.sh"
 [[ ! -f "package.json" ]] && die "Must be run from the root of the EzFD repository."
 
+# The Node major this app is built, tested and run on. .nvmrc is the one place
+# it is written: CI reads it too, so a server can't be put on a Node version CI
+# never ran. It is a floor, not a pin — a newer major is left alone.
+NODE_MAJOR="$(tr -d '[:space:]v' < .nvmrc 2>/dev/null || true)"
+[[ "$NODE_MAJOR" =~ ^[0-9]+$ ]] || die ".nvmrc is missing or does not hold a Node major version."
+
 # Debian and Ubuntu (and derivatives, which declare it in ID_LIKE) get the
-# automatic package install below. Anything else is still supported and is not
-# a hard failure: a field server is often whatever hardware a club already has,
-# an old laptop running something else included. On those the script installs
-# nothing and checks the prerequisites are present instead, which is a far more
-# useful answer than refusing to run on a machine that is perfectly capable.
+# automatic package install below. Anything else is refused a little further
+# down, before a single question is asked — see the comment there for why. This
+# block only decides which case the machine is.
 # OS_RELEASE is overridable so scripts/test-deploy-detect.sh can drive this
 # block with real /etc/os-release files from distros this machine is not.
 OS_RELEASE="${OS_RELEASE:-/etc/os-release}"
@@ -93,7 +97,7 @@ if [[ "$APT_OS" == "false" ]]; then
   warn "EzFD itself runs anywhere — it is a Node standalone build against"
   warn "PostgreSQL, behind any reverse proxy. What is Debian-specific is this"
   warn "script. To deploy by hand, the shape is:"
-  warn "  • Node 20+, PostgreSQL, nginx, rsync, openssl from your package manager"
+  warn "  • Node ${NODE_MAJOR}+, PostgreSQL, nginx, rsync, openssl from your package manager"
   warn "  • createuser/createdb, then apply db/schema.sql once — it is complete,"
   warn "    and the migrations in this script are only for upgrading older installs"
   warn "  • npm ci && npm run build, then run .next/standalone/server.js"
@@ -211,14 +215,6 @@ if [[ "$UPDATING" == "false" && "$APT_OS" == "true" ]]; then
   # Core utilities
   apt-get install -y -qq curl ca-certificates gnupg lsb-release rsync git ufw >/dev/null
 
-  # ── Node.js 20 (NodeSource) ───────────────────────────────────────────────
-  if ! node --version 2>/dev/null | grep -q '^v20'; then
-    info "Installing Node.js 20..."
-    curl -fsSL https://deb.nodesource.com/setup_20.x | bash - >/dev/null 2>&1
-    apt-get install -y -qq nodejs >/dev/null
-  fi
-  log "Node.js $(node -v)"
-
   # ── PostgreSQL (PGDG preferred; falls back to distro default) ────────────
   if ! command -v psql &>/dev/null; then
     info "Installing PostgreSQL..."
@@ -259,6 +255,29 @@ https://apt.postgresql.org/pub/repos/apt ${DISTRO_CODENAME}-pgdg main" \
   ufw --force enable         >/dev/null 2>&1
   log "Firewall: SSH + HTTP(S) allowed, all else blocked"
 
+fi
+
+# ── Node.js (NodeSource) — on updates too ────────────────────────────────────
+# Outside the fresh-install block on purpose. Inside it, a server installed on
+# Node 20 stayed on Node 20 through every redeploy — past its end of life — and
+# the old check (`grep '^v20'`) also treated a newer Node as missing. A server
+# below NODE_MAJOR is moved up to it here; the build below then runs on the new
+# Node and the service restart picks it up. An update already needs the network
+# for `npm ci`, so this adds no new dependency on it.
+if [[ "$APT_OS" == "true" ]]; then
+  CUR_NODE_MAJOR="$(node -p 'process.versions.node.split(".")[0]' 2>/dev/null || echo 0)"
+  if [[ ! "$CUR_NODE_MAJOR" =~ ^[0-9]+$ ]] || [[ "$CUR_NODE_MAJOR" -lt "$NODE_MAJOR" ]]; then
+    if [[ "$CUR_NODE_MAJOR" == "0" ]]; then
+      info "Installing Node.js ${NODE_MAJOR}..."
+    else
+      info "Upgrading Node.js ${CUR_NODE_MAJOR} → ${NODE_MAJOR}..."
+    fi
+    curl -fsSL "https://deb.nodesource.com/setup_${NODE_MAJOR}.x" | bash - >/dev/null 2>&1 \
+      || die "Could not add the NodeSource repository for Node.js ${NODE_MAJOR} (it publishes for amd64 and arm64 only)."
+    apt-get install -y -qq nodejs >/dev/null \
+      || die "Could not install Node.js ${NODE_MAJOR}."
+  fi
+  log "Node.js $(node -v)"
 fi
 
 # ── System user ───────────────────────────────────────────────────────────────
