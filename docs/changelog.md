@@ -40,7 +40,7 @@ only run events.
   `systemctl restart ezfd` sat on "Configuring systemd service" until systemd
   force-killed it at 90 seconds. The server now ends its live-update streams
   when asked to stop and restarts in a second or two; open tabs reconnect by
-  themselves and send anything they logged in the gap.
+  themselves and send anything they logged in the gap. ([#104])
   Docs: [Deployment → Service management](deployment.md#service-management),
   [Architecture → Real-time updates](architecture.md#real-time-updates)
 - **Servers left on Node.js 20 through every update** `Setup` — `deploy.sh`
@@ -815,3 +815,4 @@ continuous enough to be worth summarising.
 [#101]: https://github.com/nreed97/EzFD/pull/101
 [#102]: https://github.com/nreed97/EzFD/pull/102
 [#103]: https://github.com/nreed97/EzFD/pull/103
+[#104]: https://github.com/nreed97/EzFD/pull/104
