@@ -3,6 +3,24 @@ import { Client } from 'pg';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// Every open stream, so a shutdown can end them. Next's SIGTERM handler closes
+// the HTTP server and waits for each connection to finish — and an SSE stream
+// never finishes while a tab is open, so `systemctl restart ezfd` sat there
+// until systemd gave up and SIGKILLed at 90s, on every deploy. Ending the
+// streams lets the close complete in milliseconds; each browser sees its
+// stream drop, reconnects once the new process is up, and drains its offline
+// queue on that reconnect, as it does after any outage.
+// Held on globalThis so a dev reload of this module can't stack handlers or
+// strand the streams opened before it.
+const g = globalThis as { __ezfdOpenStreams?: Set<() => void> };
+const openStreams = g.__ezfdOpenStreams ?? new Set<() => void>();
+if (!g.__ezfdOpenStreams) {
+  g.__ezfdOpenStreams = openStreams;
+  for (const signal of ['SIGTERM', 'SIGINT'] as const) {
+    process.once(signal, () => { for (const end of openStreams) end(); });
+  }
+}
+
 export async function GET(
   request: Request,
   { params }: { params: Promise<{ eventId: string }> }
@@ -19,9 +37,12 @@ export async function GET(
   let keepaliveId: ReturnType<typeof setInterval> | null = null;
   let closed = false;
 
+  let endStream: (() => void) | null = null;
+
   function cleanup() {
     if (closed) return;
     closed = true;
+    if (endStream) openStreams.delete(endStream);
     if (keepaliveId) clearInterval(keepaliveId);
     if (pgClient) {
       pgClient.query('UNLISTEN *').finally(() => pgClient!.end()).catch(() => {});
@@ -30,6 +51,11 @@ export async function GET(
 
   const stream = new ReadableStream({
     async start(controller) {
+      endStream = () => {
+        cleanup();
+        try { controller.close(); } catch { /* already closed */ }
+      };
+      openStreams.add(endStream);
       pgClient = new Client({ connectionString: process.env.DATABASE_URL });
 
       try {

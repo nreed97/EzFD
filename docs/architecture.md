@@ -55,6 +55,13 @@ Consequences:
   `X-Accel-Buffering: no`; the deployed nginx config disables buffering too.
 - The stream sends a keepalive comment every 25 seconds so proxies don't time
   it out.
+- A stream never finishes on its own, so it has to be ended on shutdown. Next
+  closes the HTTP server on `SIGTERM` and waits for every connection to
+  finish, and one open tab used to hold a restart until systemd force-killed
+  the process at 90 seconds. The route keeps a set of its open streams and ends
+  them all on `SIGTERM`, so the process exits in well under a second. Each
+  browser sees its stream drop and reconnects once the new process is up, which
+  is also the signal that drains its offline queue.
 
 ## Offline tolerance
 
