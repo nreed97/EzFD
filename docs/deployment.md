@@ -170,6 +170,13 @@ arrive in bursts, or not at all.
 # journalctl -u ezfd -f
 ```
 
+A restart takes a second or two, even with operators logging. The app ends
+its live-update streams when told to stop, so open tabs don't hold the old
+process up; they drop, reconnect to the new one within a few seconds, and send
+anything they queued in between. If `systemctl restart ezfd` ever sits for
+15 seconds, that is the unit's `TimeoutStopSec` force-stopping something that
+did not exit — worth a look in `journalctl -u ezfd`.
+
 ## Running the database elsewhere
 
 Point `DATABASE_URL` at any reachable PostgreSQL 16 and apply `db/schema.sql`

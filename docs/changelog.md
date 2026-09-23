@@ -34,6 +34,15 @@ only run events.
 
 ### Fixed
 
+- **Restarting the server took a minute and a half** `Setup` — Any browser
+  with the logger or dashboard open held the old process up, so every
+  `deploy.sh` run, every **Update application** and every
+  `systemctl restart ezfd` sat on "Configuring systemd service" until systemd
+  force-killed it at 90 seconds. The server now ends its live-update streams
+  when asked to stop and restarts in a second or two; open tabs reconnect by
+  themselves and send anything they logged in the gap.
+  Docs: [Deployment → Service management](deployment.md#service-management),
+  [Architecture → Real-time updates](architecture.md#real-time-updates)
 - **Servers left on Node.js 20 through every update** `Setup` — `deploy.sh`
   only installed Node on a fresh install, so a server set up earlier stayed on
   Node 20 however often it was redeployed, and Node 20 stopped receiving

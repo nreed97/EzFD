@@ -497,6 +497,10 @@ EnvironmentFile=$APP_DIR/.env
 ExecStart=$(command -v node) $APP_DIR/server.js
 Restart=on-failure
 RestartSec=5
+# The app ends its own SSE streams on SIGTERM and exits in well under a second.
+# This is only the backstop if something else ever holds shutdown open —
+# systemd's default is 90s, which is what every restart used to wait out.
+TimeoutStopSec=15
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=ezfd
