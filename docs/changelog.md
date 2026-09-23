@@ -30,7 +30,7 @@ only run events.
 - **CI actions moved to their current major versions** — `actions/checkout`
   and `actions/setup-node` go from v4 to v6. v4 runs on GitHub's Node 20
   runtime, which is being retired, and would eventually have stopped CI from
-  running at all.
+  running at all. ([#103])
 
 ### Fixed
 
@@ -41,6 +41,7 @@ only run events.
   below Node 24 up to it, and the admin console's **Update application** warns
   when the server is behind. CI and `deploy.sh` now both read the version from
   `.nvmrc`, so a server can no longer run a Node release that CI never tested.
+  ([#103])
   Docs: [Deployment → Updating](deployment.md#updating),
   [Offline field servers → Updating later](field-server.md#updating-later),
   [Administration → Updating the application](administration.md#updating-the-application)
@@ -50,7 +51,7 @@ only run events.
 - **Next.js 16.3.6** `Setup` — Fixes two critical remote code execution
   advisories in 16.3.2, one of them in the image optimisation endpoint that
   every install serves, plus a high-severity flaw in the `sharp` image library
-  it bundles. Anyone with a server reachable from the internet should update.
+  it bundles. Anyone with a server reachable from the internet should update. ([#103])
   Docs: [Deployment → Updating](deployment.md#updating)
 
 ---
@@ -804,3 +805,4 @@ continuous enough to be worth summarising.
 [#96]: https://github.com/nreed97/EzFD/issues/96
 [#101]: https://github.com/nreed97/EzFD/pull/101
 [#102]: https://github.com/nreed97/EzFD/pull/102
+[#103]: https://github.com/nreed97/EzFD/pull/103
