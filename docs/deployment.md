@@ -372,8 +372,8 @@ reconnect and send anything they queued.
 
 ### What is different under Docker
 
-- **The admin console runs on the host**, from the checkout. It finds the
-  `db` container through `compose.yaml` and otherwise works as it does on a
+- **The admin console runs on the host**, from any folder. It finds the
+  `ezfd-db` container by name and otherwise works as it does on a
   `deploy.sh` install. See
   [Administration → On a Docker install](administration.md#on-a-docker-install).
 - **The clock belongs to the host.** Containers share the host's clock, so it
