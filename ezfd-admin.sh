@@ -5,6 +5,11 @@
 # Usage:
 #   sudo bash ezfd-admin.sh            interactive menu
 #   sudo bash ezfd-admin.sh --json     dump all data as JSON (stdout, pipeable)
+#
+# Works on both installs. On a deploy.sh install it is copied to /opt/ezfd
+# and talks to the local PostgreSQL. On a Docker Compose install it runs on
+# the host from the checkout beside compose.yaml and reaches the database
+# through the `db` container — see "Which install this is" below.
 # ─────────────────────────────────────────────────────────────────────────────
 set -uo pipefail
 IFS=$'\n\t'
@@ -24,6 +29,47 @@ warn()  { echo -e "  ${YELLOW}[!]${NC} $*"; }
 err()   { echo -e "  ${RED}[✗]${NC} $*" >&2; }
 pause() { read -rp "$(echo -e "\n  ${DIM}Press Enter to continue…${NC}")" _; }
 
+# ── Which install this is ─────────────────────────────────────────────────────
+# A Docker Compose install is recognised by its running `db` container, found
+# from the compose.yaml beside this script. A deploy.sh install copies this
+# script to /opt/ezfd, where there is no compose.yaml, so it never matches —
+# and a checkout on a systemd server that merely contains compose.yaml has no
+# such container. EZFD_INSTALL=docker|systemd overrides the guess.
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+COMPOSE_FILE="$SCRIPT_DIR/compose.yaml"
+INSTALL="${EZFD_INSTALL:-}"
+if [[ -z "$INSTALL" ]]; then
+  INSTALL="systemd"
+  if [[ -f "$COMPOSE_FILE" ]] && command -v docker >/dev/null 2>&1 \
+     && [[ -n "$(docker compose -f "$COMPOSE_FILE" ps -q db 2>/dev/null)" ]]; then
+    INSTALL="docker"
+  fi
+fi
+
+# psql as the database superuser, on either install. Everything that talks
+# to the database goes through this, so the two installs differ here rather
+# than at every call site. -T because a TTY would mangle the rows and the
+# heredocs fed on stdin.
+#
+# A -c query gets /dev/null for stdin, and that is not tidiness. psql -c never
+# reads stdin, but `docker compose exec` forwards it regardless — so every
+# query run under a menu swallowed the operator's next answers, and one inside
+# a `while read … <<< "$rows"` loop would eat the rows it was looping over.
+if [[ "$INSTALL" == "docker" ]]; then
+  psql_su() {
+    local a=""
+    for a in "$@"; do
+      if [[ "$a" == "-c" ]]; then
+        docker compose -f "$COMPOSE_FILE" exec -T db psql -U postgres "$@" < /dev/null
+        return
+      fi
+    done
+    docker compose -f "$COMPOSE_FILE" exec -T db psql -U postgres "$@"
+  }
+else
+  psql_su() { sudo -u postgres psql "$@"; }
+fi
+
 # ── Database ──────────────────────────────────────────────────────────────────
 DB="ezfd"
 
@@ -33,11 +79,11 @@ DB="ezfd"
 # so a club called "Pipe|Name Club" shifted every column of the event table
 # one field to the right and printed the created date under "Class".
 FS=$'\x1f'
-PG()  { sudo -u postgres psql -d "$DB" -tAX -F "$FS" "$@"; }
+PG()  { psql_su -d "$DB" -tAX -F "$FS" "$@"; }
 
 # Same, but a SQL error makes psql exit non-zero instead of being reported as
 # success. Use it for anything whose failure must not be announced as done.
-PGS() { sudo -u postgres psql -d "$DB" -tAX -F "$FS" -v ON_ERROR_STOP=1 "$@"; }
+PGS() { psql_su -d "$DB" -tAX -F "$FS" -v ON_ERROR_STOP=1 "$@"; }
 
 # Quote a value for interpolation into a SQL string literal. Everything here
 # runs as the postgres superuser, so a stray apostrophe in a callsign or a
@@ -63,7 +109,11 @@ esac
 
 if ! PG -c "SELECT 1" &>/dev/null; then
   err "Cannot connect to the ezfd database. Is PostgreSQL running?"
-  echo -e "    Try: systemctl start postgresql" >&2
+  if [[ "$INSTALL" == "docker" ]]; then
+    echo -e "    Try: docker compose -f $COMPOSE_FILE up -d" >&2
+  else
+    echo -e "    Try: systemctl start postgresql" >&2
+  fi
   exit 1
 fi
 
@@ -332,17 +382,22 @@ view_event_once() {
   case "$choice" in
     1) # CSV export
        local file="/tmp/qsos_${code}.csv"
-       local out=""
        # Every one of these used to log success unconditionally, so a full
        # disk or a permission error still printed "Exported to …" over an
        # empty file the operator would then take away as their log.
-       if out=$(sudo -u postgres psql -d "$DB" -v ON_ERROR_STOP=1 -c \
-         "\COPY (SELECT * FROM qsos WHERE event_id='$uuid' AND deleted_at IS NULL ORDER BY datetime_utc) TO '${file}' CSV HEADER" \
-         2>&1); then
+       # TO STDOUT and redirected here, rather than \COPY TO a path: on a
+       # Docker install psql runs inside the db container, so a path would
+       # name a file in there that the operator never sees.
+       local errf=""; errf=$(mktemp)
+       if psql_su -d "$DB" -v ON_ERROR_STOP=1 -c \
+         "\COPY (SELECT * FROM qsos WHERE event_id='$uuid' AND deleted_at IS NULL ORDER BY datetime_utc) TO STDOUT CSV HEADER" \
+         > "$file" 2>"$errf"; then
          log "Exported to ${file}"
        else
-         err "CSV export failed:"; echo "$out" >&2
+         err "CSV export failed:"; cat "$errf" >&2
+         rm -f "$file"
        fi
+       rm -f "$errf"
        pause ;;
 
     2) # JSON backup
@@ -990,9 +1045,73 @@ restore_from_json() {
 }
 
 # ─────────────────────────────────────────────────────────────────────────────
+# Update application, Docker Compose install (git pull → build → up)
+#
+# The same order as the systemd path: build while the old container keeps
+# serving, apply the schema, and only then replace the app. The schema step is
+# run on its own first, with `run --rm init`, and that is deliberate. Left to
+# `up`, compose stops the old app *before* the init service it depends on has
+# finished, so a schema error left the site returning 502 — measured, not
+# assumed. Run separately, a failure stops here with the old app still
+# serving, as the systemd path refuses to rsync over a failed migration. `up`
+# then runs init a second time, which is harmless: the schema is idempotent.
+# ─────────────────────────────────────────────────────────────────────────────
+update_app_docker() {
+  banner
+  echo -e "  ${BOLD}Update Application${NC}  ${DIM}(Docker Compose)${NC}"
+  echo
+  hr
+
+  label "Repo:"; echo "$SCRIPT_DIR"
+  local cur_commit; cur_commit=$(git -C "$SCRIPT_DIR" log --oneline -1 2>/dev/null || echo "(unknown)")
+  label "Current:"; echo "$cur_commit"
+  echo
+
+  echo -e "  ${DIM}Fetching latest changes from remote…${NC}"
+  if ! git -C "$SCRIPT_DIR" pull 2>&1 | sed 's/^/    /'; then
+    err "git pull failed — check your network or repo state."
+    pause; return
+  fi
+
+  local new_commit; new_commit=$(git -C "$SCRIPT_DIR" log --oneline -1 2>/dev/null || echo "(unknown)")
+  label "Updated to:"; echo "$new_commit"
+  echo
+
+  if [[ "$cur_commit" == "$new_commit" ]]; then
+    warn "Already up to date — no rebuild needed."
+    pause; return
+  fi
+
+  echo -e "  ${DIM}Building the image (the running app is untouched)…${NC}"
+  if ! docker compose -f "$COMPOSE_FILE" build 2>&1 | sed 's/^/    /'; then
+    err "Build failed — nothing has been deployed."; pause; return
+  fi
+
+  echo -e "  ${DIM}Applying database migrations…${NC}"
+  local migrate_out=""
+  if ! migrate_out=$(docker compose -f "$COMPOSE_FILE" run --rm init 2>&1); then
+    err "Database migration failed — nothing has been deployed."
+    echo "$migrate_out" | tail -20 >&2
+    echo -e "  ${DIM}The running app is untouched. Fix the schema error and re-run.${NC}"
+    pause; return
+  fi
+
+  echo -e "  ${DIM}Replacing the app…${NC}"
+  if ! docker compose -f "$COMPOSE_FILE" up -d 2>&1 | sed 's/^/    /'; then
+    err "The new app did not start. Check: docker compose -f $COMPOSE_FILE logs app"
+    pause; return
+  fi
+
+  log "Update complete."
+  echo -e "  ${DIM}Logs: docker compose -f $COMPOSE_FILE logs -f app${NC}"
+  pause
+}
+
+# ─────────────────────────────────────────────────────────────────────────────
 # Update application (git pull → build → rsync → migrate → restart)
 # ─────────────────────────────────────────────────────────────────────────────
 update_app() {
+  if [[ "$INSTALL" == "docker" ]]; then update_app_docker; return; fi
   banner
   echo -e "  ${BOLD}Update Application${NC}"
   echo

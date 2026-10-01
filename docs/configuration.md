@@ -1,7 +1,10 @@
 # Configuration
 
-Every environment variable EzFD reads. In a normal install these live in
-`/opt/ezfd/.env`, written by `deploy.sh` and read by the systemd unit.
+Every environment variable EzFD reads. On a `deploy.sh` install these live in
+`/opt/ezfd/.env`, written by `deploy.sh` and read by the systemd unit. On a
+Docker Compose install they live in `.env` beside `compose.yaml`, in a
+slightly different shape — see
+[The Docker Compose .env](#the-docker-compose-env).
 
 ## Required
 
@@ -72,6 +75,33 @@ Override where `MASTER.SCP` is fetched from. Unlike the call history file this
 one is evergreen — not year-specific — and is shared across every event on the
 server, refreshed at most once a day.
 
+## The Docker Compose .env
+
+`compose.yaml` reads `.env` from the same directory and builds the app's
+environment from it. You write this file yourself; nothing generates it. The
+first three are required, and `docker compose` refuses to start without them,
+naming the one that is missing.
+
+| Variable | What it is |
+|---|---|
+| `POSTGRES_PASSWORD` | The database superuser's password. Used by the `db` container and by the `init` step that applies the schema; the app never sees it |
+| `EZFD_DB_PASSWORD` | The `ezfd` role's password. The `init` step sets it on every start and compose builds `DATABASE_URL` from it, so there is no `DATABASE_URL` to write |
+| `EZFD_ENCRYPTION_KEY` | As [above](#ezfd_encryption_key). 64 hex characters |
+| `EZFD_ADMIN_KEY` | As [above](#ezfd_admin_key). Optional |
+| `EZFD_DOMAIN` | The domain Caddy obtains a certificate for. Blank serves plain HTTP on port 80 |
+| `EZFD_HTTP_PORT`, `EZFD_HTTPS_PORT` | The host ports Caddy listens on, 80 and 443 by default. A certificate needs both at their defaults |
+
+The call history and `MASTER.SCP` overrides work here too, under the same
+names. `EZFD_CERT_EMAIL` and `EZFD_REPO_DIR` are `deploy.sh`'s and are not
+used.
+
+Generate the secrets with `openssl rand -hex`, as
+[Deployment → First install with Docker](deployment.md#first-install-with-docker)
+shows. Changing `EZFD_DB_PASSWORD` later is fine, since `init` re-applies it on
+the next start. Changing `POSTGRES_PASSWORD` after the first start is not: the
+`db` container only reads it when it creates the database, so the new value
+stops matching and `init` fails to connect.
+
 ## The WSJT-X relay
 
 These are read by `wsjtx-bridge.cjs`, which runs on the *operator's* machine,
@@ -97,10 +127,19 @@ See [Digital modes](digital-modes.md).
 
 The service reads the file at start, so a restart is required.
 
+On a Docker install, edit `.env` beside `compose.yaml` and recreate the
+containers, which a plain restart does not do:
+
+```bash
+$ docker compose up -d
+```
+
 ## Security notes
 
 `/opt/ezfd/.env` holds the database password, the encryption key and the admin
-key. It should be readable only by the service user.
+key. It should be readable only by the service user. The Docker `.env` holds
+the same and more, so `chmod 600` it; `.dockerignore` keeps it out of the
+image.
 
 QRZ passwords are encrypted at rest with `EZFD_ENCRYPTION_KEY` and never
 returned by the API — the event endpoint omits the column entirely.

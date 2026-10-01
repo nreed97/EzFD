@@ -9,6 +9,8 @@
 #             two instances of one event back into a single log
 #   shell   — syntax-checks the shell scripts, gates on shellcheck, and
 #             verifies the two rig-bridge copies haven't drifted
+#   docker  — builds the Compose install from scratch, then runs the live
+#             stack checks and the end-to-end API flow through its proxy
 
 name: CI
 
@@ -302,3 +304,37 @@ jobs:
       # dies half-written, or refuse a Debian derivative that would have worked.
       - name: deploy.sh distro detection
         run: bash scripts/test-deploy-detect.sh
+
+  # The Docker Compose install is a second way to run the same app, and a
+  # second path is exactly what drifts while nobody looks at it. So it is
+  # built from nothing on every change, the way a club would first install it,
+  # and the whole end-to-end suite runs through its proxy, as the ezfd role —
+  # the same suite the build job runs against a bare server.
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Image and compose file checks
+        run: bash scripts/test-docker.sh
+
+      - name: Write .env
+        run: |
+          {
+            echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
+            echo "EZFD_DB_PASSWORD=$(openssl rand -hex 24)"
+            echo "EZFD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
+          } > .env
+
+      - name: Build and start the stack
+        run: docker compose up -d --build
+
+      - name: Live stack checks
+        run: BASE_URL=http://localhost bash scripts/test-docker.sh
+
+      - name: End-to-end API tests through the proxy
+        run: BASE_URL=http://localhost bash scripts/test-e2e.sh
+
+      - name: Stack logs
+        if: failure()
+        run: docker compose logs

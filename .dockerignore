@@ -1,0 +1,11 @@
+# Never sent to the image build. .env is the one that matters: it holds the
+# database passwords and the encryption key, and anything in the build context
+# can end up in an image layer.
+.env
+.env*
+.git
+.next
+node_modules
+.cache
+coverage
+*.tsbuildinfo

@@ -89,6 +89,13 @@ correction lives only in RAM and the next reboot restores the old value.
 > is fine until it has gone a long time unset, and a server that cannot answer
 > the question at all says nothing rather than guessing.
 
+**On a Docker install this warning does not appear.** The app runs in a
+container that cannot ask the host what disciplines its clock, so it gets no
+answer and, by the rule above, says nothing. The banner below still works.
+Check the host's clock yourself with `sudo bash ezfd-admin.sh` →
+**Server time / clock** before the first contact, which matters most on an
+offline field server.
+
 ## "This server's clock is N ahead of / behind this device"
 
 The server and the browser disagree about the time by more than a minute. QSOs
@@ -351,6 +358,28 @@ leaving something that looks like a backup.
 **Port in use** — something else has the port; nginx proxies to localhost.
 
 **Build artefacts missing** — re-run `deploy.sh`.
+
+On a Docker install, start with `docker compose ps -a` and the logs of
+whichever service is not running:
+
+```bash
+$ docker compose ps -a
+$ docker compose logs init
+$ docker compose logs app
+```
+
+**`init` exited with a code other than 0** — the schema step failed and the
+app was never started. Its log names the statement. A password error there
+usually means `POSTGRES_PASSWORD` was changed in `.env` after the first start;
+see [Configuration → The Docker Compose .env](configuration.md#the-docker-compose-env).
+
+**`docker compose` refuses to start, naming a variable** — `.env` is missing
+or lacks one of the three required settings.
+
+**The site returns 502 after an update** — the app container was replaced but
+did not come up, or the schema step failed after compose had already stopped
+the old app. Updating from the admin console avoids the second case; see
+[Administration → Updating the application](administration.md#updating-the-application).
 
 ## Out of memory during deploy
 

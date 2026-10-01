@@ -23,6 +23,17 @@ only run events.
 
 ---
 
+## 2026-10-01
+
+### Added
+
+- **Docker Compose install** `Setup` — EzFD can now be installed on any 64-bit
+  machine with Docker, including the distributions `deploy.sh` refuses:
+  `docker compose up -d --build` runs the app, PostgreSQL and a Caddy proxy
+  that handles TLS. The admin console works on it from the host, including
+  backups, exports, the clock tools and a safe update.
+  Docs: [Deployment → Docker Compose](deployment.md#docker-compose), [Administration → On a Docker install](administration.md#on-a-docker-install), [Configuration → The Docker Compose .env](configuration.md#the-docker-compose-env)
+
 ## 2026-09-23
 
 ### Changed

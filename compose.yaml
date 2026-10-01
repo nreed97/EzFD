@@ -1,0 +1,93 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# EzFD — Docker Compose install. The alternative to deploy.sh for any machine
+# that runs Docker; see docs/deployment.md → "Docker Compose".
+#
+#   docker compose up -d --build      first install, and every update after
+#
+# Settings come from .env beside this file (docs/configuration.md lists them).
+# The three marked :? are required and compose refuses to start without them.
+#
+# Four services, one of which exits:
+#   db     PostgreSQL 16, data in the ezfd-db volume
+#   init   one-shot: creates the ezfd role and applies db/schema.sql, on every
+#          start, before the app — the schema step deploy.sh runs on an update
+#   app    the Next.js standalone server, built from the Dockerfile
+#   proxy  Caddy: TLS when EZFD_DOMAIN is set, plain HTTP on :80 when it isn't
+# ─────────────────────────────────────────────────────────────────────────────
+name: ezfd
+
+services:
+  db:
+    image: postgres:16
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ezfd
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}
+    volumes:
+      - ezfd-db:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d ezfd"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  init:
+    image: postgres:16
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGHOST: db
+      PGUSER: postgres
+      PGDATABASE: ezfd
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      EZFD_DB_PASSWORD: ${EZFD_DB_PASSWORD:?set EZFD_DB_PASSWORD in .env}
+    volumes:
+      - ./db/schema.sql:/schema/schema.sql:ro
+      - ./docker/init-db.sh:/init-db.sh:ro
+    entrypoint: ["bash", "/init-db.sh"]
+
+  app:
+    build: .
+    image: ezfd-app
+    restart: unless-stopped
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    environment:
+      DATABASE_URL: postgresql://ezfd:${EZFD_DB_PASSWORD}@db:5432/ezfd
+      EZFD_ENCRYPTION_KEY: ${EZFD_ENCRYPTION_KEY:?set EZFD_ENCRYPTION_KEY in .env}
+      EZFD_ADMIN_KEY: ${EZFD_ADMIN_KEY:-}
+      EZFD_FD_CALL_HISTORY_URL: ${EZFD_FD_CALL_HISTORY_URL:-}
+      EZFD_WFD_CALL_HISTORY_URL: ${EZFD_WFD_CALL_HISTORY_URL:-}
+      EZFD_MASTER_SCP_URL: ${EZFD_MASTER_SCP_URL:-}
+    # tini as PID 1, so SIGTERM reaches node. The app ends its own SSE streams
+    # on SIGTERM and exits in well under a second; 15s matches the systemd
+    # unit's TimeoutStopSec and is only the backstop.
+    init: true
+    stop_grace_period: 15s
+
+  proxy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    environment:
+      # A blank EZFD_DOMAIN must become ":80", and it has to happen here:
+      # Caddy's own {$VAR:default} only covers an unset variable, and compose
+      # passes a blank one as set-but-empty, which leaves the Caddyfile with no
+      # site address at all and Caddy refusing to start.
+      EZFD_SITE_ADDRESS: ${EZFD_DOMAIN:-:80}
+    ports:
+      - "${EZFD_HTTP_PORT:-80}:80"
+      - "${EZFD_HTTPS_PORT:-443}:443"
+    volumes:
+      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+
+volumes:
+  ezfd-db:
+  caddy-data:
+  caddy-config:

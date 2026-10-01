@@ -103,6 +103,9 @@ if [[ "$APT_OS" == "false" ]]; then
   warn "  • npm ci && npm run build, then run .next/standalone/server.js"
   warn "  • a reverse proxy with proxy_buffering off, or SSE will not stream"
   echo
+  warn "Or use the Docker Compose install, which needs only Docker on this"
+  warn "machine: see docs/deployment.md, \"Docker Compose\"."
+  echo
   die "Unsupported distribution for automatic deployment."
 fi
 
