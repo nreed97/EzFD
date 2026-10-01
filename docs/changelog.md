@@ -31,7 +31,7 @@ only run events.
   machine with Docker, including the distributions `deploy.sh` refuses:
   `docker compose up -d --build` runs the app, PostgreSQL and a Caddy proxy
   that handles TLS. The admin console works on it from the host, including
-  backups, exports, the clock tools and a safe update.
+  backups, exports, the clock tools and a safe update. ([#105])
   Docs: [Deployment → Docker Compose](deployment.md#docker-compose), [Administration → On a Docker install](administration.md#on-a-docker-install), [Configuration → The Docker Compose .env](configuration.md#the-docker-compose-env)
 
 ## 2026-09-23
@@ -827,3 +827,4 @@ continuous enough to be worth summarising.
 [#102]: https://github.com/nreed97/EzFD/pull/102
 [#103]: https://github.com/nreed97/EzFD/pull/103
 [#104]: https://github.com/nreed97/EzFD/pull/104
+[#105]: https://github.com/nreed97/EzFD/pull/105
