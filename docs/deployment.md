@@ -232,7 +232,7 @@ $ cd ezfd
 $ cp .env.example .env
 $ chmod 600 .env
 $ nano .env
-$ docker compose up -d --build
+$ docker compose up -d
 ```
 
 `.env.example` is the template, with a comment on every setting. Fill in the
@@ -248,8 +248,14 @@ Set `EZFD_DOMAIN` for a TLS certificate; leave it blank for plain HTTP on
 port 80, by IP address or any name. `EZFD_ADMIN_KEY` works as it does on a
 `deploy.sh` install. Every setting is described in
 [Configuration → The Docker Compose .env](configuration.md#the-docker-compose-env).
-The last command builds the image from this checkout, since `compose.yaml`
-carries the build step; there is no image to pull.
+
+The last command builds the app image, `ezfd:latest`, from this checkout.
+EzFD is not published to Docker Hub or any other registry, so there is nothing
+to pull: the `app` service in `compose.yaml` carries its own `build:` and
+`pull_policy: build`, which makes every `docker compose up` build it locally.
+That also means a tool that drives compose for you, such as Arcane, builds it
+the same way, as long as the project folder it uses is this checkout rather
+than a copy of `compose.yaml` on its own.
 
 Keep the passwords to letters and digits, as `openssl rand -hex` produces.
 `EZFD_DB_PASSWORD` is written into a connection URL, where some punctuation
@@ -264,7 +270,7 @@ The first build takes a few minutes. When `docker compose ps` shows `app`,
 |---|---|
 | `db` | PostgreSQL 16. Data lives in the `ezfd-db` volume and survives rebuilds |
 | `init` | Runs on every start, before the app, then exits. Creates the `ezfd` role and applies `db/schema.sql` as the superuser |
-| `app` | The Next.js server, built from the `Dockerfile` |
+| `app` | The Next.js server, built locally from the `Dockerfile` as `ezfd:latest`. Its container is named `ezfd` |
 | `proxy` | Caddy. Obtains and renews the certificate when `EZFD_DOMAIN` is set, and streams live updates without buffering |
 
 The database is laid out exactly as on a `deploy.sh` install: `postgres` owns
@@ -294,11 +300,16 @@ $ docker compose run --rm init
 $ docker compose up -d
 ```
 
-Don't shorten that to `docker compose up -d --build` on an install you care
-about. It works, but compose stops the old app before the schema step has
-finished, so a schema error leaves the site returning 502 until it is fixed.
-On a first install there is nothing to lose, which is why the install above
-uses it.
+Don't shorten that to a bare `docker compose up -d` on an install you care
+about. It builds and starts everything, but compose stops the old app before
+the schema step has finished, so a schema error leaves the site returning 502
+until it is fixed. On a first install there is nothing to lose, which is why
+the install above uses it.
+
+Every `docker compose up -d` rebuilds the app image, from the build cache when
+nothing has changed, and on current Docker versions it then replaces the app
+container even so. That costs about a second: open tabs reconnect and send
+anything they queued, as they do after any restart.
 
 ### Logs and restarts
 

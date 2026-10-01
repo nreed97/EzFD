@@ -327,8 +327,10 @@ jobs:
           sed -i "s/^EZFD_DB_PASSWORD=.*/EZFD_DB_PASSWORD=$(openssl rand -hex 24)/" .env
           sed -i "s/^EZFD_ENCRYPTION_KEY=.*/EZFD_ENCRYPTION_KEY=$(openssl rand -hex 32)/" .env
 
+      # No --build: the app service's pull_policy: build is what makes a
+      # plain `up` build the image, and this is the command the guide gives.
       - name: Build and start the stack
-        run: docker compose up -d --build
+        run: docker compose up -d
 
       - name: Live stack checks
         run: BASE_URL=http://localhost bash scripts/test-docker.sh

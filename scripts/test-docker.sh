@@ -12,6 +12,8 @@
 #   - HOSTNAME left to Docker, which sets it to the container id, so the
 #     server binds where the proxy cannot reach it
 #   - .env in the build context, where the passwords can land in a layer
+#   - an app service that compose tries to pull rather than build, when the
+#     image is on no registry, which fails before anything starts
 #   - a setting compose.yaml reads that .env.example does not list, so the
 #     template a club copies no longer describes the install
 #   - a proxy that buffers, so live updates stop arriving
@@ -19,7 +21,7 @@
 #     fails on a deploy.sh install (see AGENTS.md)
 #
 # The live half runs against a stack already started with
-# `docker compose up -d --build`, from outside it, through the proxy:
+# `docker compose up -d`, from outside it, through the proxy:
 #
 #   - a live update reaches a stream that is open through Caddy
 #   - stopping the app with a stream open takes milliseconds, not the grace
@@ -61,6 +63,13 @@ if grep -Eq '^\s*flush_interval\s+-1' docker/Caddyfile; then
   ok "the proxy does not buffer, so live updates stream"
 else
   no "the proxy does not buffer, so live updates stream"
+fi
+
+app_block="$(sed -n '/^  app:/,/^  [a-z]/p' compose.yaml)"
+if grep -Eq '^\s*pull_policy:\s*build' <<<"$app_block" && grep -Eq '^\s*build:' <<<"$app_block"; then
+  ok "the app image is built locally, never pulled"
+else
+  no "the app image is built locally, never pulled" "(the app service needs build: and pull_policy: build)"
 fi
 
 if grep -Eq 'DATABASE_URL:\s*postgresql://ezfd:' compose.yaml; then

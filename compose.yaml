@@ -2,7 +2,7 @@
 # EzFD — Docker Compose install. The alternative to deploy.sh for any machine
 # that runs Docker; see docs/deployment.md → "Docker Compose".
 #
-#   docker compose up -d --build      first install, and every update after
+#   docker compose up -d      builds the app image here, then starts the stack
 #
 # Settings come from .env beside this file: copy .env.example to .env and fill
 # it in (docs/configuration.md lists them). The three marked :? are required
@@ -13,7 +13,8 @@
 #   db     PostgreSQL 16, data in the ezfd-db volume
 #   init   one-shot: creates the ezfd role and applies db/schema.sql, on every
 #          start, before the app — the schema step deploy.sh runs on an update
-#   app    the Next.js standalone server, built from the Dockerfile
+#   app    the Next.js standalone server, built locally from the Dockerfile
+#          (image ezfd:latest — it is not on any registry)
 #   proxy  Caddy: TLS when EZFD_DOMAIN is set, plain HTTP on :80 when it isn't
 # ─────────────────────────────────────────────────────────────────────────────
 name: ezfd
@@ -21,6 +22,7 @@ name: ezfd
 services:
   db:
     image: postgres:16
+    container_name: ezfd-db
     restart: unless-stopped
     environment:
       POSTGRES_DB: ezfd
@@ -51,8 +53,19 @@ services:
     entrypoint: ["bash", "/init-db.sh"]
 
   app:
-    build: .
-    image: ezfd-app
+    # Built here, from this checkout — EzFD is not published to Docker Hub or
+    # any other registry, so there is nothing to pull. pull_policy: build makes
+    # every `docker compose up` (and tools that drive compose, such as Arcane)
+    # build the image rather than look for it on a registry first. Unchanged
+    # layers come from the build cache, so a rebuild with no code change takes
+    # seconds. The Node major is the Dockerfile's NODE_MAJOR, checked against
+    # .nvmrc by scripts/test-docker.sh.
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ezfd:latest
+    pull_policy: build   # always build locally; this image is not on a registry
+    container_name: ezfd
     restart: unless-stopped
     depends_on:
       init:
@@ -72,6 +85,7 @@ services:
 
   proxy:
     image: caddy:2
+    container_name: ezfd-proxy
     restart: unless-stopped
     depends_on:
       - app

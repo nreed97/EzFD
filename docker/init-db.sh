@@ -13,7 +13,7 @@
 # there, rather than passing in Docker and failing in the field.
 #
 # schema.sql is idempotent (CI applies it twice), which is what makes running
-# it on every start safe, and what makes `docker compose up --build` an update.
+# it on every start safe, and what lets `docker compose up -d` act as an update.
 # ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
 
