@@ -62,7 +62,7 @@ Reach for it on any new control small enough to miss.
 
 ## Tests
 
-Eighteen suites, all run by CI. They come in two kinds, and the split is worth
+Nineteen suites, all run by CI. They come in two kinds, and the split is worth
 knowing when you are deciding what to run before a commit.
 
 **Fourteen need nothing at all** — no database, no build, no server. They cover
@@ -108,6 +108,11 @@ $ BASE_URL=http://localhost:3000 bash scripts/test-e2e.sh
 
 # Which machines deploy.sh will install on
 $ bash scripts/test-deploy-detect.sh
+
+# The Docker Compose install: the image and proxy settings on their own, and
+# with BASE_URL set, live updates and shutdown through a running stack
+$ bash scripts/test-docker.sh
+$ BASE_URL=http://localhost bash scripts/test-docker.sh
 ```
 
 ### What each is for
@@ -346,13 +351,14 @@ A test that has never been observed failing is a test you don't know works.
 
 ## CI
 
-`.github/workflows/ci.yml`, three jobs:
+`.github/workflows/ci.yml`, four jobs:
 
 | Job | Runs |
 |---|---|
 | `build` | The fourteen pure suites, then lint, typecheck and build, then the end-to-end suite against the built server |
 | `schema` | Schema applied twice for idempotency, then the constraint, query and restore suites |
 | `shell` | `bash -n` on every tracked `.sh`, the rig-bridge copy check, then `shellcheck` |
+| `docker` | Builds the Compose install from scratch, then the live stack checks and the end-to-end suite through its proxy |
 
 **Everything is gated.** Lint and `shellcheck` were advisory for a while, held
 back by a backlog of pre-existing findings that would have failed every pull

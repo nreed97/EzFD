@@ -25,9 +25,19 @@ nothing is offline.
 | A clock | See [The clock is the part that bites](#the-clock-is-the-part-that-bites). This is not optional |
 | Power | Whatever runs the rest of the site. The stack comes back on its own after losing it — see [Losing power](#losing-power) |
 
-There is **one way to install EzFD** and this is the same one: `deploy.sh`.
-There is no separate field-server mode to learn. The only thing that makes a
-field server different is *when* you run it.
+This guide uses `deploy.sh`, the install written for Debian, Ubuntu and
+Raspberry Pi OS. There is no separate field-server mode to learn. The only
+thing that makes a field server different is *when* you run it.
+
+The [Docker Compose](deployment.md#docker-compose) install works offline too,
+under the same rule: build at home, because the build needs the network, and
+the result runs without it. Leave `EZFD_DOMAIN` blank and it serves plain HTTP
+on port 80. Everything below about the clock, mDNS and losing power applies to
+it unchanged, since all of it is about the host. One thing is lost: the app
+cannot see what holds the host's clock from inside its container, so the
+warning described in [Either way, the app will tell you](#either-way-the-app-will-tell-you)
+about a clock nothing is setting does not appear. Check it in the admin
+console before the first contact.
 
 ---
 

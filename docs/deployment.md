@@ -1,9 +1,19 @@
 # Deployment
 
-`deploy.sh` takes a fresh Ubuntu or Debian machine to a running, TLS-secured
-install. It is also the update path — re-running it is safe and preserves
-configuration. It is the **only** way EzFD is installed; there is no second
-path to choose between.
+There are two ways to install EzFD, and they run the same app against the
+same schema:
+
+- **`deploy.sh`** takes a fresh Debian, Ubuntu or Raspberry Pi OS machine to a
+  running, TLS-secured install with nginx, certbot and a systemd service. It
+  is also the update path — re-running it is safe and preserves
+  configuration. Most of this page is about it.
+- **[Docker Compose](#docker-compose)** runs the app, PostgreSQL and a Caddy
+  proxy as containers on any machine with Docker, whatever the distribution.
+
+Pick `deploy.sh` on a machine it supports, and on a Raspberry Pi field server
+in particular, where [Offline field servers](field-server.md) is written
+around it. Pick Docker Compose on a distribution `deploy.sh` refuses, or on a
+host that already runs other things in containers.
 
 ## Requirements
 
@@ -56,6 +66,9 @@ The environment variables are listed in
 
 This path is unsupported in the sense that nothing here tests it. It is not
 discouraged.
+
+Before doing that, consider the [Docker Compose](#docker-compose) install,
+which needs nothing from the distribution but Docker and is tested in CI.
 
 ## First install
 
@@ -187,6 +200,217 @@ The real-time layer uses `LISTEN`/`NOTIFY`, which works over a normal
 connection but not through a connection pooler in transaction mode — PgBouncer
 in that mode will silently break live updates. Use session mode or connect
 directly.
+
+## Docker Compose
+
+`compose.yaml` at the root of the repository runs EzFD as four containers.
+It needs nothing from the host but Docker, so it works on distributions
+`deploy.sh` stops on. CI builds it from scratch on every change and runs the
+whole end-to-end suite through its proxy.
+
+### Requirements for Docker
+
+- **Docker Engine with the Compose plugin** (`docker compose`, not the old
+  `docker-compose`). Docker's own install instructions cover every major
+  distribution.
+- **A 64-bit machine**, amd64 or arm64. A 64-bit Raspberry Pi OS is fine; a
+  32-bit one is not, for the same reason `deploy.sh` cannot use it.
+- **The network while it builds.** The images are built from the GitHub
+  repository, and the build runs `npm ci` and fetches the interface font,
+  exactly as `deploy.sh` does. Build at home, then carry the machine anywhere.
+- **Swap on a 1 GB machine.** `deploy.sh` adds a swap file below 2 GB of RAM
+  because `next build` can be OOM-killed without one. Docker does not, so on a
+  small droplet add swap yourself before the first build.
+- Ports 80 and 443 free, and a DNS record pointing at the machine if you want
+  TLS.
+
+### First install with Docker
+
+```bash
+$ git clone https://github.com/nreed97/EzFD.git ezfd
+$ cd ezfd
+$ cp .env.example .env
+$ chmod 600 .env
+$ nano .env
+$ docker compose up -d
+```
+
+`.env.example` is the template, with a comment on every setting. Fill in the
+three required ones, generating each with the command the file gives beside
+it:
+
+```bash
+$ openssl rand -hex 24    # POSTGRES_PASSWORD, and again for EZFD_DB_PASSWORD
+$ openssl rand -hex 32    # EZFD_ENCRYPTION_KEY
+```
+
+Set `EZFD_DOMAIN` for a TLS certificate; leave it blank for plain HTTP on
+port 80, by IP address or any name. `EZFD_ADMIN_KEY` works as it does on a
+`deploy.sh` install. Every setting is described in
+[Configuration → The Docker Compose .env](configuration.md#the-docker-compose-env).
+
+The last command builds three images, `ezfd:latest`, `ezfd-init:latest` and
+`ezfd-proxy:latest`, on this machine. EzFD is not published to Docker Hub or
+any other registry, so there is nothing to pull: each service in
+`compose.yaml` carries its own `build:` and `pull_policy: build`, which makes
+every `docker compose up` build it.
+
+They are built from the repository on GitHub, at the branch named by
+`EZFD_REF` in `.env` (`master` when it is blank), not from the files beside
+`compose.yaml`. So `compose.yaml` and `.env` are all the install needs on
+disk, and a tool that drives compose for you, such as Arcane, works from those
+two alone. The clone above is still the easier start, because it brings
+`.env.example` and the admin console with it. To build from the checkout
+itself instead, to try a local change, or from a fork, set `EZFD_SOURCE`; see
+[Configuration → The Docker Compose .env](configuration.md#the-docker-compose-env).
+
+Keep the passwords to letters and digits, as `openssl rand -hex` produces.
+`EZFD_DB_PASSWORD` is written into a connection URL, where some punctuation
+has a meaning of its own.
+
+The first build takes a few minutes. When `docker compose ps` shows `app`,
+`db` and `proxy` running and `init` exited with code 0, the site is up.
+
+### What runs
+
+| Service | What it is |
+|---|---|
+| `db` | PostgreSQL 16. Data lives in the `ezfd-db` volume and survives rebuilds |
+| `init` | Runs on every start, before the app, then exits. Creates the `ezfd` role and applies `db/schema.sql` as the superuser. Built as `ezfd-init:latest`, carrying the schema from the same commit as the app |
+| `app` | The Next.js server, built from the `Dockerfile` as `ezfd:latest`. Its container is named `ezfd` |
+| `proxy` | Caddy, built as `ezfd-proxy:latest` with EzFD's proxy settings inside. Obtains and renews the certificate when `EZFD_DOMAIN` is set, and streams live updates without buffering |
+
+The database is laid out exactly as on a `deploy.sh` install: `postgres` owns
+the tables and the app connects as `ezfd` with `SELECT`, `INSERT`, `UPDATE`
+and `DELETE` only (see [Database schema](#database-schema)).
+
+Every service is `restart: unless-stopped`, so the stack comes back after a
+reboot or a power cut as long as the Docker service itself starts at boot,
+which it does by default wherever Docker is packaged.
+
+### Behind your own reverse proxy
+
+If the machine already runs a proxy that holds ports 80 and 443, such as
+Nginx Proxy Manager, Traefik or another Caddy, put it in front of the bundled
+one rather than in place of it. Leave `EZFD_DOMAIN` blank, so the bundled
+Caddy serves plain HTTP and your proxy handles the certificate, and move its
+ports off the ones yours holds:
+
+```bash
+EZFD_DOMAIN=
+EZFD_HTTP_PORT=127.0.0.1:8080
+EZFD_HTTPS_PORT=127.0.0.1:8443
+```
+
+Then point your proxy at `http://127.0.0.1:8080`. The address in front of each
+port keeps it reachable from this machine only; drop it if your proxy runs on
+another host. `EZFD_HTTPS_PORT` still has to move even though nothing is
+served on it, because Docker reserves the host port either way and a clash
+stops the stack from starting.
+
+A proxy that runs in Docker can reach the stack over its network instead, with
+no published port at all: attach it to the `ezfd_default` network
+(`docker network connect ezfd_default <your proxy>`, or list the network in
+its own compose file as `external: true`) and point it at
+`http://ezfd-proxy:80`.
+
+Keep the bundled Caddy in the path. It is what streams live updates without
+buffering and lets the app restart in under a second with screens open, and
+an outer proxy forwarding to it inherits both. Your proxy must not buffer
+responses either, or live updates stop arriving: in nginx that is
+`proxy_buffering off`, and Nginx Proxy Manager, Traefik and Caddy stream an
+event stream by default. Allow long-lived connections, as `deploy.sh`'s
+nginx does with a one-hour read timeout.
+
+### Updating a Docker install
+
+The admin console does it in the safe order:
+
+```bash
+$ sudo bash ezfd-admin.sh      # → Update application
+```
+
+It pulls, builds the new images while the old app keeps serving, applies the
+schema on its own, and only then replaces the app, so a schema error stops the
+update with the old app still running. By hand, the same steps are:
+
+```bash
+$ git pull
+$ docker compose build
+$ docker compose run --rm init
+$ docker compose up -d
+```
+
+`docker compose build` fetches the latest commit on `EZFD_REF` from GitHub
+each time, so it is what picks up new code; `git pull` only keeps
+`compose.yaml` and the admin console current. Without a checkout, skip it. To
+move to another branch or a tag, change `EZFD_REF` in `.env` and run the same
+three `docker compose` steps.
+
+Don't shorten that to a bare `docker compose up -d` on an install you care
+about. It builds and starts everything, but compose stops the old app before
+the schema step has finished, so a schema error leaves the site returning 502
+until it is fixed. On a first install there is nothing to lose, which is why
+the install above uses it.
+
+Every `docker compose up -d` rebuilds the app image, from the build cache when
+nothing has changed, and on current Docker versions it then replaces the app
+container even so. That costs about a second: open tabs reconnect and send
+anything they queued, as they do after any restart.
+
+### Logs and restarts
+
+```bash
+$ docker compose logs -f app
+$ docker compose restart app
+$ docker compose ps
+```
+
+A restart takes about a second with operators logging, as it does under
+systemd: the app ends its live-update streams when told to stop, and open tabs
+reconnect and send anything they queued.
+
+### What is different under Docker
+
+- **The admin console runs on the host**, from the checkout. It finds the
+  `db` container through `compose.yaml` and otherwise works as it does on a
+  `deploy.sh` install. See
+  [Administration → On a Docker install](administration.md#on-a-docker-install).
+- **The clock belongs to the host.** Containers share the host's clock, so it
+  is set and checked from the host, and the admin console's
+  **Server time / clock** works unchanged. The app inside the container
+  cannot see what disciplines that clock, so it reports it as unknown rather
+  than as a problem; its comparison against the operators' devices still
+  works. See
+  [Troubleshooting → Nothing is holding this server's clock](troubleshooting.md#nothing-is-holding-this-servers-clock-has-not-been-set-for-n-days).
+- **Database-level backups come from the `db` container:**
+  `docker compose exec -T db pg_dump -U postgres ezfd | gzip > ezfd.sql.gz`.
+  `ezfd-admin.sh --json` works as before.
+- **`docker compose down -v` deletes the database.** `down` on its own keeps
+  the volumes; `-v` removes them, log included.
+
+### Moving a deploy.sh install to Docker
+
+Take a database dump on the old server, then load it into the new stack
+before the app first starts:
+
+```bash
+# on the old server
+# sudo -u postgres pg_dump --no-owner ezfd > ezfd.sql
+
+# on the new one, with .env written and ezfd.sql copied over
+$ docker compose build
+$ docker compose run --rm init
+$ docker compose exec -T db dropdb -U postgres ezfd
+$ docker compose exec -T db createdb -U postgres ezfd
+$ docker compose exec -T db psql -U postgres -d ezfd -v ON_ERROR_STOP=1 < ezfd.sql
+$ docker compose up -d
+```
+
+`init` runs first so the `ezfd` role exists when the dump's grants are
+replayed. Copy `EZFD_ENCRYPTION_KEY` from the old `/opt/ezfd/.env` into the
+new `.env`, or stored QRZ passwords cannot be decrypted. Join codes, contacts
+and the SES roster come across as they were.
 
 ## Offline field servers
 

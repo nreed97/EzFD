@@ -29,7 +29,7 @@ Start with whichever describes you.
 
 | Guide | What it covers |
 |---|---|
-| [Deployment](deployment.md) | One-command install on a VPS, TLS, updates |
+| [Deployment](deployment.md) | One-command install on a VPS or with Docker Compose, TLS, updates |
 | [Administration](administration.md) | `ezfd-admin.sh`, backups, restores, recovery |
 | [Configuration](configuration.md) | Every environment variable |
 | [Offline field servers](field-server.md) | A machine at the site with no internet — installing at home, the clock, mDNS, merging back |

@@ -8,7 +8,9 @@ data, and updating the app. Run it on the server:
 ```
 
 It connects to the local `ezfd` database as `postgres` and refuses to start if
-PostgreSQL isn't reachable.
+PostgreSQL isn't reachable. On a Docker Compose install it runs on the host
+and reaches the database through the `db` container instead — see
+[On a Docker install](#on-a-docker-install).
 
 ## Command line
 
@@ -46,6 +48,29 @@ Usage:
 $ echo $?
 2
 ```
+
+## On a Docker install
+
+Run it from the checkout that holds `compose.yaml`, on the host:
+
+```bash
+$ cd ezfd && sudo bash ezfd-admin.sh
+```
+
+It recognises the install by the running `db` container and sends its queries
+through `docker compose exec`. Everything in the menu works, with two
+differences in how:
+
+- **Update application** builds a new image and replaces the container rather
+  than rsyncing into `/opt/ezfd`. See
+  [Updating the application](#updating-the-application).
+- **Server time / clock** reads and sets the host's clock, which is the one
+  the containers use, so it behaves exactly as on a `deploy.sh` install.
+
+Files it writes — CSV exports and JSON backups — land in `/tmp` on the host,
+not inside a container. If it picks the wrong install, which should only
+happen with a stopped stack, set `EZFD_INSTALL=docker` or
+`EZFD_INSTALL=systemd`.
 
 ## Main menu
 
@@ -468,6 +493,29 @@ The old order rsynced first and sent the migration's errors to `/dev/null`
 behind a `|| true`, then restarted regardless — so a new build met an old
 schema and failed on its first query, with nothing on screen to say why.
 
+### Updating a Docker install
+
+The order is the same, by a different mechanism:
+
+1. `git pull` in the checkout beside `compose.yaml`, which keeps
+   `compose.yaml` and the console itself current.
+2. `docker compose build`, while the old container keeps serving. This
+   fetches the latest commit on `EZFD_REF` from GitHub, so it runs even when
+   the pull found nothing new.
+3. **`docker compose run --rm init`**, which applies `db/schema.sql`.
+4. `docker compose up -d`, which replaces the app.
+
+Step 3 runs on its own on purpose. Left to `up`, compose stops the old app
+before the schema step it depends on has finished, so a schema error left the
+site returning 502. Run separately, a failure stops the update with the old
+app still serving:
+
+```
+  [✗] Database migration failed — nothing has been deployed.
+psql:/schema/schema.sql:980: ERROR:  division by zero
+  The running app is untouched. Fix the schema error and re-run.
+```
+
 ## Notes on the script itself
 
 If you extend it, `AGENTS.md` documents the conventions. The important one:
@@ -479,7 +527,10 @@ false result.
 
 Three more that are easy to get wrong:
 
-**Query through `PG()` or `PGS()`, not a bare `psql`.** Both set the field
+**Query through `PG()` or `PGS()`, not a bare `psql`.** Both go through
+`psql_su()`, which is the one place the two installs differ — `sudo -u
+postgres psql` on a `deploy.sh` install, `docker compose exec` on a Docker
+one — so a bare `psql` also works on only one of them. Both set the field
 separator to an ASCII unit separator (`\x1f`) rather than psql's default pipe,
 and every row reader splits on `$FS` to match:
 

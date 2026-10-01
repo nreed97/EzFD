@@ -1,0 +1,30 @@
+# EzFD — reverse proxy for the Docker Compose install.
+#
+# With EZFD_DOMAIN set, Caddy obtains and renews a Let's Encrypt certificate
+# for it and redirects HTTP to HTTPS — the job certbot does for deploy.sh.
+# Left blank, compose passes ":80" as the site address and Caddy serves plain
+# HTTP on port 80 for any name or address, which is what an offline field
+# server wants.
+#
+# flush_interval -1 is the equivalent of deploy.sh's `proxy_buffering off`.
+# Live updates are a Server-Sent Events stream that never finishes; a proxy
+# that buffers the response holds every event until the buffer fills, and
+# other screens stop updating with nothing on any of them to say why. Caddy
+# already flushes a text/event-stream response immediately on its own (with
+# this line set to 30s, scripts/test-docker.sh still saw updates arrive), so
+# this states the requirement rather than relying on that detection.
+{$EZFD_SITE_ADDRESS} {
+	reverse_proxy app:3000 {
+		flush_interval -1
+		# No pooled connections to the app. On SIGTERM the app ends its open
+		# streams and Next closes the server, but Node only closes connections
+		# that are idle at that moment; a stream that has just ended leaves
+		# its connection idle a moment later, and a pooled one is then held
+		# until Node's 5s keep-alive timeout. Measured: stopping the app with
+		# one stream open took 6.3s through a pooling proxy and 0.3s without.
+		# nginx in deploy.sh has no upstream keepalive, so it never had this.
+		transport http {
+			keepalive off
+		}
+	}
+}
