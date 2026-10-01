@@ -30,41 +30,62 @@ err()   { echo -e "  ${RED}[✗]${NC} $*" >&2; }
 pause() { read -rp "$(echo -e "\n  ${DIM}Press Enter to continue…${NC}")" _; }
 
 # ── Which install this is ─────────────────────────────────────────────────────
-# A Docker Compose install is recognised by its running `db` container, found
-# from the compose.yaml beside this script. A deploy.sh install copies this
-# script to /opt/ezfd, where there is no compose.yaml, so it never matches —
-# and a checkout on a systemd server that merely contains compose.yaml has no
-# such container. EZFD_INSTALL=docker|systemd overrides the guess.
+# A Docker Compose install is recognised by its running database container,
+# `ezfd-db` (compose.yaml fixes the name), wherever this script is run from.
+# It used to be found through a compose.yaml beside the script, which missed
+# the commonest Docker layout: a stack managed by a tool such as Arcane, with
+# the script downloaded on its own into a home directory. That fell through
+# to the systemd path and told the operator to start a PostgreSQL that was
+# never installed. A deploy.sh server has no such container, so it never
+# matches. EZFD_INSTALL=docker|systemd overrides the guess, and
+# EZFD_DB_CONTAINER the container name.
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-COMPOSE_FILE="$SCRIPT_DIR/compose.yaml"
+DB_CONTAINER="${EZFD_DB_CONTAINER:-ezfd-db}"
+has_docker() { command -v docker >/dev/null 2>&1; }
+db_container() {  # $1: "running" or "any"
+  local all=""; [[ "${1:-}" == "any" ]] && all="-a"
+  has_docker && [[ -n "$(docker ps $all -q --filter "name=^${DB_CONTAINER}\$" 2>/dev/null)" ]]
+}
 INSTALL="${EZFD_INSTALL:-}"
 if [[ -z "$INSTALL" ]]; then
   INSTALL="systemd"
-  if [[ -f "$COMPOSE_FILE" ]] && command -v docker >/dev/null 2>&1 \
-     && [[ -n "$(docker compose -f "$COMPOSE_FILE" ps -q db 2>/dev/null)" ]]; then
-    INSTALL="docker"
-  fi
+  if db_container running; then INSTALL="docker"; fi
+fi
+
+# The stack's compose.yaml, which only the update needs: the one beside this
+# script, or else the one compose recorded on the container when it started
+# it, if that path exists on this machine (a manager running compose inside
+# its own container records a path that may not). Empty when neither is found.
+COMPOSE_FILE=""
+if [[ -f "$SCRIPT_DIR/compose.yaml" ]]; then
+  COMPOSE_FILE="$SCRIPT_DIR/compose.yaml"
+elif [[ "$INSTALL" == "docker" ]]; then
+  _cf="$(docker inspect -f '{{ index .Config.Labels "com.docker.compose.project.config_files" }}' "$DB_CONTAINER" 2>/dev/null)"
+  _cf="${_cf%%,*}"
+  [[ -n "$_cf" && -f "$_cf" ]] && COMPOSE_FILE="$_cf"
+  unset _cf
 fi
 
 # psql as the database superuser, on either install. Everything that talks
 # to the database goes through this, so the two installs differ here rather
-# than at every call site. -T because a TTY would mangle the rows and the
+# than at every call site. No TTY, because one would mangle the rows and the
 # heredocs fed on stdin.
 #
-# A -c query gets /dev/null for stdin, and that is not tidiness. psql -c never
-# reads stdin, but `docker compose exec` forwards it regardless — so every
-# query run under a menu swallowed the operator's next answers, and one inside
-# a `while read … <<< "$rows"` loop would eat the rows it was looping over.
+# A -c query gets no stdin at all (no -i), and that is not tidiness. psql -c
+# never reads stdin, but a docker exec that forwards it consumes it regardless
+# — so every query run under a menu swallowed the operator's next answers,
+# and one inside a `while read … <<< "$rows"` loop would eat the rows it was
+# looping over. Anything else may be fed a heredoc, so it gets -i.
 if [[ "$INSTALL" == "docker" ]]; then
   psql_su() {
     local a=""
     for a in "$@"; do
       if [[ "$a" == "-c" ]]; then
-        docker compose -f "$COMPOSE_FILE" exec -T db psql -U postgres "$@" < /dev/null
+        docker exec "$DB_CONTAINER" psql -U postgres "$@" < /dev/null
         return
       fi
     done
-    docker compose -f "$COMPOSE_FILE" exec -T db psql -U postgres "$@"
+    docker exec -i "$DB_CONTAINER" psql -U postgres "$@"
   }
 else
   psql_su() { sudo -u postgres psql "$@"; }
@@ -110,7 +131,12 @@ esac
 if ! PG -c "SELECT 1" &>/dev/null; then
   err "Cannot connect to the ezfd database. Is PostgreSQL running?"
   if [[ "$INSTALL" == "docker" ]]; then
-    echo -e "    Try: docker compose -f $COMPOSE_FILE up -d" >&2
+    echo -e "    The ${DB_CONTAINER} container is running but not answering. Check: docker logs ${DB_CONTAINER}" >&2
+  elif db_container running; then
+    echo -e "    EZFD_INSTALL=systemd is set, but this is a Docker install (${DB_CONTAINER} is running)." >&2
+  elif db_container any; then
+    echo -e "    This is a Docker install and its database container, ${DB_CONTAINER}, is stopped." >&2
+    echo -e "    Start the stack: docker compose up -d in the folder holding compose.yaml, or from the tool that manages it." >&2
   else
     echo -e "    Try: systemctl start postgresql" >&2
   fi
@@ -1062,19 +1088,36 @@ update_app_docker() {
   echo
   hr
 
-  label "Repo:"; echo "$SCRIPT_DIR"
-  local cur_commit; cur_commit=$(git -C "$SCRIPT_DIR" log --oneline -1 2>/dev/null || echo "(unknown)")
-  label "Current:"; echo "$cur_commit"
-  echo
-
-  echo -e "  ${DIM}Fetching latest changes from remote…${NC}"
-  if ! git -C "$SCRIPT_DIR" pull 2>&1 | sed 's/^/    /'; then
-    err "git pull failed — check your network or repo state."
+  if [[ -z "$COMPOSE_FILE" ]]; then
+    err "Cannot find this stack's compose.yaml from here."
+    echo -e "  ${DIM}Run the update from the tool that manages the stack, or put this script${NC}"
+    echo -e "  ${DIM}beside compose.yaml and run it there. Everything else in this console${NC}"
+    echo -e "  ${DIM}works from anywhere.${NC}"
     pause; return
   fi
 
-  local new_commit; new_commit=$(git -C "$SCRIPT_DIR" log --oneline -1 2>/dev/null || echo "(unknown)")
-  label "Updated to:"; echo "$new_commit"
+  local dir=""; dir="$(dirname "$COMPOSE_FILE")"
+  label "Stack:"; echo "$COMPOSE_FILE"
+
+  # The images build from GitHub, not from this folder, so a folder that is
+  # not a git checkout (compose.yaml and .env on their own, as a manager such
+  # as Arcane keeps them) has nothing to pull and the update goes on without.
+  if git -C "$dir" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    local cur_commit; cur_commit=$(git -C "$dir" log --oneline -1 2>/dev/null || echo "(unknown)")
+    label "Current:"; echo "$cur_commit"
+    echo
+
+    echo -e "  ${DIM}Fetching latest changes from remote…${NC}"
+    if ! git -C "$dir" pull 2>&1 | sed 's/^/    /'; then
+      err "git pull failed — check your network or repo state."
+      pause; return
+    fi
+
+    local new_commit; new_commit=$(git -C "$dir" log --oneline -1 2>/dev/null || echo "(unknown)")
+    label "Updated to:"; echo "$new_commit"
+  else
+    echo -e "  ${DIM}Not a git checkout, so there is nothing to pull; building from the source compose.yaml names.${NC}"
+  fi
 
   # The images are built from EZFD_SOURCE, or GitHub at EZFD_REF, not from
   # this checkout — so an unchanged checkout says nothing about whether there
