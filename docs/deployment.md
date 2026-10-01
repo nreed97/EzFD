@@ -288,6 +288,40 @@ Every service is `restart: unless-stopped`, so the stack comes back after a
 reboot or a power cut as long as the Docker service itself starts at boot,
 which it does by default wherever Docker is packaged.
 
+### Behind your own reverse proxy
+
+If the machine already runs a proxy that holds ports 80 and 443, such as
+Nginx Proxy Manager, Traefik or another Caddy, put it in front of the bundled
+one rather than in place of it. Leave `EZFD_DOMAIN` blank, so the bundled
+Caddy serves plain HTTP and your proxy handles the certificate, and move its
+ports off the ones yours holds:
+
+```bash
+EZFD_DOMAIN=
+EZFD_HTTP_PORT=127.0.0.1:8080
+EZFD_HTTPS_PORT=127.0.0.1:8443
+```
+
+Then point your proxy at `http://127.0.0.1:8080`. The address in front of each
+port keeps it reachable from this machine only; drop it if your proxy runs on
+another host. `EZFD_HTTPS_PORT` still has to move even though nothing is
+served on it, because Docker reserves the host port either way and a clash
+stops the stack from starting.
+
+A proxy that runs in Docker can reach the stack over its network instead, with
+no published port at all: attach it to the `ezfd_default` network
+(`docker network connect ezfd_default <your proxy>`, or list the network in
+its own compose file as `external: true`) and point it at
+`http://ezfd-proxy:80`.
+
+Keep the bundled Caddy in the path. It is what streams live updates without
+buffering and lets the app restart in under a second with screens open, and
+an outer proxy forwarding to it inherits both. Your proxy must not buffer
+responses either, or live updates stop arriving: in nginx that is
+`proxy_buffering off`, and Nginx Proxy Manager, Traefik and Caddy stream an
+event stream by default. Allow long-lived connections, as `deploy.sh`'s
+nginx does with a one-hour read timeout.
+
 ### Updating a Docker install
 
 The admin console does it in the safe order:

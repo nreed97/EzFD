@@ -91,7 +91,7 @@ missing.
 | `EZFD_ENCRYPTION_KEY` | As [above](#ezfd_encryption_key). 64 hex characters |
 | `EZFD_ADMIN_KEY` | As [above](#ezfd_admin_key). Optional |
 | `EZFD_DOMAIN` | The domain Caddy obtains a certificate for. Blank serves plain HTTP on port 80 |
-| `EZFD_HTTP_PORT`, `EZFD_HTTPS_PORT` | The host ports Caddy listens on, 80 and 443 by default. A certificate needs both at their defaults |
+| `EZFD_HTTP_PORT`, `EZFD_HTTPS_PORT` | The host ports Caddy listens on, 80 and 443 by default. A certificate needs both at their defaults. Either may carry an address, such as `127.0.0.1:8080`, to listen on this machine only behind [your own proxy](deployment.md#behind-your-own-reverse-proxy) |
 | `EZFD_REF` | The branch, tag or commit of `https://github.com/nreed97/EzFD` the images are built from. Blank builds `master` |
 | `EZFD_SOURCE` | Replaces the repository and `EZFD_REF` entirely. `.` builds from the checkout `compose.yaml` sits in, including uncommitted changes; a fork's URL with its own `#branch` builds the fork. Blank uses GitHub at `EZFD_REF` |
 
