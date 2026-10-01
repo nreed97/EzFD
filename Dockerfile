@@ -2,15 +2,35 @@
 # ─────────────────────────────────────────────────────────────────────────────
 # EzFD — application image, used by compose.yaml.
 #
-# Two stages: the first runs `npm ci` and `next build` exactly as deploy.sh
-# does, the second carries only the standalone server, its static assets and
-# public/ — the same three directories deploy.sh rsyncs into /opt/ezfd.
+# compose.yaml builds three images from this one file, each by its target:
+#
+#   init    postgres:16 plus db/schema.sql and docker/init-db.sh
+#   proxy   caddy:2 plus docker/Caddyfile
+#   app     (the last stage, and the default) the Next.js server
+#
+# Baking the schema and the proxy config into images, rather than mounting
+# them from beside compose.yaml, is what lets compose.yaml build the whole
+# stack from the git repository with nothing else on disk — and it means the
+# schema applied is always the one from the same commit as the app.
+#
+# The app is two stages: the first runs `npm ci` and `next build` exactly as
+# deploy.sh does, the second carries only the standalone server, its static
+# assets and public/ — the same three directories deploy.sh rsyncs into
+# /opt/ezfd.
 #
 # NODE_MAJOR must match .nvmrc, which is where the Node major is decided.
 # scripts/test-docker.sh fails if the two disagree, because a Dockerfile that
 # quietly kept an older Node is the drift deploy.sh once had with setup_20.x.
 # ─────────────────────────────────────────────────────────────────────────────
 ARG NODE_MAJOR=24
+
+FROM postgres:16 AS init
+COPY db/schema.sql /schema/schema.sql
+COPY docker/init-db.sh /init-db.sh
+ENTRYPOINT ["bash", "/init-db.sh"]
+
+FROM caddy:2 AS proxy
+COPY docker/Caddyfile /etc/caddy/Caddyfile
 
 FROM node:${NODE_MAJOR}-bookworm-slim AS build
 WORKDIR /src
@@ -20,7 +40,7 @@ RUN npm ci
 COPY . .
 RUN npm run build
 
-FROM node:${NODE_MAJOR}-bookworm-slim
+FROM node:${NODE_MAJOR}-bookworm-slim AS app
 WORKDIR /app
 # HOSTNAME is not optional. Next's standalone server binds to $HOSTNAME, and
 # Docker sets HOSTNAME to the container id — so without this the server

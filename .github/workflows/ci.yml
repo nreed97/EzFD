@@ -326,11 +326,21 @@ jobs:
           sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
           sed -i "s/^EZFD_DB_PASSWORD=.*/EZFD_DB_PASSWORD=$(openssl rand -hex 24)/" .env
           sed -i "s/^EZFD_ENCRYPTION_KEY=.*/EZFD_ENCRYPTION_KEY=$(openssl rand -hex 32)/" .env
+          sed -i "s|^EZFD_SOURCE=.*|EZFD_SOURCE=${SOURCE}|" .env
+        env:
+          # Built from the repository over git, as an install does, at the
+          # commit under test rather than master.
+          SOURCE: ${{ github.server_url }}/${{ github.repository }}.git#${{ github.event.pull_request.head.sha || github.sha }}
 
-      # No --build: the app service's pull_policy: build is what makes a
-      # plain `up` build the image, and this is the command the guide gives.
-      - name: Build and start the stack
-        run: docker compose up -d
+      # From a directory holding only compose.yaml and .env, so a file the
+      # stack quietly reads from a checkout fails here. No --build: the
+      # pull_policy: build on each image is what makes a plain `up` build, and
+      # this is the command the guide gives.
+      - name: Build and start the stack from compose.yaml and .env alone
+        run: |
+          mkdir "$RUNNER_TEMP/stack"
+          cp compose.yaml .env "$RUNNER_TEMP/stack/"
+          cd "$RUNNER_TEMP/stack" && docker compose up -d
 
       - name: Live stack checks
         run: BASE_URL=http://localhost bash scripts/test-docker.sh

@@ -92,6 +92,8 @@ missing.
 | `EZFD_ADMIN_KEY` | As [above](#ezfd_admin_key). Optional |
 | `EZFD_DOMAIN` | The domain Caddy obtains a certificate for. Blank serves plain HTTP on port 80 |
 | `EZFD_HTTP_PORT`, `EZFD_HTTPS_PORT` | The host ports Caddy listens on, 80 and 443 by default. A certificate needs both at their defaults |
+| `EZFD_REF` | The branch, tag or commit of `https://github.com/nreed97/EzFD` the images are built from. Blank builds `master` |
+| `EZFD_SOURCE` | Replaces the repository and `EZFD_REF` entirely. `.` builds from the checkout `compose.yaml` sits in, including uncommitted changes; a fork's URL with its own `#branch` builds the fork. Blank uses GitHub at `EZFD_REF` |
 
 The call history and `MASTER.SCP` overrides work here too, under the same
 names. `EZFD_CERT_EMAIL` and `EZFD_REPO_DIR` are `deploy.sh`'s and are not

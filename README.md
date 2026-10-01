@@ -146,8 +146,8 @@ the app, provisions TLS and registers a systemd service. Re-running it is the
 update path and preserves your configuration.
 
 On any other machine with Docker, copy `.env.example` to `.env`, fill it in,
-and `docker compose up -d` builds the app locally and runs it, PostgreSQL and a
-Caddy proxy as containers instead. See
+and `docker compose up -d` builds the app from GitHub, at the branch `.env`
+names, and runs it, PostgreSQL and a Caddy proxy as containers instead. See
 [Deployment → Docker Compose](docs/deployment.md#docker-compose).
 
 Then open the site, create an event, and share the join code.

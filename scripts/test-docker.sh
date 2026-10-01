@@ -12,8 +12,10 @@
 #   - HOSTNAME left to Docker, which sets it to the container id, so the
 #     server binds where the proxy cannot reach it
 #   - .env in the build context, where the passwords can land in a layer
-#   - an app service that compose tries to pull rather than build, when the
-#     image is on no registry, which fails before anything starts
+#   - an image compose tries to pull rather than build, when it is on no
+#     registry, which fails before anything starts
+#   - a file mounted from beside compose.yaml, which breaks an install that
+#     has only compose.yaml and .env on disk and builds from GitHub
 #   - a setting compose.yaml reads that .env.example does not list, so the
 #     template a club copies no longer describes the install
 #   - a proxy that buffers, so live updates stop arriving
@@ -65,11 +67,21 @@ else
   no "the proxy does not buffer, so live updates stream"
 fi
 
-app_block="$(sed -n '/^  app:/,/^  [a-z]/p' compose.yaml)"
-if grep -Eq '^\s*pull_policy:\s*build' <<<"$app_block" && grep -Eq '^\s*build:' <<<"$app_block"; then
-  ok "the app image is built locally, never pulled"
+for svc in init app proxy; do
+  block="$(sed -n "/^  ${svc}:/,/^  [a-z]/p" compose.yaml)"
+  if grep -Eq '^\s*pull_policy:\s*build' <<<"$block" \
+     && grep -Eq "^\s*target:\s*${svc}\s*$" <<<"$block" \
+     && grep -Eq "^FROM .* AS ${svc}\s*$" Dockerfile; then
+    ok "the ${svc} image is built from the Dockerfile's ${svc} stage, never pulled"
+  else
+    no "the ${svc} image is built from the Dockerfile's ${svc} stage, never pulled" "(needs build: target: ${svc}, pull_policy: build, and a stage named ${svc})"
+  fi
+done
+
+if grep -Eq '^\s*-\s*\.{1,2}/' compose.yaml; then
+  no "compose.yaml mounts nothing from beside itself" "($(grep -E '^\s*-\s*\.{1,2}/' compose.yaml | head -1 | xargs))"
 else
-  no "the app image is built locally, never pulled" "(the app service needs build: and pull_policy: build)"
+  ok "compose.yaml mounts nothing from beside itself"
 fi
 
 if grep -Eq 'DATABASE_URL:\s*postgresql://ezfd:' compose.yaml; then

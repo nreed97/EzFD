@@ -1075,14 +1075,17 @@ update_app_docker() {
 
   local new_commit; new_commit=$(git -C "$SCRIPT_DIR" log --oneline -1 2>/dev/null || echo "(unknown)")
   label "Updated to:"; echo "$new_commit"
+
+  # The images are built from EZFD_SOURCE, or GitHub at EZFD_REF, not from
+  # this checkout — so an unchanged checkout says nothing about whether there
+  # is anything new to build, and the build always runs. When nothing changed
+  # it comes from the cache in seconds.
+  local source=""
+  source=$(docker compose -f "$COMPOSE_FILE" config 2>/dev/null | sed -n 's/^ *context: //p' | head -1)
+  label "Building:"; echo "${source:-(unknown)}"
   echo
 
-  if [[ "$cur_commit" == "$new_commit" ]]; then
-    warn "Already up to date — no rebuild needed."
-    pause; return
-  fi
-
-  echo -e "  ${DIM}Building the image (the running app is untouched)…${NC}"
+  echo -e "  ${DIM}Building the images (the running app is untouched)…${NC}"
   if ! docker compose -f "$COMPOSE_FILE" build 2>&1 | sed 's/^/    /'; then
     err "Build failed — nothing has been deployed."; pause; return
   fi

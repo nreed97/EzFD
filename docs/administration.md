@@ -497,8 +497,11 @@ schema and failed on its first query, with nothing on screen to say why.
 
 The order is the same, by a different mechanism:
 
-1. `git pull` in the checkout beside `compose.yaml`.
-2. `docker compose build`, while the old container keeps serving.
+1. `git pull` in the checkout beside `compose.yaml`, which keeps
+   `compose.yaml` and the console itself current.
+2. `docker compose build`, while the old container keeps serving. This
+   fetches the latest commit on `EZFD_REF` from GitHub, so it runs even when
+   the pull found nothing new.
 3. **`docker compose run --rm init`**, which applies `db/schema.sql`.
 4. `docker compose up -d`, which replaces the app.
 

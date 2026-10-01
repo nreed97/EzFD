@@ -2,7 +2,12 @@
 # EzFD — Docker Compose install. The alternative to deploy.sh for any machine
 # that runs Docker; see docs/deployment.md → "Docker Compose".
 #
-#   docker compose up -d      builds the app image here, then starts the stack
+#   docker compose up -d      builds the images from GitHub, then starts them
+#
+# This file and a .env beside it are all an install needs on disk: the app,
+# the schema step and the proxy config are all built from the git repository,
+# at the branch, tag or commit EZFD_REF names (master when unset). Set
+# EZFD_SOURCE=. to build from a checkout instead — local changes, or a fork.
 #
 # Settings come from .env beside this file: copy .env.example to .env and fill
 # it in (docs/configuration.md lists them). The three marked :? are required
@@ -13,11 +18,23 @@
 #   db     PostgreSQL 16, data in the ezfd-db volume
 #   init   one-shot: creates the ezfd role and applies db/schema.sql, on every
 #          start, before the app — the schema step deploy.sh runs on an update
-#   app    the Next.js standalone server, built locally from the Dockerfile
-#          (image ezfd:latest — it is not on any registry)
+#   app    the Next.js standalone server
 #   proxy  Caddy: TLS when EZFD_DOMAIN is set, plain HTTP on :80 when it isn't
+#
+# init, app and proxy are images built here, from one Dockerfile by target —
+# EzFD is not published to Docker Hub or any other registry, so there is
+# nothing to pull. pull_policy: build makes every `docker compose up` (and
+# tools that drive compose, such as Arcane) build them rather than look for
+# them on a registry first.
 # ─────────────────────────────────────────────────────────────────────────────
 name: ezfd
+
+# Where every image is built from. The default is the repository on GitHub at
+# EZFD_REF; EZFD_SOURCE replaces the whole thing, so `.` builds from this
+# checkout and a fork's URL (with its own #ref) builds the fork.
+x-source: &source
+  context: "${EZFD_SOURCE:-https://github.com/nreed97/EzFD.git#${EZFD_REF:-master}}"
+  dockerfile: Dockerfile
 
 services:
   db:
@@ -36,7 +53,11 @@ services:
       retries: 20
 
   init:
-    image: postgres:16
+    build:
+      <<: *source
+      target: init
+    image: ezfd-init:latest
+    pull_policy: build   # always build locally; this image is not on a registry
     restart: "no"
     depends_on:
       db:
@@ -47,22 +68,14 @@ services:
       PGDATABASE: ezfd
       PGPASSWORD: ${POSTGRES_PASSWORD}
       EZFD_DB_PASSWORD: ${EZFD_DB_PASSWORD:?set EZFD_DB_PASSWORD in .env}
-    volumes:
-      - ./db/schema.sql:/schema/schema.sql:ro
-      - ./docker/init-db.sh:/init-db.sh:ro
-    entrypoint: ["bash", "/init-db.sh"]
 
   app:
-    # Built here, from this checkout — EzFD is not published to Docker Hub or
-    # any other registry, so there is nothing to pull. pull_policy: build makes
-    # every `docker compose up` (and tools that drive compose, such as Arcane)
-    # build the image rather than look for it on a registry first. Unchanged
-    # layers come from the build cache, so a rebuild with no code change takes
-    # seconds. The Node major is the Dockerfile's NODE_MAJOR, checked against
-    # .nvmrc by scripts/test-docker.sh.
+    # Unchanged layers come from the build cache, so a rebuild with no code
+    # change takes seconds. The Node major is the Dockerfile's NODE_MAJOR,
+    # checked against .nvmrc by scripts/test-docker.sh.
     build:
-      context: .
-      dockerfile: Dockerfile
+      <<: *source
+      target: app
     image: ezfd:latest
     pull_policy: build   # always build locally; this image is not on a registry
     container_name: ezfd
@@ -84,7 +97,11 @@ services:
     stop_grace_period: 15s
 
   proxy:
-    image: caddy:2
+    build:
+      <<: *source
+      target: proxy
+    image: ezfd-proxy:latest
+    pull_policy: build   # always build locally; this image is not on a registry
     container_name: ezfd-proxy
     restart: unless-stopped
     depends_on:
@@ -99,7 +116,6 @@ services:
       - "${EZFD_HTTP_PORT:-80}:80"
       - "${EZFD_HTTPS_PORT:-443}:443"
     volumes:
-      - ./docker/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy-data:/data
       - caddy-config:/config
 
