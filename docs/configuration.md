@@ -78,9 +78,11 @@ server, refreshed at most once a day.
 ## The Docker Compose .env
 
 `compose.yaml` reads `.env` from the same directory and builds the app's
-environment from it. You write this file yourself; nothing generates it. The
-first three are required, and `docker compose` refuses to start without them,
-naming the one that is missing.
+environment from it. Start from the template in the repository —
+`cp .env.example .env` — which lists every setting below with a comment;
+nothing generates the file for you. The first three are required, and
+`docker compose` refuses to start without them, naming the one that is
+missing.
 
 | Variable | What it is |
 |---|---|
@@ -95,9 +97,9 @@ The call history and `MASTER.SCP` overrides work here too, under the same
 names. `EZFD_CERT_EMAIL` and `EZFD_REPO_DIR` are `deploy.sh`'s and are not
 used.
 
-Generate the secrets with `openssl rand -hex`, as
+Generate the secrets with `openssl rand -hex`, as `.env.example` and
 [Deployment → First install with Docker](deployment.md#first-install-with-docker)
-shows. Changing `EZFD_DB_PASSWORD` later is fine, since `init` re-applies it on
+show. Changing `EZFD_DB_PASSWORD` later is fine, since `init` re-applies it on
 the next start. Changing `POSTGRES_PASSWORD` after the first start is not: the
 `db` container only reads it when it creates the database, so the new value
 stops matching and `init` fails to connect.

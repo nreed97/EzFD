@@ -374,7 +374,8 @@ usually means `POSTGRES_PASSWORD` was changed in `.env` after the first start;
 see [Configuration → The Docker Compose .env](configuration.md#the-docker-compose-env).
 
 **`docker compose` refuses to start, naming a variable** — `.env` is missing
-or lacks one of the three required settings.
+or lacks one of the three required settings. Copy `.env.example` to `.env`
+and fill them in.
 
 **The site returns 502 after an update** — the app container was replaced but
 did not come up, or the schema step failed after compose had already stopped

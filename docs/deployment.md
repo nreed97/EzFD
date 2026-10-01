@@ -229,21 +229,27 @@ whole end-to-end suite through its proxy.
 ```bash
 $ git clone https://github.com/nreed97/EzFD.git ezfd
 $ cd ezfd
-$ cat > .env <<EOF
-POSTGRES_PASSWORD=$(openssl rand -hex 24)
-EZFD_DB_PASSWORD=$(openssl rand -hex 24)
-EZFD_ENCRYPTION_KEY=$(openssl rand -hex 32)
-EZFD_ADMIN_KEY=
-EZFD_DOMAIN=
-EOF
+$ cp .env.example .env
 $ chmod 600 .env
+$ nano .env
 $ docker compose up -d --build
 ```
 
-Fill in `EZFD_DOMAIN` before the last command for a TLS certificate; leave it
-blank for plain HTTP on port 80, by IP address or any name. `EZFD_ADMIN_KEY`
-works as it does on a `deploy.sh` install. Every setting is described in
+`.env.example` is the template, with a comment on every setting. Fill in the
+three required ones, generating each with the command the file gives beside
+it:
+
+```bash
+$ openssl rand -hex 24    # POSTGRES_PASSWORD, and again for EZFD_DB_PASSWORD
+$ openssl rand -hex 32    # EZFD_ENCRYPTION_KEY
+```
+
+Set `EZFD_DOMAIN` for a TLS certificate; leave it blank for plain HTTP on
+port 80, by IP address or any name. `EZFD_ADMIN_KEY` works as it does on a
+`deploy.sh` install. Every setting is described in
 [Configuration → The Docker Compose .env](configuration.md#the-docker-compose-env).
+The last command builds the image from this checkout, since `compose.yaml`
+carries the build step; there is no image to pull.
 
 Keep the passwords to letters and digits, as `openssl rand -hex` produces.
 `EZFD_DB_PASSWORD` is written into a connection URL, where some punctuation

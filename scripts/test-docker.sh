@@ -12,6 +12,8 @@
 #   - HOSTNAME left to Docker, which sets it to the container id, so the
 #     server binds where the proxy cannot reach it
 #   - .env in the build context, where the passwords can land in a layer
+#   - a setting compose.yaml reads that .env.example does not list, so the
+#     template a club copies no longer describes the install
 #   - a proxy that buffers, so live updates stop arriving
 #   - the app connecting as the superuser, so a TRUNCATE passes in Docker and
 #     fails on a deploy.sh install (see AGENTS.md)
@@ -65,6 +67,25 @@ if grep -Eq 'DATABASE_URL:\s*postgresql://ezfd:' compose.yaml; then
   ok "the app connects as ezfd, not as the superuser"
 else
   no "the app connects as ezfd, not as the superuser"
+fi
+
+# Every setting compose.yaml reads must be in the template a club copies, or
+# the template quietly stops describing the install. Read from compose.yaml
+# itself rather than listed here, so a new setting cannot skip this check.
+missing=""
+while read -r v; do
+  grep -Eq "^${v}=" .env.example || missing="$missing $v"
+done < <(grep -oE '[$][{][A-Z_][A-Z0-9_]*' compose.yaml | cut -c3- | sort -u)
+if [[ -z "$missing" ]]; then
+  ok ".env.example lists every setting compose.yaml reads"
+else
+  no ".env.example lists every setting compose.yaml reads" "(missing:$missing)"
+fi
+
+if git check-ignore -q .env.example 2>/dev/null; then
+  no ".env.example is committed, not ignored" "(.gitignore's .env* swallows it)"
+else
+  ok ".env.example is committed, not ignored"
 fi
 
 if grep -Eq '^\s*init:\s*true' compose.yaml; then

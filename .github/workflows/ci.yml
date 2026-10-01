@@ -318,13 +318,14 @@ jobs:
       - name: Image and compose file checks
         run: bash scripts/test-docker.sh
 
-      - name: Write .env
+      # From the committed template, as the install guide does, so the stack
+      # under test is the one a club gets from .env.example.
+      - name: Write .env from .env.example
         run: |
-          {
-            echo "POSTGRES_PASSWORD=$(openssl rand -hex 24)"
-            echo "EZFD_DB_PASSWORD=$(openssl rand -hex 24)"
-            echo "EZFD_ENCRYPTION_KEY=$(openssl rand -hex 32)"
-          } > .env
+          cp .env.example .env
+          sed -i "s/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=$(openssl rand -hex 24)/" .env
+          sed -i "s/^EZFD_DB_PASSWORD=.*/EZFD_DB_PASSWORD=$(openssl rand -hex 24)/" .env
+          sed -i "s/^EZFD_ENCRYPTION_KEY=.*/EZFD_ENCRYPTION_KEY=$(openssl rand -hex 32)/" .env
 
       - name: Build and start the stack
         run: docker compose up -d --build

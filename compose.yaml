@@ -4,8 +4,10 @@
 #
 #   docker compose up -d --build      first install, and every update after
 #
-# Settings come from .env beside this file (docs/configuration.md lists them).
-# The three marked :? are required and compose refuses to start without them.
+# Settings come from .env beside this file: copy .env.example to .env and fill
+# it in (docs/configuration.md lists them). The three marked :? are required
+# and compose refuses to start without them. scripts/test-docker.sh fails if
+# this file reads a variable .env.example does not list.
 #
 # Four services, one of which exits:
 #   db     PostgreSQL 16, data in the ezfd-db volume
