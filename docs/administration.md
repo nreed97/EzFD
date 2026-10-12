@@ -51,15 +51,18 @@ $ echo $?
 
 ## On a Docker install
 
-Run it from the checkout that holds `compose.yaml`, on the host:
+Run it on the host, from any folder. If you have no checkout, as when a tool
+such as Arcane manages the stack, download it on its own:
 
 ```bash
-$ cd ezfd && sudo bash ezfd-admin.sh
+$ curl -fsSLO https://raw.githubusercontent.com/nreed97/EzFD/master/ezfd-admin.sh
+$ sudo bash ezfd-admin.sh
 ```
 
-It recognises the install by the running `db` container and sends its queries
-through `docker compose exec`. Everything in the menu works, with two
-differences in how:
+It recognises the install by the running `ezfd-db` container and sends its
+queries through `docker exec`. If that container exists but is stopped, it
+says so rather than suggesting a PostgreSQL service to start. Everything in
+the menu works, with two differences in how:
 
 - **Update application** builds a new image and replaces the container rather
   than rsyncing into `/opt/ezfd`. See
@@ -498,7 +501,15 @@ schema and failed on its first query, with nothing on screen to say why.
 The order is the same, by a different mechanism:
 
 1. `git pull` in the checkout beside `compose.yaml`, which keeps
-   `compose.yaml` and the console itself current.
+   `compose.yaml` and the console itself current. A folder that is not a git
+   checkout, with `compose.yaml` and `.env` on their own, skips this step.
+
+The console finds `compose.yaml` beside itself, or else at the path compose
+recorded on the running stack. When neither exists on this machine, as with a
+manager that runs compose inside its own container, the update says so and
+stops; update from that tool instead, or run the steps below in the folder
+holding `compose.yaml`.
+
 2. `docker compose build`, while the old container keeps serving. This
    fetches the latest commit on `EZFD_REF` from GitHub, so it runs even when
    the pull found nothing new.
@@ -529,7 +540,7 @@ Three more that are easy to get wrong:
 
 **Query through `PG()` or `PGS()`, not a bare `psql`.** Both go through
 `psql_su()`, which is the one place the two installs differ — `sudo -u
-postgres psql` on a `deploy.sh` install, `docker compose exec` on a Docker
+postgres psql` on a `deploy.sh` install, `docker exec ezfd-db` on a Docker
 one — so a bare `psql` also works on only one of them. Both set the field
 separator to an ASCII unit separator (`\x1f`) rather than psql's default pipe,
 and every row reader splits on `$FS` to match:

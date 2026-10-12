@@ -37,6 +37,16 @@ only run events.
   backups, exports, the clock tools and a safe update. ([#105])
   Docs: [Deployment → Docker Compose](deployment.md#docker-compose), [Deployment → Behind your own reverse proxy](deployment.md#behind-your-own-reverse-proxy), [Administration → On a Docker install](administration.md#on-a-docker-install), [Configuration → The Docker Compose .env](configuration.md#the-docker-compose-env)
 
+### Fixed
+
+- **The admin console finds a Docker install from any folder** `Setup` — It
+  used to look for `compose.yaml` beside itself, so run from a home directory
+  on a stack managed by a tool such as Arcane, it fell back to the bare-server
+  path and said to start a PostgreSQL service that is not there. It now finds
+  the `ezfd-db` container by name, and its update works in a folder that is
+  not a git checkout. ([#106])
+  Docs: [Administration → On a Docker install](administration.md#on-a-docker-install)
+
 ## 2026-09-23
 
 ### Changed
@@ -831,3 +841,4 @@ continuous enough to be worth summarising.
 [#103]: https://github.com/nreed97/EzFD/pull/103
 [#104]: https://github.com/nreed97/EzFD/pull/104
 [#105]: https://github.com/nreed97/EzFD/pull/105
+[#106]: https://github.com/nreed97/EzFD/pull/106
