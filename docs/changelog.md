@@ -23,6 +23,16 @@ only run events.
 
 ---
 
+## 2026-10-17
+
+### Fixed
+
+- **Sections missing from the map** `Display` — The Map view sometimes showed
+  only the section labels, with no fills or borders, until you switched views
+  and back. Whenever the sections loaded before the land, the land was drawn
+  over them; the land now always stays underneath, in every browser.
+  Docs: [Troubleshooting → The map shows only the section labels, with no sections or borders](troubleshooting.md#the-map-shows-only-the-section-labels-with-no-sections-or-borders)
+
 ## 2026-10-01
 
 ### Added
