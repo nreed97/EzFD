@@ -13,7 +13,7 @@ convenience.
 
 ## Two ways to connect
 
-There are two transports. The bridge is the default and works everywhere; the
+There are two transports. The bridge is the default and works almost everywhere; the
 browser can also open the CAT port itself on some setups, which needs nothing
 installed.
 
@@ -21,7 +21,7 @@ installed.
 |---|---|---|
 | Needs installing | Python, and Hamlib | nothing |
 | Kept running | a second process, per radio | nothing |
-| Browsers | all of them | Chrome, Edge and other Chromium browsers only — not Firefox, not Safari, and no browser on iOS |
+| Browsers | all of them, except Safari when the server uses `https://` | Chrome, Edge and other Chromium browsers only — not Firefox, not Safari, and no browser on iOS |
 | Served over plain HTTP | works | **not available** — the browser only offers serial ports on a secure page |
 | Radios | around 200, through Hamlib | Kenwood and Elecraft commands, which also covers FlexRadio SmartCAT |
 | Band and mode follow the VFO | yes | yes |
@@ -163,6 +163,11 @@ there permanently offsets every later frequency reading by one field.
 **The header's Rig button still reads `off`.** Check the bridge is running and shows no errors.
 The browser connects to `localhost`, so the bridge must be on the same machine
 as the browser, not the server.
+
+**The bridge shows the frequency but Safari never connects.** Safari blocks a
+page served over `https://` from talking to the bridge's plain `ws://localhost`
+link, and says nothing on screen. Chrome, Edge and Firefox allow it. Use one of
+those for rig control, or a server on plain HTTP.
 
 **"Rig not responding (no reply within 2s)" keeps repeating.** `rigctld` is
 answering slowly or not at all, most often because the Hamlib model doesn't

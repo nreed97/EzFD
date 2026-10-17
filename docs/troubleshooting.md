@@ -186,6 +186,8 @@ isn't obvious which.
 
 **The header's Rig button still reads `off`.** The bridge must run on the same machine as the
 browser — it connects to `localhost:4575`. Check the bridge window for errors.
+If the bridge shows the frequency and you are in Safari on an `https://`
+server, Safari is blocking the link; use Chrome, Edge or Firefox.
 
 **"Rig not responding (no reply within 2s)" keeps repeating, or the mode shows
 where the frequency should be.** The Hamlib model doesn't match what the radio

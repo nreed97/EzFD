@@ -42,6 +42,14 @@ only run events.
   malformed reply and the next reading is correct.
   Docs: [Rig control → Troubleshooting](rig-control.md#troubleshooting), [Rig control → Radio-specific notes](rig-control.md#radio-specific-notes)
 
+### Changed
+
+- **Safari and the rig bridge** `Display` — The rig control guide said the
+  bridge works in every browser. Safari blocks it on a server that uses
+  `https://`, which most do, so the guide and troubleshooting page now say so
+  and point at Chrome, Edge or Firefox.
+  Docs: [Rig control → Two ways to connect](rig-control.md#two-ways-to-connect), [Rig control → Troubleshooting](rig-control.md#troubleshooting)
+
 ## 2026-10-01
 
 ### Added
