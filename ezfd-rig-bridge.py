@@ -499,6 +499,10 @@ def start_rigctld(cfg: dict, rigctld_port: int) -> "subprocess.Popen | None":
 class RigError(Exception):
     """Rig returned an RPRT error code — rigctld is alive but the rig isn't responding."""
 
+class RigTimeout(RigError):
+    """rigctld didn't answer in time. The connection has already been replaced,
+    so the caller only needs to try again."""
+
 class RigCtldClient:
     """Minimal async client for rigctld's simple (non-extended) protocol."""
 
@@ -512,15 +516,32 @@ class RigCtldClient:
     async def connect(self):
         self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
 
+    async def _resync(self):
+        """Drops the connection and opens a fresh one. Called (under the lock)
+        whenever a reply is late or isn't the shape the command expects.
+
+        rigctld answers strictly in order, so a reply that arrives after we
+        gave up waiting is read as the answer to the *next* command — the
+        mode turns up where the frequency belongs, a frequency where the mode
+        belongs, and every later reading stays one field off for as long as
+        the connection lives. A new connection carries none of those stray
+        lines. Slow CAT links hit this routinely: a radio emulator, or the
+        wrong Hamlib model making rigctld retry each command."""
+        await self.close()
+        try:
+            await self.connect()
+        except Exception:
+            self.reader = self.writer = None
+
     async def _send(self, cmd: str):
+        if self.writer is None:
+            await self.connect()
         assert self.writer
         self.writer.write((cmd + "\n").encode())
         await self.writer.drain()
 
     async def _readline(self) -> str:
-        assert self.reader
-        line = await asyncio.wait_for(self.reader.readline(), timeout=2.0)
-        text = line.decode().strip()
+        text = await self._raw_readline()
         if text.startswith("RPRT"):
             raise RigError(text)
         return text
@@ -528,7 +549,14 @@ class RigCtldClient:
     async def _raw_readline(self, timeout: float = 2.0) -> str:
         """Like _readline but never raises on RPRT — caller inspects it directly."""
         assert self.reader
-        line = await asyncio.wait_for(self.reader.readline(), timeout=timeout)
+        try:
+            line = await asyncio.wait_for(self.reader.readline(), timeout=timeout)
+        except asyncio.TimeoutError:
+            await self._resync()
+            raise RigTimeout(f"no reply within {timeout:g}s") from None
+        if not line:
+            await self._resync()
+            raise ConnectionError("rigctld closed the connection")
         return line.decode().strip()
 
     async def _read_rprt(self, timeout: float = 3.0):
@@ -536,6 +564,7 @@ class RigCtldClient:
         Raises RigError if the code is non-zero or the line is malformed."""
         text = await self._raw_readline(timeout)
         if not text.startswith("RPRT"):
+            await self._resync()
             raise RigError(f"Unexpected response: {text}")
         parts = text.split()
         code = parts[-1] if len(parts) > 1 else "?"
@@ -546,7 +575,12 @@ class RigCtldClient:
         """Returns VFO frequency in Hz."""
         async with self.lock:
             await self._send("f")
-            return int(await self._readline())
+            text = await self._readline()
+            try:
+                return int(text)
+            except ValueError:
+                await self._resync()
+                raise RigError(f"Unexpected response: {text}") from None
 
     async def get_mode(self) -> str:
         """Returns Hamlib mode string (e.g. 'USB', 'CW', 'RTTY')."""
@@ -591,6 +625,7 @@ class RigCtldClient:
                 await self.writer.wait_closed()
             except Exception:
                 pass
+        self.reader = self.writer = None
 
 async def probe_cw_support(host: str, port: int) -> bool:
     """Checks whether the rig supports CAT-based CW sending, via \\dump_caps.

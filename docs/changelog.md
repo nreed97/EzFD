@@ -34,6 +34,13 @@ only run events.
   environment in `~/.ezfd/rig-bridge-venv` and runs from that, so it starts
   with nothing installed by hand. Download the bridge again to pick this up.
   Docs: [Rig control → Setup](rig-control.md#setup), [Troubleshooting → Rig control](troubleshooting.md#rig-control)
+- **Rig readings swapped after a slow reply** `Display` — When `rigctld` took
+  more than two seconds to answer, the bridge read the late reply as the
+  answer to its next question, so the mode showed up as the frequency, CW
+  macros failed with "Unexpected response", and it stayed wrong until the
+  bridge was restarted. It now reopens the connection after any late or
+  malformed reply and the next reading is correct.
+  Docs: [Rig control → Troubleshooting](rig-control.md#troubleshooting), [Rig control → Radio-specific notes](rig-control.md#radio-specific-notes)
 
 ## 2026-10-01
 

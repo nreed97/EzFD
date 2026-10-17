@@ -141,6 +141,12 @@ These are the ones that have actually caused trouble:
 `2014`, not any FlexRadio-specific model — those are TCP-only and cannot open
 a COM port at all.
 
+**FlexRadio via AetherSDR** on a Mac or Linux works the same way: turn on its
+TS-2000 CAT emulation, pick Hamlib model `2014`, and give `127.0.0.1:` and the
+port AetherSDR shows (for example `127.0.0.1:5001`) as the serial port. A
+FlexRadio model number here sends commands the emulation doesn't answer, and
+every reading arrives late.
+
 **Virtual and software CAT ports** often don't implement RTS/CTS hardware
 handshaking, which causes silent write failures. The bridge defaults serial
 connections to `serial_handshake=None` for this reason. It's a safe default
@@ -158,8 +164,12 @@ there permanently offsets every later frequency reading by one field.
 The browser connects to `localhost`, so the bridge must be on the same machine
 as the browser, not the server.
 
-**Frequency reads are wrong or drift by one field.** Restart the bridge. This
-is the desynchronisation described above and it doesn't self-correct.
+**"Rig not responding (no reply within 2s)" keeps repeating.** `rigctld` is
+answering slowly or not at all, most often because the Hamlib model doesn't
+match what the radio, or the program emulating it, actually speaks. Check the
+model number first; see [Radio-specific notes](#radio-specific-notes). The
+bridge reopens its connection after each late reply, so a late answer can no
+longer be mistaken for the next one.
 
 **CW button never appears.** The rig didn't report CAT keying support. Not all
 radios have it, and some need it enabled in a menu. The rest of rig control

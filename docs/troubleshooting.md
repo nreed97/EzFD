@@ -187,9 +187,11 @@ isn't obvious which.
 **The header's Rig button still reads `off`.** The bridge must run on the same machine as the
 browser — it connects to `localhost:4575`. Check the bridge window for errors.
 
-**Frequency readings are wrong or offset.** Restart the bridge. A misread byte
-on the polling connection permanently offsets every later reading by one
-field, and it doesn't self-correct.
+**"Rig not responding (no reply within 2s)" keeps repeating, or the mode shows
+where the frequency should be.** The Hamlib model doesn't match what the radio
+speaks, so every reply is late. With a FlexRadio through SmartCAT or AetherSDR,
+use model `2014`. Older copies of the bridge also read each late reply as the
+answer to the next question; download it again to get one that recovers.
 
 **No CW button.** The radio didn't report CAT keying support. Some rigs need
 it enabled in a menu; many don't have it at all.
