@@ -59,6 +59,15 @@ serial, and run:
 $ python3 ezfd-rig-bridge.py
 ```
 
+It needs Python 3 and nothing else installed by hand. The first time it runs it
+fetches the one library it uses, `websockets`. Some Pythons refuse to install
+anything system-wide, notably Homebrew's on a Mac and the system Python on
+recent Debian, Ubuntu and Raspberry Pi OS, which say
+`externally-managed-environment`. On those the bridge sets up a private
+environment of its own in `~/.ezfd/rig-bridge-venv` and runs from it, so your
+system Python is left alone and later starts go straight there. Deleting that
+folder is safe; the bridge rebuilds it on the next start.
+
 The script will:
 
 1. Find `rigctld`, offering to install Hamlib if it's missing.
@@ -160,6 +169,11 @@ still works.
 the keying command. The bridge deliberately never does this, because `rigctld`
 only accepts one when started with `--vfo` — and without it the word "VFO"
 gets sent as Morse, which sounds confusingly like "4FO" on the air.
+
+**"Could not create ~/.ezfd/rig-bridge-venv".** Your Python can't install
+packages system-wide and is also missing its `venv` module. On Debian, Ubuntu
+or Raspberry Pi OS run `sudo apt install python3-venv` and start the bridge
+again. See [Setup](#setup) for why the bridge needs it.
 
 **Serial port permission denied on Linux.** Add yourself to the `dialout`
 group and log back in.

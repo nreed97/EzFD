@@ -198,6 +198,12 @@ it enabled in a menu; many don't have it at all.
 `rigctld` only accepts one when started with `--vfo`; without it the literal
 word gets keyed, which sounds like "4FO" on the air.
 
+**The bridge stops with `externally-managed-environment`, or "Could not create
+~/.ezfd/rig-bridge-venv".** A current copy of the bridge handles the first by
+setting up its own private Python environment, so download it again from the
+logger's **Rig** panel. The second means Python's `venv` module is missing: on
+Debian, Ubuntu or Raspberry Pi OS, run `sudo apt install python3-venv`.
+
 **Permission denied on the serial port.** On Linux, add yourself to `dialout`
 and log back in.
 

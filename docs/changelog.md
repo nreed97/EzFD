@@ -23,6 +23,18 @@ only run events.
 
 ---
 
+## 2026-10-17
+
+### Fixed
+
+- **The rig bridge on Homebrew Python and recent Linux** `Setup` — On a Mac
+  with Homebrew's Python, and on recent Debian, Ubuntu and Raspberry Pi OS, the
+  bridge crashed on first start with `externally-managed-environment` because
+  it tried to install its one library system-wide. It now sets up a private
+  environment in `~/.ezfd/rig-bridge-venv` and runs from that, so it starts
+  with nothing installed by hand. Download the bridge again to pick this up.
+  Docs: [Rig control → Setup](rig-control.md#setup), [Troubleshooting → Rig control](troubleshooting.md#rig-control)
+
 ## 2026-10-01
 
 ### Added

@@ -40,14 +40,83 @@ from pathlib import Path
 logging.getLogger("websockets").setLevel(logging.CRITICAL)
 
 # ── Auto-install websockets if missing ────────────────────────────────────────
+# Homebrew's Python, and Debian/Ubuntu's since 12/23.04, refuse a system-wide
+# `pip install` (PEP 668, "externally-managed-environment"). When pip refuses,
+# the bridge keeps a private virtual environment of its own under ~/.ezfd/ and
+# re-runs itself with that environment's Python, so the operator's system
+# Python is never touched and the next start goes straight there.
+BRIDGE_VENV = Path.home() / ".ezfd" / "rig-bridge-venv"
+_VENV_PY = BRIDGE_VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+
+
+def _in_bridge_venv():
+    try:
+        return Path(sys.prefix).resolve() == BRIDGE_VENV.resolve()
+    except OSError:
+        return False
+
+
+def _rerun_in_bridge_venv():
+    argv = [str(_VENV_PY), os.path.abspath(__file__), *sys.argv[1:]]
+    sys.stdout.flush()
+    if os.name == "nt":
+        # os.execv on Windows starts a detached process and returns to the
+        # prompt at once; wait for the child instead so Ctrl+C still works.
+        try:
+            sys.exit(subprocess.call(argv))
+        except KeyboardInterrupt:
+            sys.exit(130)
+    os.execv(argv[0], argv)
+
+
+def _pip_install(python):
+    return subprocess.run(
+        [str(python), "-m", "pip", "install", "websockets", "--quiet"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+    )
+
+
+def _ensure_websockets():
+    if _in_bridge_venv():
+        # Already re-run into our own environment and it still lacks the
+        # library (an interrupted earlier install): install it here.
+        print("  [*] Installing 'websockets' into the bridge's own environment...")
+        result = _pip_install(sys.executable)
+        if result.returncode != 0:
+            sys.exit(f"  [!] Could not install 'websockets':\n{result.stderr}")
+        return
+
+    if _VENV_PY.exists():
+        _rerun_in_bridge_venv()
+
+    print("  [*] 'websockets' not installed — installing now...")
+    if _pip_install(sys.executable).returncode == 0:
+        return
+
+    # Most often this is an externally managed Python. Leave it alone.
+    print(f"  [*] This Python won't install packages system-wide; "
+          f"setting up a private one in {BRIDGE_VENV} instead...")
+    import venv
+    try:
+        venv.create(BRIDGE_VENV, with_pip=True, clear=True)
+    except Exception as exc:  # noqa: BLE001 — any failure gets the same advice
+        shutil.rmtree(BRIDGE_VENV, ignore_errors=True)
+        hint = ("  On Debian, Ubuntu or Raspberry Pi OS, run "
+                "'sudo apt install python3-venv' and start the bridge again."
+                if platform.system() == "Linux" else "")
+        sys.exit(f"  [!] Could not create {BRIDGE_VENV}: {exc}\n{hint}")
+    result = _pip_install(_VENV_PY)
+    if result.returncode != 0:
+        shutil.rmtree(BRIDGE_VENV, ignore_errors=True)
+        sys.exit(f"  [!] Could not install 'websockets':\n{result.stderr}")
+    print("  [+] Done. Future starts use it automatically.")
+    _rerun_in_bridge_venv()
+
+
 try:
     import websockets
 except ImportError:
-    print("  [*] 'websockets' not installed — installing now...")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "websockets", "--quiet"],
-        stdout=subprocess.DEVNULL,
-    )
+    _ensure_websockets()
     import websockets  # noqa: E402
 
 # ── Configuration ─────────────────────────────────────────────────────────────
