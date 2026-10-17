@@ -23,6 +23,33 @@ only run events.
 
 ---
 
+## 2026-10-17
+
+### Fixed
+
+- **The rig bridge on Homebrew Python and recent Linux** `Setup` — On a Mac
+  with Homebrew's Python, and on recent Debian, Ubuntu and Raspberry Pi OS, the
+  bridge crashed on first start with `externally-managed-environment` because
+  it tried to install its one library system-wide. It now sets up a private
+  environment in `~/.ezfd/rig-bridge-venv` and runs from that, so it starts
+  with nothing installed by hand. Download the bridge again to pick this up. ([#107])
+  Docs: [Rig control → Setup](rig-control.md#setup), [Troubleshooting → Rig control](troubleshooting.md#rig-control)
+- **Rig readings swapped after a slow reply** `Display` — When `rigctld` took
+  more than two seconds to answer, the bridge read the late reply as the
+  answer to its next question, so the mode showed up as the frequency, CW
+  macros failed with "Unexpected response", and it stayed wrong until the
+  bridge was restarted. It now reopens the connection after any late or
+  malformed reply and the next reading is correct. ([#107])
+  Docs: [Rig control → Troubleshooting](rig-control.md#troubleshooting), [Rig control → Radio-specific notes](rig-control.md#radio-specific-notes)
+
+### Changed
+
+- **Safari and the rig bridge** `Display` — The rig control guide said the
+  bridge works in every browser. Safari blocks it on a server that uses
+  `https://`, which most do, so the guide and troubleshooting page now say so
+  and point at Chrome, Edge or Firefox. ([#107])
+  Docs: [Rig control → Two ways to connect](rig-control.md#two-ways-to-connect), [Rig control → Troubleshooting](rig-control.md#troubleshooting)
+
 ## 2026-10-01
 
 ### Added
@@ -842,3 +869,4 @@ continuous enough to be worth summarising.
 [#104]: https://github.com/nreed97/EzFD/pull/104
 [#105]: https://github.com/nreed97/EzFD/pull/105
 [#106]: https://github.com/nreed97/EzFD/pull/106
+[#107]: https://github.com/nreed97/EzFD/pull/107

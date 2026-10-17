@@ -186,10 +186,14 @@ isn't obvious which.
 
 **The header's Rig button still reads `off`.** The bridge must run on the same machine as the
 browser — it connects to `localhost:4575`. Check the bridge window for errors.
+If the bridge shows the frequency and you are in Safari on an `https://`
+server, Safari is blocking the link; use Chrome, Edge or Firefox.
 
-**Frequency readings are wrong or offset.** Restart the bridge. A misread byte
-on the polling connection permanently offsets every later reading by one
-field, and it doesn't self-correct.
+**"Rig not responding (no reply within 2s)" keeps repeating, or the mode shows
+where the frequency should be.** The Hamlib model doesn't match what the radio
+speaks, so every reply is late. With a FlexRadio through SmartCAT or AetherSDR,
+use model `2014`. Older copies of the bridge also read each late reply as the
+answer to the next question; download it again to get one that recovers.
 
 **No CW button.** The radio didn't report CAT keying support. Some rigs need
 it enabled in a menu; many don't have it at all.
@@ -197,6 +201,12 @@ it enabled in a menu; many don't have it at all.
 **CW sends "VFO" as text.** A VFO argument is reaching the keying command.
 `rigctld` only accepts one when started with `--vfo`; without it the literal
 word gets keyed, which sounds like "4FO" on the air.
+
+**The bridge stops with `externally-managed-environment`, or "Could not create
+~/.ezfd/rig-bridge-venv".** A current copy of the bridge handles the first by
+setting up its own private Python environment, so download it again from the
+logger's **Rig** panel. The second means Python's `venv` module is missing: on
+Debian, Ubuntu or Raspberry Pi OS, run `sudo apt install python3-venv`.
 
 **Permission denied on the serial port.** On Linux, add yourself to `dialout`
 and log back in.

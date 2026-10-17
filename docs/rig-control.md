@@ -13,7 +13,7 @@ convenience.
 
 ## Two ways to connect
 
-There are two transports. The bridge is the default and works everywhere; the
+There are two transports. The bridge is the default and works almost everywhere; the
 browser can also open the CAT port itself on some setups, which needs nothing
 installed.
 
@@ -21,7 +21,7 @@ installed.
 |---|---|---|
 | Needs installing | Python, and Hamlib | nothing |
 | Kept running | a second process, per radio | nothing |
-| Browsers | all of them | Chrome, Edge and other Chromium browsers only — not Firefox, not Safari, and no browser on iOS |
+| Browsers | all of them, except Safari when the server uses `https://` | Chrome, Edge and other Chromium browsers only — not Firefox, not Safari, and no browser on iOS |
 | Served over plain HTTP | works | **not available** — the browser only offers serial ports on a secure page |
 | Radios | around 200, through Hamlib | Kenwood and Elecraft commands, which also covers FlexRadio SmartCAT |
 | Band and mode follow the VFO | yes | yes |
@@ -58,6 +58,15 @@ serial, and run:
 ```bash
 $ python3 ezfd-rig-bridge.py
 ```
+
+It needs Python 3 and nothing else installed by hand. The first time it runs it
+fetches the one library it uses, `websockets`. Some Pythons refuse to install
+anything system-wide, notably Homebrew's on a Mac and the system Python on
+recent Debian, Ubuntu and Raspberry Pi OS, which say
+`externally-managed-environment`. On those the bridge sets up a private
+environment of its own in `~/.ezfd/rig-bridge-venv` and runs from it, so your
+system Python is left alone and later starts go straight there. Deleting that
+folder is safe; the bridge rebuilds it on the next start.
 
 The script will:
 
@@ -132,6 +141,12 @@ These are the ones that have actually caused trouble:
 `2014`, not any FlexRadio-specific model — those are TCP-only and cannot open
 a COM port at all.
 
+**FlexRadio via AetherSDR** on a Mac or Linux works the same way: turn on its
+TS-2000 CAT emulation, pick Hamlib model `2014`, and give `127.0.0.1:` and the
+port AetherSDR shows (for example `127.0.0.1:5001`) as the serial port. A
+FlexRadio model number here sends commands the emulation doesn't answer, and
+every reading arrives late.
+
 **Virtual and software CAT ports** often don't implement RTS/CTS hardware
 handshaking, which causes silent write failures. The bridge defaults serial
 connections to `serial_handshake=None` for this reason. It's a safe default
@@ -149,8 +164,17 @@ there permanently offsets every later frequency reading by one field.
 The browser connects to `localhost`, so the bridge must be on the same machine
 as the browser, not the server.
 
-**Frequency reads are wrong or drift by one field.** Restart the bridge. This
-is the desynchronisation described above and it doesn't self-correct.
+**The bridge shows the frequency but Safari never connects.** Safari blocks a
+page served over `https://` from talking to the bridge's plain `ws://localhost`
+link, and says nothing on screen. Chrome, Edge and Firefox allow it. Use one of
+those for rig control, or a server on plain HTTP.
+
+**"Rig not responding (no reply within 2s)" keeps repeating.** `rigctld` is
+answering slowly or not at all, most often because the Hamlib model doesn't
+match what the radio, or the program emulating it, actually speaks. Check the
+model number first; see [Radio-specific notes](#radio-specific-notes). The
+bridge reopens its connection after each late reply, so a late answer can no
+longer be mistaken for the next one.
 
 **CW button never appears.** The rig didn't report CAT keying support. Not all
 radios have it, and some need it enabled in a menu. The rest of rig control
@@ -160,6 +184,11 @@ still works.
 the keying command. The bridge deliberately never does this, because `rigctld`
 only accepts one when started with `--vfo` — and without it the word "VFO"
 gets sent as Morse, which sounds confusingly like "4FO" on the air.
+
+**"Could not create ~/.ezfd/rig-bridge-venv".** Your Python can't install
+packages system-wide and is also missing its `venv` module. On Debian, Ubuntu
+or Raspberry Pi OS run `sudo apt install python3-venv` and start the bridge
+again. See [Setup](#setup) for why the bridge needs it.
 
 **Serial port permission denied on Linux.** Add yourself to the `dialout`
 group and log back in.
