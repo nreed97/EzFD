@@ -40,14 +40,83 @@ from pathlib import Path
 logging.getLogger("websockets").setLevel(logging.CRITICAL)
 
 # ── Auto-install websockets if missing ────────────────────────────────────────
+# Homebrew's Python, and Debian/Ubuntu's since 12/23.04, refuse a system-wide
+# `pip install` (PEP 668, "externally-managed-environment"). When pip refuses,
+# the bridge keeps a private virtual environment of its own under ~/.ezfd/ and
+# re-runs itself with that environment's Python, so the operator's system
+# Python is never touched and the next start goes straight there.
+BRIDGE_VENV = Path.home() / ".ezfd" / "rig-bridge-venv"
+_VENV_PY = BRIDGE_VENV / ("Scripts/python.exe" if os.name == "nt" else "bin/python")
+
+
+def _in_bridge_venv():
+    try:
+        return Path(sys.prefix).resolve() == BRIDGE_VENV.resolve()
+    except OSError:
+        return False
+
+
+def _rerun_in_bridge_venv():
+    argv = [str(_VENV_PY), os.path.abspath(__file__), *sys.argv[1:]]
+    sys.stdout.flush()
+    if os.name == "nt":
+        # os.execv on Windows starts a detached process and returns to the
+        # prompt at once; wait for the child instead so Ctrl+C still works.
+        try:
+            sys.exit(subprocess.call(argv))
+        except KeyboardInterrupt:
+            sys.exit(130)
+    os.execv(argv[0], argv)
+
+
+def _pip_install(python):
+    return subprocess.run(
+        [str(python), "-m", "pip", "install", "websockets", "--quiet"],
+        stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True,
+    )
+
+
+def _ensure_websockets():
+    if _in_bridge_venv():
+        # Already re-run into our own environment and it still lacks the
+        # library (an interrupted earlier install): install it here.
+        print("  [*] Installing 'websockets' into the bridge's own environment...")
+        result = _pip_install(sys.executable)
+        if result.returncode != 0:
+            sys.exit(f"  [!] Could not install 'websockets':\n{result.stderr}")
+        return
+
+    if _VENV_PY.exists():
+        _rerun_in_bridge_venv()
+
+    print("  [*] 'websockets' not installed — installing now...")
+    if _pip_install(sys.executable).returncode == 0:
+        return
+
+    # Most often this is an externally managed Python. Leave it alone.
+    print(f"  [*] This Python won't install packages system-wide; "
+          f"setting up a private one in {BRIDGE_VENV} instead...")
+    import venv
+    try:
+        venv.create(BRIDGE_VENV, with_pip=True, clear=True)
+    except Exception as exc:  # noqa: BLE001 — any failure gets the same advice
+        shutil.rmtree(BRIDGE_VENV, ignore_errors=True)
+        hint = ("  On Debian, Ubuntu or Raspberry Pi OS, run "
+                "'sudo apt install python3-venv' and start the bridge again."
+                if platform.system() == "Linux" else "")
+        sys.exit(f"  [!] Could not create {BRIDGE_VENV}: {exc}\n{hint}")
+    result = _pip_install(_VENV_PY)
+    if result.returncode != 0:
+        shutil.rmtree(BRIDGE_VENV, ignore_errors=True)
+        sys.exit(f"  [!] Could not install 'websockets':\n{result.stderr}")
+    print("  [+] Done. Future starts use it automatically.")
+    _rerun_in_bridge_venv()
+
+
 try:
     import websockets
 except ImportError:
-    print("  [*] 'websockets' not installed — installing now...")
-    subprocess.check_call(
-        [sys.executable, "-m", "pip", "install", "websockets", "--quiet"],
-        stdout=subprocess.DEVNULL,
-    )
+    _ensure_websockets()
     import websockets  # noqa: E402
 
 # ── Configuration ─────────────────────────────────────────────────────────────
@@ -430,6 +499,10 @@ def start_rigctld(cfg: dict, rigctld_port: int) -> "subprocess.Popen | None":
 class RigError(Exception):
     """Rig returned an RPRT error code — rigctld is alive but the rig isn't responding."""
 
+class RigTimeout(RigError):
+    """rigctld didn't answer in time. The connection has already been replaced,
+    so the caller only needs to try again."""
+
 class RigCtldClient:
     """Minimal async client for rigctld's simple (non-extended) protocol."""
 
@@ -443,15 +516,32 @@ class RigCtldClient:
     async def connect(self):
         self.reader, self.writer = await asyncio.open_connection(self.host, self.port)
 
+    async def _resync(self):
+        """Drops the connection and opens a fresh one. Called (under the lock)
+        whenever a reply is late or isn't the shape the command expects.
+
+        rigctld answers strictly in order, so a reply that arrives after we
+        gave up waiting is read as the answer to the *next* command — the
+        mode turns up where the frequency belongs, a frequency where the mode
+        belongs, and every later reading stays one field off for as long as
+        the connection lives. A new connection carries none of those stray
+        lines. Slow CAT links hit this routinely: a radio emulator, or the
+        wrong Hamlib model making rigctld retry each command."""
+        await self.close()
+        try:
+            await self.connect()
+        except Exception:
+            self.reader = self.writer = None
+
     async def _send(self, cmd: str):
+        if self.writer is None:
+            await self.connect()
         assert self.writer
         self.writer.write((cmd + "\n").encode())
         await self.writer.drain()
 
     async def _readline(self) -> str:
-        assert self.reader
-        line = await asyncio.wait_for(self.reader.readline(), timeout=2.0)
-        text = line.decode().strip()
+        text = await self._raw_readline()
         if text.startswith("RPRT"):
             raise RigError(text)
         return text
@@ -459,7 +549,14 @@ class RigCtldClient:
     async def _raw_readline(self, timeout: float = 2.0) -> str:
         """Like _readline but never raises on RPRT — caller inspects it directly."""
         assert self.reader
-        line = await asyncio.wait_for(self.reader.readline(), timeout=timeout)
+        try:
+            line = await asyncio.wait_for(self.reader.readline(), timeout=timeout)
+        except asyncio.TimeoutError:
+            await self._resync()
+            raise RigTimeout(f"no reply within {timeout:g}s") from None
+        if not line:
+            await self._resync()
+            raise ConnectionError("rigctld closed the connection")
         return line.decode().strip()
 
     async def _read_rprt(self, timeout: float = 3.0):
@@ -467,6 +564,7 @@ class RigCtldClient:
         Raises RigError if the code is non-zero or the line is malformed."""
         text = await self._raw_readline(timeout)
         if not text.startswith("RPRT"):
+            await self._resync()
             raise RigError(f"Unexpected response: {text}")
         parts = text.split()
         code = parts[-1] if len(parts) > 1 else "?"
@@ -477,7 +575,12 @@ class RigCtldClient:
         """Returns VFO frequency in Hz."""
         async with self.lock:
             await self._send("f")
-            return int(await self._readline())
+            text = await self._readline()
+            try:
+                return int(text)
+            except ValueError:
+                await self._resync()
+                raise RigError(f"Unexpected response: {text}") from None
 
     async def get_mode(self) -> str:
         """Returns Hamlib mode string (e.g. 'USB', 'CW', 'RTTY')."""
@@ -522,6 +625,7 @@ class RigCtldClient:
                 await self.writer.wait_closed()
             except Exception:
                 pass
+        self.reader = self.writer = None
 
 async def probe_cw_support(host: str, port: int) -> bool:
     """Checks whether the rig supports CAT-based CW sending, via \\dump_caps.
