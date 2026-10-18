@@ -237,6 +237,29 @@ On an older build the map is the only thing affected — the section grid,
 **Sections Needed**, scoring and every export read the same data and are
 unaffected.
 
+## The map shows only the section labels, with no sections or borders
+
+The labels are there, the land is there, and the sections are not: no amber
+fill, no border lines. Switching to another dashboard view and back to **Map**
+usually brings them back, and it can come and go between page loads and
+between browsers.
+
+**Cause.** The land and the sections are two separate files, and the map drew
+each one on top of whatever had arrived before it. When the sections file
+happened to arrive first, the land was drawn over it, fully opaque, and hid
+every section. The labels sit in a layer of their own above both, which is
+why they still showed. Which file wins depends on the network and the browser,
+so it looked like a Firefox problem one week and a Chrome problem the next.
+
+**Fix.** **Update the application.** Each layer of the map now has a fixed
+place in the stack, so the land is always underneath the sections no matter
+which file arrives first.
+
+If it still happens on a current build, the sections file is not reaching the
+browser: open `/sections.geo.json` on your server, which should download a
+file of about 160 KB. A deploy that left out `public/` is the usual cause, and
+running `deploy.sh` again copies it.
+
 ## The map has no roads, towns or terrain
 
 By design. The background is coastlines and land, drawn from Natural Earth's
