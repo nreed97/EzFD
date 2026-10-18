@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { MapContainer, Marker, Tooltip, GeoJSON, useMap, AttributionControl } from 'react-leaflet';
+import { MapContainer, Marker, Tooltip, GeoJSON, Pane, useMap, AttributionControl } from 'react-leaflet';
 import L from 'leaflet';
 import type { LatLngExpression, PathOptions } from 'leaflet';
 import type { Feature, FeatureCollection, Geometry } from 'geojson';
@@ -185,6 +185,29 @@ function sectionIcon(section: string, worked: boolean, lightMode: boolean) {
   });
 }
 
+/**
+ * The stacking order of the map's four vector layers, fixed by pane rather
+ * than left to the order the layers happen to be added in.
+ *
+ * Leaflet draws every vector layer in a pane into one SVG, in the order the
+ * layers were added, so the JSX order below only holds if every layer is
+ * added in that order. Two of them are not: the land and the sections are
+ * fetched separately and each layer mounts when its own file arrives. When
+ * the sections arrived first, the land was added last, drawn on top at full
+ * opacity, and covered every fill and border on the map, leaving only the
+ * labels, which sit in the marker pane. Whether that happened depended on
+ * which of two requests finished first, so it came and went between page
+ * loads and browsers, and switching away from the Map view and back (which
+ * fetches both again, usually from cache) cleared it.
+ *
+ * Each layer now has a pane of its own, and a pane's z-index does not care
+ * when its contents arrived. All four sit between the tile pane (200) and the
+ * marker pane (600), so the labels stay on top as before. A theme change
+ * remounts the land with a new key, which used to re-add it on top for the
+ * same reason; the panes cover that too.
+ */
+const PANE_Z = { land: 350, fill: 410, dim: 420, strong: 430 } as const;
+
 export default function MapView({ workedSections }: Props) {
   const workedSet = useMemo(
     () => new Set(workedSections.map(s => s.toUpperCase())), [workedSections]);
@@ -243,11 +266,10 @@ export default function MapView({ workedSections }: Props) {
           fillColor: lightMode ? '#f4f4f5' : '#27272a', fillOpacity: 0.15 };
   }, [workedSet, lightMode]);
 
-  // Borders are their own layers, drawn after every fill, because Leaflet
-  // renders all 85 polygons into one SVG group in document order and a stroke
-  // is centred on its path — so half of each border sat inside the neighbour
-  // drawn after it and was washed by that neighbour's 50% amber. That alone
-  // took light mode from 3.59 to 2.00.
+  // Borders are their own layers, in panes above every fill (see PANE_Z),
+  // because a stroke is centred on its path — so half of each border sat
+  // inside the neighbour drawn after it and was washed by that neighbour's 50%
+  // amber. That alone took light mode from 3.59 to 2.00.
   //
   // Dim first, strong second, and that order is load-bearing rather than
   // incidental: a worked section and an unworked neighbour both draw the
@@ -334,15 +356,17 @@ export default function MapView({ workedSections }: Props) {
           line on screen that says this map is the app's own. */}
       <AttributionControl position="bottomright" prefix={false} />
       {/* The ground, under everything. One feature, so one path. */}
-      {basemap && (
-        <GeoJSON
-          key={`land-${lightMode}`}
-          data={basemap}
-          style={basemapStyle as never}
-          interactive={false}
-          attribution="Land: Natural Earth · Sections: ARRL/RAC"
-        />
-      )}
+      <Pane name="ezfd-land" style={{ zIndex: PANE_Z.land }}>
+        {basemap && (
+          <GeoJSON
+            key={`land-${lightMode}`}
+            data={basemap}
+            style={basemapStyle as never}
+            interactive={false}
+            attribution="Land: Natural Earth · Sections: ARRL/RAC"
+          />
+        )}
+      </Pane>
       {/* Under the markers: Leaflet draws vector overlays below the marker
           pane, so the section labels stay legible on top of their own fill.
           Keyed on what it is drawn from, so a change to either redraws it —
@@ -352,56 +376,62 @@ export default function MapView({ workedSections }: Props) {
           and the recompute hands back a set of the same length with different
           members, which left the map drawing the old one with nothing to say
           it was stale. */}
-      {shapes && (
-        <GeoJSON
-          key={`fill-${workedKey}-${lightMode}`}
-          data={shapes}
-          style={fillStyle as never}
-          onEachFeature={(feature, layer) => {
-            const p = (feature as SectionFeature).properties;
-            if (p?.kind === 'pending') {
-              if (p.name) {
-                layer.bindTooltip(
-                  `${p.name} — ${(p.sections ?? []).join(' or ')}`,
-                  { sticky: true });
+      <Pane name="ezfd-fill" style={{ zIndex: PANE_Z.fill }}>
+        {shapes && (
+          <GeoJSON
+            key={`fill-${workedKey}-${lightMode}`}
+            data={shapes}
+            style={fillStyle as never}
+            onEachFeature={(feature, layer) => {
+              const p = (feature as SectionFeature).properties;
+              if (p?.kind === 'pending') {
+                if (p.name) {
+                  layer.bindTooltip(
+                    `${p.name} — ${(p.sections ?? []).join(' or ')}`,
+                    { sticky: true });
+                }
+                return;
               }
-              return;
-            }
-            // The shape answers for itself. It used to say nothing, so the
-            // only way to identify a section was to hit its label — a 9px box
-            // about 20px wide, which on a phone is most of the reason to give
-            // up. Now that the shapes carry the map, they carry the question
-            // too, and a label hidden by placement costs nothing.
-            const id = feature.id ? String(feature.id) : '';
-            const info = id ? SECTION_DATA[id as keyof typeof SECTION_DATA] : undefined;
-            if (!info) return;
-            layer.bindTooltip(
-              `${id} — ${info.name}${workedSet.has(id) ? ' ✓' : ''}`,
-              { sticky: true });
-          }}
-        />
-      )}
+              // The shape answers for itself. It used to say nothing, so the
+              // only way to identify a section was to hit its label — a 9px box
+              // about 20px wide, which on a phone is most of the reason to give
+              // up. Now that the shapes carry the map, they carry the question
+              // too, and a label hidden by placement costs nothing.
+              const id = feature.id ? String(feature.id) : '';
+              const info = id ? SECTION_DATA[id as keyof typeof SECTION_DATA] : undefined;
+              if (!info) return;
+              layer.bindTooltip(
+                `${id} — ${info.name}${workedSet.has(id) ? ' ✓' : ''}`,
+                { sticky: true });
+            }}
+          />
+        )}
+      </Pane>
       {/* After every fill, so strokes are painted over them. Non-interactive:
           the fill layer above owns the hover, and a stroke that swallowed it
           would make the pending tooltip depend on hitting a hairline. */}
-      {shapes && (
-        <GeoJSON
-          key={`dim-${workedKey}-${lightMode}`}
-          data={shapes}
-          filter={f => !isWorked(f as SectionFeature)}
-          style={borderStyle as never}
-          interactive={false}
-        />
-      )}
-      {shapes && (
-        <GeoJSON
-          key={`strong-${workedKey}-${lightMode}`}
-          data={shapes}
-          filter={f => isWorked(f as SectionFeature)}
-          style={borderStyle as never}
-          interactive={false}
-        />
-      )}
+      <Pane name="ezfd-dim" style={{ zIndex: PANE_Z.dim }}>
+        {shapes && (
+          <GeoJSON
+            key={`dim-${workedKey}-${lightMode}`}
+            data={shapes}
+            filter={f => !isWorked(f as SectionFeature)}
+            style={borderStyle as never}
+            interactive={false}
+          />
+        )}
+      </Pane>
+      <Pane name="ezfd-strong" style={{ zIndex: PANE_Z.strong }}>
+        {shapes && (
+          <GeoJSON
+            key={`strong-${workedKey}-${lightMode}`}
+            data={shapes}
+            filter={f => isWorked(f as SectionFeature)}
+            style={borderStyle as never}
+            interactive={false}
+          />
+        )}
+      </Pane>
       <SectionLabels workedSet={workedSet} lightMode={lightMode} />
 
     </MapContainer>

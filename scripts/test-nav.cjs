@@ -355,18 +355,37 @@ console.log('\n-- the map fetches nothing from anybody --');
     'borders are a neutral chosen against the page, and flip with the theme');
 
   // Order is load-bearing three times over, and every one of them fails
-  // quietly. Leaflet draws all 85 polygons into one SVG group in document
-  // order and centres a stroke on its path, so fills after borders wash half
-  // of every border away, and one border tier lets the shade of a shared
+  // quietly. Leaflet centres a stroke on its path, so fills over borders wash
+  // half of every border away, and one border tier lets the shade of a shared
   // worked/unworked edge depend on which polygon the file lists last.
   const at = (k) => src.indexOf('key={`' + k + '-');
   const [fill, dim, strong] = ['fill', 'dim', 'strong'].map(at);
   truthy(fill >= 0 && dim >= 0 && strong >= 0,
     'fills and both border tiers are separate layers');
-  truthy(fill >= 0 && dim > fill,
-    'borders are drawn after every fill, so no neighbour washes them');
-  truthy(dim >= 0 && strong > dim,
-    'the strong tier is drawn last, so a worked region always owns its outline');
+
+  // And the order is the panes', never the JSX's. Leaflet draws a pane's
+  // layers in the order they were *added*, and the land and the sections are
+  // two separate fetches that each mount their layer on arrival. When the
+  // sections won the race, the land was added last at full opacity and
+  // covered every fill and border on the map: only the labels showed, and
+  // only on some loads. Source order was what this test used to check, and it
+  // was true the whole time the map was broken.
+  const z = {};
+  for (const m of src.matchAll(/(land|fill|dim|strong):\s*(\d+)/g)) z[m[1]] = Number(m[2]);
+  truthy(/const PANE_Z = \{/.test(src) && ['land', 'fill', 'dim', 'strong'].every(k => k in z),
+    'every vector layer has a pane of its own');
+  truthy(z.land < z.fill && z.fill < z.dim && z.dim < z.strong,
+    'the panes stack land, fills, dim borders, strong borders, whatever loads first');
+  // Between the tile pane and the marker pane, so the labels stay on top.
+  truthy(Object.values(z).every(v => v > 200 && v < 600),
+    'the map panes sit below the labels in the marker pane');
+  for (const k of ['land', 'fill', 'dim', 'strong']) {
+    const open = src.indexOf(`<Pane name="ezfd-${k}" style={{ zIndex: PANE_Z.${k} }}>`);
+    const key = src.indexOf('key={`' + k + '-');
+    const close = open >= 0 ? src.indexOf('</Pane>', open) : -1;
+    truthy(open >= 0 && key > open && key < close,
+      `the ${k} layer is drawn inside its own pane`);
+  }
 }
 
 console.log('\n-- no source file carries a literal unicode escape --');
