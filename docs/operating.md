@@ -20,8 +20,9 @@ The board is live. A checkout made anywhere else — another operator, another
 station, the coordination panel in someone's logging window — appears while
 you are looking at it, so the band you are about to take cannot quietly become
 somebody else's between the screen loading and your click. Who is *on air*
-without a checkout is refreshed every 15 seconds instead, which is as fast as
-a logging window reports itself.
+without a checkout is live too: a logging window arriving, changing band or
+mode, or going QRT appears as it happens. A window that simply closed takes up
+to a minute and a half to drop off, since nothing announces it.
 
 A position may already be selected when the screen opens — a band you have
 checked out, or failing that the one this browser was last logging on. The
@@ -38,7 +39,7 @@ you started. Change band from the **QSY** drawer once you're in.
 
 ## The entry form
 
-![The logging screen: entry form and QSY drawer down the left with a folded call checkout, the operators list and the score; the Rig button, score and menu in the header; the QSO log filling the rest](images/logging-screen.png)
+![The logging screen on a Field Day event: entry form with N0CALL and SEC placeholders and the QSY drawer down the left, folded band coordination, the operators list and the score; the Rig button, score and menu in the header; the QSO log filling the rest](images/logging-screen.png)
 
 Focus starts in the callsign field and returns there after every logged QSO.
 The keyboard path is designed so a run never requires the mouse:
@@ -99,6 +100,13 @@ What counts as a duplicate depends on the event's **dupe rule**:
 Duplicates are **logged, not rejected**. They're marked, excluded from
 scoring, and excluded from exports. Refusing them outright would lose the
 record of a contact that actually happened.
+
+The first contact with a station counts and any later ones are the dupes, and
+that is worked out again whenever the log changes. Delete the first of two and
+the second becomes the one that counts; move the first to another band and the
+same happens. A queued contact that syncs late is placed at the time you
+logged it, so it can turn out to be the first, and then the later one is the
+dupe.
 
 ## Who else is on
 
@@ -167,14 +175,23 @@ Three consequences worth knowing:
 - **Replayed QSOs bypass the special-event checkout gate.** By the time the
   browser reconnects the reservation has expired, and the contact already
   happened on the air. Dropping it would only lose the record.
-- **A queued QSO is timestamped when the server accepts it**, not when you
-  logged it, because the server stamps every contact from one clock. A long
-  outage therefore shifts those times.
+- **A queued QSO keeps the time you logged it.** The server still stamps every
+  contact from its own clock, so operators' logs agree with each other, but a
+  queued contact also carries how long it waited, measured by your browser
+  from queueing to sending, and the server takes that off. How far your own
+  clock is out does not matter, because both ends of that interval come from
+  it.
+- **A contact the server refuses is kept, not retried and not thrown away.**
+  This is rare: a callsign with characters no callsign has, say. The row stays
+  in the log list in red with the server's reason and is skipped by the
+  retries, so it cannot hold up anything queued behind it. Log it again
+  correctly, then delete the red row.
 
 ## Editing and deleting
 
 The QSO table supports inline editing of callsign, band, mode and exchange.
-Duplicate status is re-evaluated after an edit. Deleting a QSO removes it
+Duplicate status is re-evaluated after an edit or a delete, for every contact
+it affects (see [Duplicates](#duplicates)). Deleting a QSO removes it
 everywhere in real time.
 
 A queued QSO that hasn't synced yet can be deleted locally — it never reaches

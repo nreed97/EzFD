@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { MERGE_WINDOW_SECONDS } from '@/lib/events';
+import { adminKeyOk } from '@/lib/adminKey';
 
 /**
  * Bring a full-event JSON export into this instance.
@@ -23,7 +24,14 @@ import { MERGE_WINDOW_SECONDS } from '@/lib/events';
  * it follows the rule creating events does; merge rewrites an existing log,
  * which is if anything the more consequential of the two.
  */
+/** An export is a few kilobytes per hundred contacts; this is far above any
+ *  real event and stops an unauthenticated upload from filling memory. */
+const MAX_IMPORT_BYTES = 50 * 1024 * 1024;
+
 export async function POST(request: Request) {
+  if (Number(request.headers.get('content-length')) > MAX_IMPORT_BYTES) {
+    return NextResponse.json({ error: 'Export file is too large' }, { status: 413 });
+  }
   let body: { payload?: unknown; admin_key?: string; allow_different_origin?: boolean };
   try {
     body = await request.json();
@@ -31,11 +39,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Body must be JSON' }, { status: 400 });
   }
 
-  const requiredKey = process.env.EZFD_ADMIN_KEY;
-  if (requiredKey) {
-    if (!body.admin_key || body.admin_key !== requiredKey) {
-      return NextResponse.json({ error: 'Admin key required to import an event' }, { status: 403 });
-    }
+  if (!adminKeyOk(body.admin_key)) {
+    return NextResponse.json({ error: 'Admin key required to import an event' }, { status: 403 });
   }
 
   const payload = body.payload;

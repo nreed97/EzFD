@@ -16,9 +16,10 @@ PostgreSQL connection string.
 DATABASE_URL=postgres://ezfd:PASSWORD@localhost:5432/ezfd
 ```
 
-Used by the connection pool and, separately, by the real-time endpoint, which
-opens its own dedicated connection per client to `LISTEN` on that event's
-channels.
+Used by the connection pool and, separately, by the real-time listener: one
+dedicated connection for the whole process that `LISTEN`s on the channels of
+every event with a stream open. A server therefore uses at most
+`EZFD_DB_POOL_MAX` plus one connections, however many browsers are watching.
 
 A connection pooler in transaction mode (PgBouncer's default) silently breaks
 `LISTEN`/`NOTIFY` and therefore all live updates. Use session mode or connect
@@ -42,10 +43,14 @@ passwords undecryptable** — they must be re-entered.
 
 ### `EZFD_ADMIN_KEY`
 
-If set, creating an event requires this key. If unset, anyone who can reach
-the site can create events.
+If set, creating, restoring or merging an event requires this key. If unset,
+anyone who can reach the site can do all three, including uploading an export
+of any size up to 50 MB.
 
-Worth setting on a public server. Not needed on a private LAN.
+Set it on any server with a domain. `deploy.sh` generates one by default when
+you give it a domain (type `none` at the prompt to run open anyway), and keeps
+an IP-only field server's old default of no key. The Docker Compose install
+does not generate one; set it in `.env`. Not needed on a private LAN.
 
 ## Optional
 
@@ -74,6 +79,20 @@ changes their scheme.
 Override where `MASTER.SCP` is fetched from. Unlike the call history file this
 one is evergreen — not year-specific — and is shared across every event on the
 server, refreshed at most once a day.
+
+### `EZFD_MAX_STREAMS`
+
+The most real-time streams the server holds open at once, across every event.
+Default `2000`. A stream no longer holds a database connection, so this only
+bounds sockets and memory: a logging window, a CW window, a position picker and
+a dashboard are one stream each. A browser refused at the limit retries on its
+own, as it does after any dropped stream.
+
+### `EZFD_DB_POOL_MAX`
+
+The size of the app's database connection pool. Default `10`, which is ample
+for a club; raise it only if requests queue behind each other on a busy server,
+and keep it plus one under PostgreSQL's `max_connections` (100 by default).
 
 ## The Docker Compose .env
 
@@ -154,3 +173,10 @@ can additionally require roster approval before an operator may log, but that
 is an authorisation gate, not authentication. Treat the join code as the
 secret it is, and don't expose an instance publicly if that model doesn't suit
 you.
+
+Join codes come from the operating system's cryptographic random source, over
+a 32-symbol alphabet with no `0`/`O` or `1`/`I`, for created and restored
+events alike. Every response carries `Referrer-Policy: same-origin`, so an
+event URL, join code and all, is never sent to another site in a `Referer`
+header, and refuses to be framed by another page (`X-Frame-Options: DENY` and
+`frame-ancestors 'none'`).

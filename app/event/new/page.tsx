@@ -37,7 +37,7 @@ export default function NewEventPage() {
     club_name: '',
     club_call: '',
     event_year: new Date().getFullYear(),
-    arrl_section: 'MN',
+    arrl_section: '',
     gota_call: '',
     location: '',
     qrz_username: '',
@@ -149,8 +149,9 @@ export default function NewEventPage() {
                 onClick={() => {
                   setEventType(type);
                   if (type !== 'SES') setClassLetter(type === 'WFD' ? 'H' : 'A');
-                  // FD/WFD require a section; an SES defaults to none.
-                  set('arrl_section', type === 'SES' ? '' : 'MN');
+                  // FD/WFD require a section, which the operator picks; an SES
+                  // defaults to none.
+                  set('arrl_section', '');
                   // Contest dupes are once per event; a special event may
                   // run for weeks, where working someone again on another
                   // day is normal.
@@ -195,7 +196,7 @@ export default function NewEventPage() {
                   required
                   value={form.club_call}
                   onChange={e => set('club_call', e.target.value.toUpperCase())}
-                  placeholder={isSes ? 'W9X' : 'W0NY'}
+                  placeholder={isSes ? 'W9X' : 'N0CALL'}
                   className="input font-mono tracking-widest"
                 />
               </label>
@@ -291,7 +292,8 @@ export default function NewEventPage() {
               </fieldset>
               <label className="flex min-w-0 flex-col gap-1 sm:flex-1">
                 <span className="text-sm text-zinc-400">ARRL/RAC Section</span>
-                <select value={form.arrl_section} onChange={e => set('arrl_section', e.target.value)} className="input">
+                <select value={form.arrl_section} onChange={e => set('arrl_section', e.target.value)} className="input" required>
+                  <option value="" disabled>SEC</option>
                   {ARRL_SECTIONS.map(s => <option key={s} value={s}>{s}</option>)}
                 </select>
               </label>
@@ -509,7 +511,7 @@ export default function NewEventPage() {
                 <input
                   value={form.qrz_username}
                   onChange={e => set('qrz_username', e.target.value)}
-                  placeholder="W0NY"
+                  placeholder="N0CALL"
                   autoComplete="off"
                   className="input"
                 />

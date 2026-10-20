@@ -110,18 +110,36 @@ END
 $$;
 
 -- ---------------------------------------------------------------------------
--- pg_notify trigger — fires on every QSO INSERT or DELETE
+-- pg_notify trigger — fires on every QSO INSERT, UPDATE or DELETE
 -- Clients LISTEN on channel  "qsos_<event_id>"
+--
+-- NOTIFY refuses a payload of 8,000 bytes or more, and refuses it by raising —
+-- inside this AFTER trigger, so the INSERT itself rolled back. A contact with
+-- a long comment was therefore impossible to log, and from the offline queue
+-- it retried forever. The API caps free text well under that now, but a row
+-- that still does not fit (a restore, a bulk import, a column added later)
+-- is announced by id alone, and the server's listener fetches the row before
+-- passing it on. Nothing a trigger announces can fail the write it announces.
 -- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION ezfd_notify_row(chan text, op text, rec jsonb, id uuid)
+RETURNS void LANGUAGE plpgsql AS $$
+DECLARE
+  payload text := json_build_object('op', op, 'record', rec)::text;
+BEGIN
+  IF octet_length(payload) >= 7900 THEN
+    payload := json_build_object('op', op, 'id', id, 'truncated', true)::text;
+  END IF;
+  PERFORM pg_notify(chan, payload);
+END;
+$$;
+
 CREATE OR REPLACE FUNCTION notify_qso_change()
 RETURNS trigger LANGUAGE plpgsql AS $$
 DECLARE
   rec    RECORD;
-  chan   TEXT;
 BEGIN
   rec  := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
-  chan := 'qsos_' || rec.event_id::text;
-  PERFORM pg_notify(chan, json_build_object('op', TG_OP, 'record', row_to_json(rec))::text);
+  PERFORM ezfd_notify_row('qsos_' || rec.event_id::text, TG_OP, to_jsonb(rec), rec.id);
   RETURN rec;
 END;
 $$;
@@ -168,7 +186,9 @@ CREATE TABLE IF NOT EXISTS call_history_entries (
   UNIQUE (event_id, callsign)
 );
 
-CREATE INDEX IF NOT EXISTS call_history_event_idx ON call_history_entries(event_id);
+-- UNIQUE (event_id, callsign) already gives every lookup an index led by
+-- event_id; a second one on event_id alone only cost writes on every refresh.
+DROP INDEX IF EXISTS call_history_event_idx;
 ALTER TABLE call_history_entries ADD COLUMN IF NOT EXISTS sent_class TEXT;
 
 -- ---------------------------------------------------------------------------
@@ -381,7 +401,7 @@ DECLARE
 BEGIN
   rec  := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
   chan := 'ses_' || rec.event_id::text;
-  PERFORM pg_notify(chan, json_build_object('op', TG_OP, 'record', row_to_json(rec))::text);
+  PERFORM ezfd_notify_row(chan, TG_OP, to_jsonb(rec), rec.id);
   RETURN rec;
 END;
 $$;
@@ -390,6 +410,41 @@ DROP TRIGGER IF EXISTS ses_reservation_notify ON ses_reservations;
 CREATE TRIGGER ses_reservation_notify
   AFTER INSERT OR UPDATE OR DELETE ON ses_reservations
   FOR EACH ROW EXECUTE FUNCTION notify_ses_reservation_change();
+
+-- ---------------------------------------------------------------------------
+-- pg_notify trigger for presence — "presence_<event_id>"
+--
+-- Every logging window, the dashboard and the position picker polled presence
+-- every 15 seconds, all weekend, whether or not anything had moved. A change
+-- of band or mode, a window arriving and a window going QRT are announced
+-- instead, and the polls drop to a slow sweep that only exists to notice a
+-- window that vanished without saying so (a closed laptop sends no QRT).
+--
+-- The heartbeat that only refreshes updated_at is deliberately silent: every
+-- window heartbeats every 30 seconds, and announcing those would turn each
+-- one into a refetch by every other window — more traffic than the poll it
+-- replaced, growing with the square of the number of windows.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION notify_presence_change()
+RETURNS trigger LANGUAGE plpgsql AS $$
+DECLARE
+  rec RECORD;
+BEGIN
+  rec := CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+  IF TG_OP = 'UPDATE' AND OLD.band = NEW.band AND OLD.mode = NEW.mode THEN
+    RETURN rec;
+  END IF;
+  PERFORM pg_notify('presence_' || rec.event_id::text,
+    json_build_object('op', TG_OP, 'op_call', rec.op_call, 'station', rec.station,
+                      'band', rec.band, 'mode', rec.mode)::text);
+  RETURN rec;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS presence_notify ON presence;
+CREATE TRIGGER presence_notify
+  AFTER INSERT OR UPDATE OR DELETE ON presence
+  FOR EACH ROW EXECUTE FUNCTION notify_presence_change();
 
 -- ---------------------------------------------------------------------------
 -- Grants — the ezfd role gets DML only; postgres owns the tables.
@@ -401,6 +456,36 @@ BEGIN
     GRANT SELECT, INSERT, UPDATE, DELETE ON ses_operators, ses_reservations TO ezfd;
   END IF;
 END
+$$;
+
+-- ---------------------------------------------------------------------------
+-- A fresh join code, from the same alphabet the API uses
+--
+-- Restore used to take six hex digits off a UUID: random enough, but from 16
+-- symbols rather than 32, so a restored event's code had a 64th of the
+-- guessing space of a created one, and nothing retried a collision with the
+-- UNIQUE constraint. The first six bytes of a v4 UUID are all random, and 256
+-- is a multiple of 32, so taking each byte modulo 32 is unbiased.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION ezfd_new_join_code()
+RETURNS text
+LANGUAGE plpgsql
+AS $$
+DECLARE
+  alphabet constant text := 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  b bytea;
+  code text;
+BEGIN
+  LOOP
+    b := uuid_send(gen_random_uuid());
+    code := '';
+    FOR i IN 0..5 LOOP
+      code := code || substr(alphabet, get_byte(b, i) % 32 + 1, 1);
+    END LOOP;
+    EXIT WHEN NOT EXISTS (SELECT 1 FROM events WHERE join_code = code);
+  END LOOP;
+  RETURN code;
+END;
 $$;
 
 -- ---------------------------------------------------------------------------
@@ -512,7 +597,7 @@ BEGIN
   -- therefore type-checked rather than COALESCEd.
   FOR ev IN SELECT * FROM jsonb_array_elements(raw) LOOP
     v_new_id := gen_random_uuid();
-    v_new_code := upper(substr(replace(gen_random_uuid()::text,'-',''),1,6));
+    v_new_code := ezfd_new_join_code();
 
     INSERT INTO events (id, join_code, club_name, club_call, event_year, class, arrl_section,
                         location, bonuses, event_type, power, created_at,
@@ -641,8 +726,27 @@ $$;
 -- the second to being the one that counts — which is what an operator
 -- deleting a mistaken entry expects. Their own is_dupe flag is left alone;
 -- every read path filters them out anyway.
+--
+-- The optional callsign/band/mode narrow the pass to one group. The API calls
+-- it that way after every insert, edit, delete and restore of a contact: the
+-- per-row check those paths used to make could only ever *set* a flag, so
+-- deleting the first of two contacts left the second flagged and scoring
+-- nothing, and an edit applied the whole-event rule even to a DAY or NONE
+-- special event. A dupe is a property of the group, so it is settled for the
+-- group. Inside one group the window is the same as the whole-event pass, so
+-- the two cannot disagree.
+--
+-- The one-argument form is dropped rather than replaced: with defaults on the
+-- new arguments, both would match a one-argument call and every caller would
+-- fail as ambiguous.
 -- ---------------------------------------------------------------------------
-CREATE OR REPLACE FUNCTION ezfd_recompute_dupes(p_event_id uuid)
+DROP FUNCTION IF EXISTS ezfd_recompute_dupes(uuid);
+CREATE OR REPLACE FUNCTION ezfd_recompute_dupes(
+  p_event_id uuid,
+  p_callsign text DEFAULT NULL,
+  p_band     text DEFAULT NULL,
+  p_mode     text DEFAULT NULL
+)
 RETURNS int
 LANGUAGE plpgsql
 AS $$
@@ -670,6 +774,9 @@ BEGIN
            ) AS rn
       FROM qsos
      WHERE event_id = p_event_id AND deleted_at IS NULL
+       AND (p_callsign IS NULL OR callsign = p_callsign)
+       AND (p_band     IS NULL OR band     = p_band)
+       AND (p_mode     IS NULL OR mode     = p_mode)
   ), want AS (
     SELECT id, CASE WHEN v_rule = 'NONE' THEN false ELSE rn > 1 END AS is_dupe FROM ranked
   )

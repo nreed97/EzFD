@@ -39,6 +39,32 @@ expired TLS certificate, the service being down, or — on a special event with
 Queued QSOs are **not** lost while this persists. They stay in local storage
 until accepted. Don't clear site data.
 
+## A queued contact is shown in red as "not accepted"
+
+**Symptom.** A row in the log list is red and says `not accepted:` followed by
+a reason, and stays there after everything else has synced.
+
+**Cause.** The server refused that contact on purpose and said why, usually a
+callsign containing characters a callsign cannot have, or an event that no
+longer exists. Retrying cannot change that answer, so the queue stops retrying
+it, but it keeps the contact, because it happened on the air.
+
+**Fix.** Log the contact again with the mistake corrected, then delete the red
+row with its **✕**. Nothing else is waiting on it: the rest of the queue syncs
+around it.
+
+## Live updates stop on a busy server
+
+**Symptom.** Screens stop updating and reload into a working stream again a
+moment later, on a server with a very large number of windows open.
+
+**Cause.** The server holds at most `EZFD_MAX_STREAMS` real-time streams
+(2,000 by default). A browser refused at the limit retries on its own.
+
+**Fix.** Raise `EZFD_MAX_STREAMS`; see
+[Configuration](configuration.md#ezfd_max_streams). Streams no longer hold a
+database connection each, so this bounds only sockets and memory.
+
 ## "Nobody has checked out 20m PH right now"
 
 A special event with checkout enforcement. Either check the band and mode out

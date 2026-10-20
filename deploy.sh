@@ -144,7 +144,7 @@ echo
 
 # Domain — pre-fill from previous deploy if available
 SAVED_DOMAIN="$(grep '^EZFD_DOMAIN=' "$APP_DIR/.env" 2>/dev/null | cut -d= -f2- || true)"
-prompt DOMAIN "Domain name (e.g. fd.w0ny.xyz) — leave blank for IP-only access" "${SAVED_DOMAIN}"
+prompt DOMAIN "Domain name (e.g. fd.example.org) — leave blank for IP-only access" "${SAVED_DOMAIN}"
 DOMAIN="${DOMAIN,,}"
 
 # SSL / Let's Encrypt — pre-fill email from previous deploy if available
@@ -186,8 +186,19 @@ if [[ -f "$APP_DIR/.env" ]]; then
 fi
 if [[ "$UPDATING" == "false" && -z "$EZFD_ADMIN_KEY" ]]; then
   echo
-  echo -e "  ${BLUE}Tip:${NC} Setting an admin key prevents unauthorised event creation on public servers."
-  prompt EZFD_ADMIN_KEY "Admin key (leave blank to allow open event creation)" ""
+  if [[ -n "$DOMAIN" ]]; then
+    # A server with a domain is on the internet, where an open server lets
+    # anyone create events or upload an export of any size. So the key is on
+    # by default there: press Enter to keep the generated one, or type "none"
+    # to run open anyway. An IP-only field server keeps the old default.
+    GENERATED_ADMIN_KEY="$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)"
+    echo -e "  ${BLUE}Tip:${NC} An admin key stops anyone on the internet creating or importing events."
+    prompt EZFD_ADMIN_KEY "Admin key (Enter to use the generated key, or type none)" "$GENERATED_ADMIN_KEY"
+    [[ "${EZFD_ADMIN_KEY,,}" == "none" ]] && EZFD_ADMIN_KEY=""
+  else
+    echo -e "  ${BLUE}Tip:${NC} Setting an admin key prevents unauthorised event creation on public servers."
+    prompt EZFD_ADMIN_KEY "Admin key (leave blank to allow open event creation)" ""
+  fi
 fi
 
 echo

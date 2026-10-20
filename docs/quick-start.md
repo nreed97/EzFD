@@ -115,8 +115,8 @@ A counter appears in the header showing how many contacts are waiting. It
 clears itself when things recover; you don't have to do anything. If you're
 impatient, clicking it retries immediately.
 
-The one thing worth knowing: a contact that syncs late is timestamped when the
-server accepts it, not when you logged it. A long outage shifts those times.
+A contact that syncs late keeps the time you logged it, not the time the
+server came back.
 
 ## 5. Finish up
 

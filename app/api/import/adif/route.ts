@@ -1,20 +1,24 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
-import { parseAdif } from '@/lib/adif';
-import { isDupeQSO, MERGE_WINDOW_SECONDS } from '@/lib/events';
+import { parseAdif, type AdifQSO } from '@/lib/adif';
+import { MERGE_WINDOW_SECONDS } from '@/lib/events';
+import { badRequest, callsign as asCallsign, isUuid, jsonBody, text } from '@/lib/validate';
+
+/** Larger than any real contest log, and small enough that a stray upload of
+ *  something else cannot hold the server's memory. */
+const MAX_ADIF_BYTES = 20 * 1024 * 1024;
 
 export async function POST(request: Request) {
-  const body = await request.json() as {
-    event_id?: string;
-    adif?: string;
-    operator_call?: string;
-    station_number?: number;
-  };
+  if (Number(request.headers.get('content-length')) > MAX_ADIF_BYTES) {
+    return NextResponse.json({ error: 'ADIF file is too large' }, { status: 413 });
+  }
+  const body = await jsonBody(request);
+  if (!body) return badRequest('Body must be a JSON object');
 
   const { event_id, adif, operator_call, station_number } = body;
-  if (!event_id || !adif) {
-    return NextResponse.json({ error: 'Missing event_id or adif' }, { status: 400 });
-  }
+  if (!event_id || !adif) return badRequest('Missing event_id or adif');
+  if (!isUuid(event_id)) return badRequest('event_id is not a valid id');
+  if (typeof adif !== 'string') return badRequest('adif must be text');
 
   const pool = getPool();
   const { rows: evRows } = await pool.query(
@@ -24,69 +28,104 @@ export async function POST(request: Request) {
   if (!evRows[0]) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   const event = evRows[0];
   const isSes = event.event_type === 'SES';
+  const opCall = asCallsign(operator_call);
+  const station = Math.max(1, Math.round(Number(station_number)) || 1);
 
   const records = parseAdif(adif);
-  let imported = 0, dupes = 0, skipped = 0, alreadyPresent = 0;
+  let skipped = 0;
 
+  // The same contact twice in one file is collapsed here. The old loop caught
+  // it by accident, inserting one row and then finding it on the next pass;
+  // the batched insert below checks against what was already in the log, so
+  // the file has to be consistent with itself first.
+  const now = Date.now();
+  const kept: (AdifQSO & { at: Date; call: string })[] = [];
   for (const rec of records) {
-    if (!rec.band) { skipped++; continue; }
+    const call = asCallsign(rec.callsign);
+    if (!rec.band || !call) { skipped++; continue; }
+    const at = rec.datetime_utc ? new Date(rec.datetime_utc) : new Date(now);
+    const twin = kept.find(k =>
+      k.call === call && k.band === rec.band && k.mode === rec.mode
+      && Math.abs(k.at.getTime() - at.getTime()) <= MERGE_WINDOW_SECONDS * 1000);
+    if (twin) continue;
+    kept.push({ ...rec, call, at });
+  }
 
-    const callsign = rec.callsign;
-    const dt = rec.datetime_utc ? new Date(rec.datetime_utc) : new Date();
-
-    // Idempotency. Importing is how an operator who logged offline in N1MM
-    // or N3FJP merges into the central log, and re-importing the same file —
-    // or two operators importing an overlapping export — must not double the
-    // log. This is distinct from the dupe *rule* below: that flags a contact
-    // worked twice on the air, this detects the same contact arriving twice.
-    //
-    // A soft-deleted contact counts as absent here, so re-importing a file
-    // brings it back. Deleting removes a mistake from the log; deliberately
-    // importing a file that contains it is a second, explicit act, and a
-    // silent no-op the operator couldn't explain would be worse.
-    const { rows: seen } = await pool.query(
-      `SELECT id FROM qsos
-       WHERE event_id=$1 AND callsign=$2 AND band=$3 AND mode=$4
-         AND ABS(EXTRACT(EPOCH FROM (datetime_utc - $5::timestamptz))) <= $6
-         AND deleted_at IS NULL
-       LIMIT 1`,
-      [event_id, callsign, rec.band, rec.mode, dt, MERGE_WINDOW_SECONDS]
-    );
-    if (seen.length > 0) { alreadyPresent++; continue; }
-
-    const is_dupe = await isDupeQSO(
-      pool, event_id, callsign, rec.band, rec.mode, event.dupe_rule ?? 'EVENT', dt
-    );
-    if (is_dupe) dupes++; else imported++;
-
-    await pool.query(
+  // One transaction, one INSERT. This used to be two queries per record
+  // outside any transaction, so a large file took thousands of round trips
+  // and a failure partway left half of it in the log.
+  //
+  // Idempotency is the NOT EXISTS: importing is how an operator who logged
+  // offline in N1MM or N3FJP merges into the central log, and re-importing the
+  // same file — or two operators importing an overlapping export — must not
+  // double the log. That is distinct from the dupe *rule*, which flags a
+  // contact worked twice on the air.
+  //
+  // A soft-deleted contact counts as absent, so re-importing a file brings it
+  // back. Deleting removes a mistake from the log; deliberately importing a
+  // file that contains it is a second, explicit act, and a silent no-op the
+  // operator couldn't explain would be worse.
+  const client = await pool.connect();
+  try {
+    await client.query('BEGIN');
+    const { rows: inserted } = await client.query(
       `INSERT INTO qsos
          (event_id, callsign, band, mode, datetime_utc, sent_class, sent_section,
-          rcvd_class, rcvd_section, operator_call, station_number, is_dupe)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12)`,
+          rcvd_class, rcvd_section, operator_call, station_number, is_dupe,
+          adif_mode, freq_khz)
+       SELECT $1, r.callsign, r.band, r.mode, r.at, $2, $3,
+              NULLIF(r.rcvd_class, ''), NULLIF(r.rcvd_section, ''), $4, $5, false,
+              r.adif_mode, r.freq_khz
+         FROM unnest($6::text[], $7::text[], $8::text[], $9::timestamptz[],
+                     $10::text[], $11::text[], $12::text[], $13::int[])
+              AS r(callsign, band, mode, at, rcvd_class, rcvd_section, adif_mode, freq_khz)
+        WHERE NOT EXISTS (
+          SELECT 1 FROM qsos q
+           WHERE q.event_id = $1 AND q.callsign = r.callsign AND q.band = r.band
+             AND q.mode = r.mode AND q.deleted_at IS NULL
+             AND ABS(EXTRACT(EPOCH FROM (q.datetime_utc - r.at))) <= $14)
+       RETURNING id`,
       [
-        event_id,
-        callsign,
-        rec.band,
-        rec.mode,
-        dt,
+        event.id,
         // A special event station has no contest exchange to stamp.
         isSes ? null : event.class,
         isSes ? null : event.arrl_section,
-        isSes ? null : (rec.rcvd_class  || null),
-        isSes ? null : (rec.rcvd_section || null),
-        operator_call?.toUpperCase().trim() ?? null,
-        station_number ?? 1,
-        is_dupe,
+        opCall,
+        station,
+        kept.map(r => r.call),
+        kept.map(r => r.band),
+        kept.map(r => r.mode),
+        kept.map(r => r.at),
+        kept.map(r => (isSes ? '' : text(r.rcvd_class, { upper: true, max: 4 }) ?? '')),
+        kept.map(r => (isSes ? '' : text(r.rcvd_section, { upper: true, max: 5 }) ?? '')),
+        kept.map(r => r.adif_mode ?? null),
+        kept.map(r => r.freq_khz ?? null),
+        MERGE_WINDOW_SECONDS,
       ]
     );
-  }
 
-  return NextResponse.json({
-    imported,
-    dupes,
-    skipped,
-    already_present: alreadyPresent,
-    total: records.length,
-  });
+    // Imported contacts can land anywhere in time, including before ones
+    // already logged, so the dupe flags are settled over the whole event once
+    // rather than guessed per row against a log still being written.
+    await client.query('SELECT ezfd_recompute_dupes($1)', [event.id]);
+    const ids = inserted.map(r => r.id);
+    const { rows: [{ dupes }] } = await client.query(
+      'SELECT count(*)::int AS dupes FROM qsos WHERE id = ANY($1::uuid[]) AND is_dupe',
+      [ids]
+    );
+    await client.query('COMMIT');
+
+    return NextResponse.json({
+      imported: ids.length - dupes,
+      dupes,
+      skipped,
+      already_present: records.length - skipped - ids.length,
+      total: records.length,
+    });
+  } catch (err) {
+    await client.query('ROLLBACK').catch(() => {});
+    throw err;
+  } finally {
+    client.release();
+  }
 }

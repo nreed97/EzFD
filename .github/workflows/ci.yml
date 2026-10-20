@@ -49,6 +49,12 @@ jobs:
       # which is what we want in CI rather than silently resolving new versions.
       - run: npm ci
 
+      # Known vulnerabilities in what ships. Next.js sat two patch releases
+      # behind six advisories, SSRF among them, with nothing here to say so.
+      # Dev-only dependencies never reach a server, so they are not gated.
+      - name: Dependency audit
+        run: npm audit --omit=dev --audit-level=high
+
       # Pure source check — no build or database needed, so it runs first and
       # fails fast. Guards the ARRL/RAC section list against drifting between
       # the three places that enumerate it, and against a section total being
@@ -174,7 +180,7 @@ jobs:
 
       - name: Prepare database
         run: |
-          psql -h localhost -U postgres -c "CREATE ROLE ezfd LOGIN;"
+          psql -h localhost -U postgres -c "CREATE ROLE ezfd LOGIN PASSWORD 'ezfd';"
           psql -h localhost -U postgres -c "CREATE DATABASE ezfd;"
           psql -h localhost -U postgres -d ezfd -v ON_ERROR_STOP=1 -q -f db/schema.sql
 
@@ -184,7 +190,10 @@ jobs:
         run: |
           cp -r .next/static .next/standalone/.next/
           cd .next/standalone
-          DATABASE_URL=postgres://postgres:postgres@localhost:5432/ezfd \
+          # As the app's own DML-only role, the way both installs run it. As
+          # the superuser, a permission the role lacks (TRUNCATE, say) passed
+          # here and was only caught by the docker job.
+          DATABASE_URL=postgres://ezfd:ezfd@localhost:5432/ezfd \
           PORT=3000 HOSTNAME=127.0.0.1 node server.js > /tmp/server.log 2>&1 &
 
       - name: End-to-end API tests
@@ -222,7 +231,7 @@ jobs:
       # so applying it twice is the real-world case: it must be idempotent.
       - name: Apply schema twice
         run: |
-          psql -h localhost -U postgres -c "CREATE ROLE ezfd LOGIN;"
+          psql -h localhost -U postgres -c "CREATE ROLE ezfd LOGIN PASSWORD 'ezfd';"
           psql -h localhost -U postgres -c "CREATE DATABASE ezfd;"
           psql -h localhost -U postgres -d ezfd -v ON_ERROR_STOP=1 -q -f db/schema.sql
           psql -h localhost -U postgres -d ezfd -v ON_ERROR_STOP=1 -q -f db/schema.sql

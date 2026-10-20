@@ -113,11 +113,17 @@ DATABASE_URL=postgres://ezfd:PASSWORD@localhost:5432/ezfd
 EZFD_ENCRYPTION_KEY=<64 hex characters>
 EZFD_DOMAIN=fd.example.org
 EZFD_CERT_EMAIL=admin@example.org
-EZFD_ADMIN_KEY=<optional>
+EZFD_ADMIN_KEY=<generated when a domain is given>
 EZFD_REPO_DIR=/opt/ezfd-src
 ```
 
 Full meanings in [Configuration](configuration.md).
+
+When you give `deploy.sh` a domain it offers a generated admin key, and
+pressing Enter keeps it; type `none` to run an open server instead. The key is
+printed in the summary at the end. Without a domain the default is still no
+key, for a field server whose network is the boundary. An update keeps
+whatever the file already has.
 
 `EZFD_REPO_DIR` records where you cloned the source, so the admin console's
 update action knows where to `git pull` from.
@@ -246,7 +252,8 @@ $ openssl rand -hex 32    # EZFD_ENCRYPTION_KEY
 
 Set `EZFD_DOMAIN` for a TLS certificate; leave it blank for plain HTTP on
 port 80, by IP address or any name. `EZFD_ADMIN_KEY` works as it does on a
-`deploy.sh` install. Every setting is described in
+`deploy.sh` install, but nothing generates it for you: set it whenever
+`EZFD_DOMAIN` is set (`openssl rand -hex 16`). Every setting is described in
 [Configuration → The Docker Compose .env](configuration.md#the-docker-compose-env).
 
 The last command builds three images, `ezfd:latest`, `ezfd-init:latest` and

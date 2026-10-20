@@ -29,6 +29,9 @@ export interface QSOSubmission {
   rcvd_qth?: string;
   rcvd_grid?: string;
   comment?: string;
+  /** Filled in by the logging window from the rig, not by the form. */
+  freq_khz?: number;
+  adif_mode?: string;
 }
 
 /** Default signal report per mode — RS for phone, RST for CW and digital.
@@ -365,7 +368,7 @@ function QSOForm({
               }
             }
           }}
-          placeholder="W0NY"
+          placeholder="N0CALL"
           className="input w-full font-mono text-xl tracking-widest"
           autoComplete="off"
           spellCheck={false}
@@ -452,7 +455,7 @@ function QSOForm({
               <input
                 value={rcvdQth}
                 onChange={e => setRcvdQth(e.target.value)}
-                placeholder="MN"
+                placeholder="ST"
                 className="input w-full"
                 maxLength={60}
               />
@@ -473,7 +476,7 @@ function QSOForm({
                 list="section-list"
                 value={rcvdSection}
                 onChange={e => setRcvdSection(e.target.value.toUpperCase())}
-                placeholder="MN"
+                placeholder="SEC"
                 className="input w-full font-mono"
                 maxLength={5}
               />
@@ -533,7 +536,7 @@ function QSOForm({
                 callRef.current?.focus();
               }
             }}
-            placeholder="MN"
+            placeholder="SEC"
             className={`input w-full font-mono ${sectionInvalid ? 'border-orange-500' : ''}`}
             maxLength={5}
           />
@@ -584,7 +587,7 @@ function QSOForm({
           <p className={`text-2xs mt-0.5 ${
             lastLogged.is_dupe ? 'text-yellow-600' : lastLogged._pending ? 'text-zinc-500' : 'text-green-600'
           }`}>
-            {lastLogged.is_dupe ? 'Logged as dupe' : lastLogged._pending ? 'Queued — syncing…' : 'Logged ✓'}
+            {lastLogged.is_dupe ? 'Logged as dupe' : lastLogged._rejected ? 'Not accepted — kept in the log list until you fix it' : lastLogged._pending ? 'Queued — syncing…' : 'Logged ✓'}
           </p>
         </div>
       )}

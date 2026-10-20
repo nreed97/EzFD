@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
+import { badRequest, callsign as asCallsign, isUuid, jsonBody } from '@/lib/validate';
 import { EXCLUSION_VIOLATION, RESERVATION_COLUMNS } from '@/lib/ses';
 
 /**
@@ -18,12 +19,16 @@ import { EXCLUSION_VIOLATION, RESERVATION_COLUMNS } from '@/lib/ses';
  */
 export async function PATCH(request: Request, { params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
-  const { action, op_call, minutes } = await request.json();
+  if (!isUuid(id)) return badRequest('Not a valid reservation id');
+  const body = await jsonBody(request);
+  if (!body) return badRequest('Body must be a JSON object');
+  const { action, minutes } = body;
+  const op_call = typeof body.op_call === 'string' ? body.op_call : null;
 
   if (action !== 'extend' && action !== 'release') {
     return NextResponse.json({ error: 'action must be "extend" or "release"' }, { status: 400 });
   }
-  if (!op_call) {
+  if (!op_call || !asCallsign(op_call)) {
     return NextResponse.json({ error: 'op_call required' }, { status: 400 });
   }
 

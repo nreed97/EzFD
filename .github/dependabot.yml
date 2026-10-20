@@ -1,0 +1,18 @@
+# Weekly pull requests for dependency updates, so an advisory against Next.js
+# or pg arrives as a PR to review rather than as a red audit step on someone
+# else's change. Minor and patch updates are grouped to keep the volume to one
+# PR a week; majors come on their own, since they are the ones that need
+# reading.
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      minor-and-patch:
+        update-types: [minor, patch]
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly

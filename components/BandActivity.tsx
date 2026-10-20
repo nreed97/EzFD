@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { useNow } from '@/lib/useNow';
 import type { Band, Mode, DisplayQSO } from '@/lib/types';
+import { useVisibleInterval } from '@/lib/useVisibleInterval';
 
 interface StationPresence {
   op_call: string;
@@ -21,6 +22,9 @@ interface Props {
   qsos: DisplayQSO[];
   onConflict?: (conflicting: boolean) => void;
   onBandOccupancy?: (occupied: Partial<Record<Band, string[]>>) => void;
+  /** Bumped by the logging window whenever the stream announces a presence
+   *  change, which is what triggers a refetch. */
+  presenceVersion?: number;
 }
 
 const MODE_COLORS: Record<Mode, string> = {
@@ -30,7 +34,10 @@ const MODE_COLORS: Record<Mode, string> = {
 };
 
 const HEARTBEAT_MS = 30_000;
-const POLL_MS      = 15_000;
+// A sweep, not the source of updates: changes arrive over the real-time
+// stream as `presenceVersion`. What only a poll can see is a window that
+// vanished without a QRT, which presence already ages out after 90 seconds.
+const POLL_MS      = 60_000;
 const INACTIVE_MS  = 15 * 60 * 1000;
 
 function timeSince(iso: string): string {
@@ -40,7 +47,7 @@ function timeSince(iso: string): string {
   return `${Math.floor(s / 3600)}h`;
 }
 
-export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos, onConflict, onBandOccupancy }: Props) {
+export default function BandActivity({ eventId, myOpCall, myStation, currentBand, currentMode, qsos, onConflict, onBandOccupancy, presenceVersion = 0 }: Props) {
   const [stations, setStations] = useState<StationPresence[]>([]);
   const [isQRT, setIsQRT] = useState(false);
   const lastBandRef = useRef<Band | null>(null);
@@ -90,9 +97,8 @@ export default function BandActivity({ eventId, myOpCall, myStation, currentBand
     // boundary.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchPresence();
-    const id = setInterval(fetchPresence, POLL_MS);
-    return () => clearInterval(id);
-  }, [fetchPresence]);
+  }, [fetchPresence, presenceVersion]);
+  useVisibleInterval(fetchPresence, POLL_MS);
 
   function goQRT() {
     isQRTRef.current = true;

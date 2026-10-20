@@ -8,6 +8,7 @@ import { NO_POSITION, positionKey, suggestPosition, validPosition, type StoredPo
 import { slotWords } from '@/lib/slotWords';
 import { useStoredJson } from '@/lib/useStoredJson';
 import { useNow } from '@/lib/useNow';
+import { useVisibleInterval } from '@/lib/useVisibleInterval';
 
 /**
  * Where do you want to operate?
@@ -38,7 +39,7 @@ const STATE_STYLE: Record<SlotInfo['state'], string> = {
 };
 
 /** How often to re-ask for presence, which has no notify channel. */
-const POLL_MS = 15_000;
+const POLL_MS = 60_000;
 
 /**
  * How often the board re-reads the clock.
@@ -107,6 +108,7 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
   useEffect(() => {
     const es = new EventSource(`/api/realtime/${event.id}`);
     es.addEventListener('reservation', () => { void load(); });
+    es.addEventListener('presence', () => { void load(); });
 
     // A reconnect is the earliest evidence the server was away and is back,
     // and the board is stale by definition across that gap — nothing was
@@ -122,14 +124,11 @@ export default function OperatingPosition({ event, opCall, station, onStart, onD
     return () => es.close();
   }, [event.id, load]);
 
-  // Presence has no notify trigger — a logging window reports itself over
-  // HTTP on a heartbeat — so who is on air is still polled. The poll also
-  // covers claims a second time, which is not redundant: an SSE stream can
-  // die quietly, and this is what makes the board eventually right anyway.
-  useEffect(() => {
-    const id = setInterval(() => { void load(); }, POLL_MS);
-    return () => clearInterval(id);
-  }, [load]);
+  // Presence changes arrive on the stream too now. The poll stays as a slow
+  // sweep, and is not redundant: an SSE stream can die quietly, and a window
+  // that closed without a QRT announces nothing — this is what makes the
+  // board eventually right anyway. It pauses while the page is hidden.
+  useVisibleInterval(() => { void load(); }, POLL_MS);
 
   const board = useMemo(
     () => buildSlotBoard(bands, MODES, reservations, presence, nowMs,

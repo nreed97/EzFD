@@ -5,8 +5,22 @@ download routes, which return files, and the real-time route, which is an
 event stream.
 
 There is no authentication. Access control is the join code, plus
-`EZFD_ADMIN_KEY` on event creation if the server sets it. See
-[Configuration](configuration.md#security-notes).
+`EZFD_ADMIN_KEY` on event creation, restore and merge if the server sets it.
+See [Configuration](configuration.md#security-notes).
+
+### Errors
+
+A request the server cannot accept gets a `400` with `{ "error": "..." }`
+naming the problem: a body that is not a JSON object, an id that is not a
+UUID, a callsign that is not one, a band outside the app's list, a mode other
+than `PH`, `CW` or `DIG`. These used to reach the database and come back as a
+`500`, which the offline queue retries forever. A `4xx` means the server will
+never accept that request as sent; a `5xx` or no answer is worth retrying.
+
+Free text (comments, names, notes) is trimmed to a fixed length rather than
+refused, so an over-long comment never costs the contact it is attached to.
+`POST /api/import/adif` refuses a body over 20 MB, and
+`POST /api/import/event` one over 50 MB, with a `413`.
 
 ## Events
 
@@ -24,7 +38,7 @@ callsign database failed to download.
 | `event_year` | Defaults to the current year |
 | `location` | |
 | `qrz_username`, `qrz_password` | Password encrypted before storage |
-| `admin_key` | Required if the server sets `EZFD_ADMIN_KEY` |
+| `admin_key` | Required if the server sets `EZFD_ADMIN_KEY`. Compared in constant time |
 | `use_call_history`, `use_master_callsign_file` | Forced off for `SES` and non-applicable respectively |
 | `starts_at`, `ends_at` | `SES` only, ISO 8601 |
 | `ses_description`, `ses_qsl_info` | `SES` only |
@@ -59,11 +73,14 @@ Log a QSO. Returns the created row, `201`.
 | `rcvd_class`, `rcvd_section` | Contest exchange; class ignored for `SES` |
 | `operator_call`, `station_number` | |
 | `rst_sent`, `rst_rcvd`, `rcvd_name`, `rcvd_qth`, `rcvd_grid`, `comment` | Special event exchange |
-| `adif_mode`, `freq_khz` | Optional detail for export |
+| `adif_mode`, `freq_khz` | Optional detail for export. The logging windows send the rig's frequency when it agrees with the logged band |
 | `replay` | Marks a QSO replayed from the offline queue |
+| `age_ms` | How long ago the contact was logged, by the sender's own clock. The server dates it `NOW() - age_ms`, capped at seven days |
 
-Duplicate status is computed server-side from the event's dupe rule.
-Duplicates are logged and flagged, never rejected.
+Duplicate status is computed server-side from the event's dupe rule, for the
+whole (call, band, mode) group, so a backdated contact that lands before an
+existing one makes the later one the dupe. Duplicates are logged and flagged,
+never rejected. A free-text field over 500 characters is trimmed.
 
 On a special event the server may add `slot_warning` to the response — the
 QSO was logged, but on a band and mode the operator hasn't checked out.
@@ -80,18 +97,25 @@ Every QSO for an event, newest first.
 
 ### `PATCH /api/qso/{id}`
 
-Edit callsign, band, mode or exchange. Duplicate status is re-evaluated.
+Edit callsign, band, mode or exchange. Duplicate status is re-evaluated under
+the event's dupe rule for both the group the contact left and the group it
+joined, so moving the first of two contacts to another band releases the
+second.
 
 ### `DELETE /api/qso/{id}?operator_call=`
 
 Soft delete — the row is marked, not removed. It leaves the live log, the
 ADIF and Cabrillo exports, scoring and dupe checking immediately; the
-full-event JSON backup keeps it. `operator_call` records who claimed to
-delete it. Deleting an already-deleted contact returns 200.
+full-event JSON backup keeps it. If it was the first of two contacts with the
+same station on that band and mode, the second stops being a dupe.
+`operator_call` records who claimed to delete it. Deleting an already-deleted
+contact returns 200.
 
 ### `POST /api/qso/{id}`
 
-Restore a soft-deleted contact. Body `{ "operator_call": "W0AAA" }`.
+Restore a soft-deleted contact. Body `{ "operator_call": "N0CALL" }`. Dupe
+status is re-evaluated, so a restored first contact makes the later one a dupe
+again.
 
 ### `GET /api/qso?event_id=&deleted=1`
 
@@ -173,12 +197,14 @@ leaves the operator's other radio on the air.
 
 ### `GET /api/realtime/{eventId}`
 
-Server-Sent Events. Two event types:
+Server-Sent Events. `400` if `eventId` is not a UUID, `404` if no event has
+it. Three event types:
 
 | Event | Payload |
 |---|---|
 | `qso` | `{ op, record }` where `op` is `INSERT`, `UPDATE` or `DELETE` |
 | `reservation` | Same shape, for checkouts |
+| `presence` | `{ op, op_call, station, band, mode }` when a window arrives, changes band or mode, or goes QRT |
 
 A keepalive comment every 25 seconds keeps proxies from timing the stream out.
 
@@ -187,9 +213,13 @@ timestamps — treat it as a signal to refetch, not as data. The logging
 window's coordination panel and the operating position picker both do exactly
 that.
 
-There is no presence event. A logging window reports itself over HTTP rather
-than through the database, so who is on air is polled by whatever displays
-it.
+A presence heartbeat that changes nothing is not announced, so a window that
+closes without going QRT is noticed only by the 90-second staleness in
+`GET /api/presence`. Screens treat `presence` as a signal to refetch and sweep
+once a minute for the rest.
+
+A row too large for a PostgreSQL notification (8,000 bytes) is fetched by the
+server and delivered whole, so a client never sees a different shape.
 
 ## Import and export
 
@@ -268,7 +298,11 @@ for when you would.
 | `event_id`, `adif` | Required |
 | `operator_call`, `station_number` | Attributed to the imported QSOs |
 
-Returns `{ imported, dupes, already_present, skipped, total }`.
+Returns `{ imported, dupes, already_present, skipped, total }`. The file goes
+in as one transaction, so a failure leaves nothing half-imported. Each
+record's `FREQ` and `MODE` are kept, so the export writes them back out.
+`skipped` counts records with no recognisable band or callsign;
+`already_present` includes a contact that appears twice in the file itself.
 
 Idempotent: a record matching an existing QSO on callsign, band, mode and a
 ±2 minute window is skipped rather than inserted. A contact you deleted counts
@@ -280,7 +314,9 @@ event merge above goes the other way, because it is bulk and automatic.
 ### `GET /api/qrz?callsign=&event_id=`
 
 QRZ lookup using the event's stored credentials. Returns name, state, country
-and grid where available.
+and grid where available. Lookups give up after five seconds, are cached per
+event for half an hour, and sign in again if QRZ ended the session early (it
+does when the same account signs in elsewhere).
 
 ### `GET /api/callhistory?callsign=&event_id=`
 

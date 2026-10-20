@@ -11,6 +11,13 @@ export interface AdifQSO {
   rcvd_class: string;
   rcvd_section: string;
   datetime_utc?: string; // ISO 8601 UTC
+  /** The ADIF FREQ field in kHz, when the file has one. */
+  freq_khz?: number;
+  /** The file's own MODE — FT8, RTTY, SSB — beside the PH/CW/DIG split, so an
+   *  import keeps what the export writes back out. MODE rather than SUBMODE,
+   *  because the export writes this value into MODE and USB or FT4 there is
+   *  not valid ADIF. */
+  adif_mode?: string;
 }
 
 function mhzToBand(mhz: number): Band | null {
@@ -106,7 +113,12 @@ export function parseAdif(text: string): AdifQSO[] {
       if (!isNaN(Date.parse(candidate))) datetime_utc = candidate;
     }
 
-    results.push({ callsign, band, mode, rcvd_class, rcvd_section, datetime_utc });
+    const qso: AdifQSO = { callsign, band, mode, rcvd_class, rcvd_section, datetime_utc };
+    const mhz = parseFloat(fields['FREQ'] ?? '');
+    if (Number.isFinite(mhz) && mhz > 0) qso.freq_khz = Math.round(mhz * 1000);
+    const realMode = (fields['MODE'] ?? '').trim().toUpperCase();
+    if (realMode) qso.adif_mode = realMode.slice(0, 20);
+    results.push(qso);
   }
 
   return results;

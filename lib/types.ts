@@ -290,7 +290,12 @@ export interface Score {
 }
 
 // QSO with an optional pending marker for optimistic UI
-export type DisplayQSO = QSO & { _pending?: true; _local_id?: string };
+export type DisplayQSO = QSO & {
+  _pending?: true;
+  _local_id?: string;
+  /** Why the server refused this queued contact; it waits for an operator. */
+  _rejected?: string;
+};
 
 export interface QRZLookup {
   callsign: string;
