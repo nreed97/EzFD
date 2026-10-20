@@ -190,7 +190,7 @@ fi
 
 # ── Field Day regression ─────────────────────────────────────────────────────
 echo "── Field Day regression ──"
-FD=$(req POST /api/events '{"club_name":"E2E FD","club_call":"W0NY","event_type":"FD","class":"3A","arrl_section":"MN","power":"LOW"}' | jq_get join_code)
+FD=$(req POST /api/events '{"club_name":"E2E FD","club_call":"N0CALL","event_type":"FD","class":"3A","arrl_section":"MN","power":"LOW"}' | jq_get join_code)
 FD_ID=$(req GET "/api/events/$FD" | jq_get id)
 FDQ=$(req POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":\"K1XYZ\",\"band\":\"20m\",\"mode\":\"PH\",\"rcvd_class\":\"2A\",\"rcvd_section\":\"EPA\",\"operator_call\":\"W0AAA\"}")
 if [[ "$(echo "$FDQ" | jq_get sent_class)" == "3A" && "$(echo "$FDQ" | jq_get rcvd_class)" == "2A" ]]; then
@@ -224,6 +224,101 @@ if [[ "$(req GET "/api/export/$FD")" == *"STX_STRING:5>3A MN"* ]]; then
 else
   no "  FD ADIF still carries the contest exchange"
 fi
+
+# ── Untrusted input on the logging routes ───────────────────────────────────
+# Each of these was a 500 or worse. The real-time route ran its URL segment as
+# SQL; a 500 from /api/qso is retried by the offline queue for as long as the
+# tab is open, holding back everything queued behind it.
+echo "── API input handling ──"
+INJ='x%22%3B%20UPDATE%20qsos%20SET%20deleted_at%3Dnow()%3B%20--'
+INJ_CODE=$(curl -s -m 5 -o /dev/null -w '%{http_code}' "$BASE/api/realtime/$INJ")
+if [[ "$INJ_CODE" == "400" ]]; then
+  ok "  the real-time route refuses an id that is not a UUID"
+else
+  no "  the real-time route refuses an id that is not a UUID" "got $INJ_CODE"
+fi
+LIVE=$(req GET "/api/qso?event_id=$FD_ID" | python3 -c "import sys,json;print(len(json.load(sys.stdin)))")
+if [[ "$LIVE" -ge 2 ]]; then
+  ok "  and the log is untouched by it"
+else
+  no "  and the log is untouched by it" "$LIVE live contacts"
+fi
+NOEV=$(curl -s -m 5 -o /dev/null -w '%{http_code}' "$BASE/api/realtime/00000000-0000-4000-8000-000000000000")
+if [[ "$NOEV" == "404" ]]; then
+  ok "  a stream for an event that does not exist is refused"
+else
+  no "  a stream for an event that does not exist is refused" "got $NOEV"
+fi
+BAD_MODE=$(status POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":\"K1BAD\",\"band\":\"20m\",\"mode\":\"FT8\"}")
+BAD_BAND=$(status POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":\"K1BAD\",\"band\":\"11m\",\"mode\":\"PH\"}")
+BAD_CALL=$(status POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":12345,\"band\":\"20m\",\"mode\":\"PH\"}")
+BAD_ID=$(status GET "/api/qso?event_id=nope")
+if [[ "$BAD_MODE$BAD_BAND$BAD_CALL$BAD_ID" == "400400400400" ]]; then
+  ok "  a bad mode, band, callsign or id is a 400, not a 500"
+else
+  no "  a bad mode, band, callsign or id is a 400, not a 500" "$BAD_MODE $BAD_BAND $BAD_CALL $BAD_ID"
+fi
+LONG=$(python3 -c "print('x'*9000)")
+LONGQ=$(req POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":\"K1LNG\",\"band\":\"20m\",\"mode\":\"PH\",\"comment\":\"$LONG\"}")
+LONG_LEN=$(echo "$LONGQ" | python3 -c "import sys,json;print(len(json.load(sys.stdin).get('comment') or ''))" 2>/dev/null)
+if [[ "$LONG_LEN" == "500" ]]; then
+  ok "  a long comment is trimmed, and the contact is logged"
+else
+  no "  a long comment is trimmed, and the contact is logged" "${LONG_LEN:-not logged}"
+fi
+AGED=$(req POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":\"K1AGE\",\"band\":\"40m\",\"mode\":\"CW\",\"replay\":true,\"age_ms\":1200000,\"freq_khz\":7030,\"adif_mode\":\"cw\"}")
+AGE_OK=$(echo "$AGED" | python3 -c "
+import sys,json
+from datetime import datetime,timezone
+d=json.load(sys.stdin)
+t=datetime.fromisoformat(d['datetime_utc'].replace('Z','+00:00'))
+age=(datetime.now(timezone.utc)-t).total_seconds()
+print('yes' if 1180 < age < 1260 and d['freq_khz']==7030 and d['adif_mode']=='CW' else 'no %s' % age)")
+if [[ "$AGE_OK" == "yes" ]]; then
+  ok "  a queued contact keeps its age, frequency and submode"
+else
+  no "  a queued contact keeps its age, frequency and submode" "$AGE_OK"
+fi
+
+# Deleting the first of two contacts must promote the second. The per-row
+# check that used to run could set a dupe flag but never clear one.
+D1=$(req POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":\"W1DEL\",\"band\":\"15m\",\"mode\":\"CW\"}" | jq_get id)
+D2=$(req POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":\"W1DEL\",\"band\":\"15m\",\"mode\":\"CW\"}" | jq_get id)
+req DELETE "/api/qso/$D1" > /dev/null
+D2_DUPE=$(req GET "/api/qso?event_id=$FD_ID" | python3 -c "
+import sys,json
+print([q['is_dupe'] for q in json.load(sys.stdin) if q['id']=='$D2'])")
+if [[ "$D2_DUPE" == "[False]" ]]; then
+  ok "  deleting the first of two contacts promotes the second"
+else
+  no "  deleting the first of two contacts promotes the second" "$D2_DUPE"
+fi
+req POST "/api/qso/$D1" '{}' > /dev/null
+D1_AFTER=$(req GET "/api/qso?event_id=$FD_ID" | python3 -c "
+import sys,json
+print(sorted((q['id']=='$D2', q['is_dupe']) for q in json.load(sys.stdin) if q['callsign']=='W1DEL'))")
+if [[ "$D1_AFTER" == "[(False, False), (True, True)]" ]]; then
+  ok "  restoring it makes the second a dupe again"
+else
+  no "  restoring it makes the second a dupe again" "$D1_AFTER"
+fi
+# An edit that moves a contact out of a group releases the one it duplicated.
+req PATCH "/api/qso/$D1" '{"callsign":"W1DEL","band":"10m","mode":"CW"}' > /dev/null
+D2_EDIT=$(req GET "/api/qso?event_id=$FD_ID" | python3 -c "
+import sys,json
+print([q['is_dupe'] for q in json.load(sys.stdin) if q['id']=='$D2'])")
+if [[ "$D2_EDIT" == "[False]" ]]; then
+  ok "  editing the first onto another band releases the second"
+else
+  no "  editing the first onto another band releases the second" "$D2_EDIT"
+fi
+for id in "$D1" "$D2"; do req DELETE "/api/qso/$id" > /dev/null; done
+for c in K1LNG K1AGE; do
+  id=$(req GET "/api/qso?event_id=$FD_ID" | python3 -c "
+import sys,json
+print(next((q['id'] for q in json.load(sys.stdin) if q['callsign']=='$c'), ''))")
+  [[ -n "$id" ]] && req DELETE "/api/qso/$id" > /dev/null
+done
 
 # ── Section accounting and bonus arithmetic ──────────────────────────────────
 #

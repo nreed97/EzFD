@@ -11,7 +11,7 @@
  *   node scripts/wsjtx-bridge.cjs \
  *     --event-id  <EzFD event UUID>   \
  *     --api-url   http://localhost:3000 \
- *     --operator  W0NY                 \
+ *     --operator  N0CALL               \
  *     --station   1                    \
  *     --port      2237                 \
  *     --spool     ~/.ezfd/wsjtx-queue-<event>.jsonl
@@ -256,7 +256,9 @@ function parseExchange(s) {
 
 async function postQso(qso) {
   const url = `${API_URL}/api/qso`;
-  const body = JSON.stringify(qso);
+  const { logged_at, ...rest } = qso;
+  const age = logged_at ? Date.now() - Date.parse(logged_at) : 0;
+  const body = JSON.stringify({ ...rest, age_ms: Number.isFinite(age) && age > 0 ? age : 0 });
 
   const lib = url.startsWith('https') ? https : http;
 
@@ -438,6 +440,13 @@ sock.on('message', async (msg) => {
     rcvd_section,
     operator_call:  operatorCall || undefined,
     station_number: STATION,
+    freq_khz:       Math.round(freqHz / 1000),
+    adif_mode:      mode || undefined,
+    // When WSJT-X logged it, by this machine's clock. Sent to the server as
+    // an age, measured on the same clock when the post goes out, so a contact
+    // that waited in the spool is dated when it happened rather than when the
+    // server came back, without the server trusting this clock's setting.
+    logged_at:      (dateOff ?? new Date()).toISOString(),
   };
 
   const ts = (dateOff ?? new Date()).toISOString().slice(11, 19);

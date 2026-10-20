@@ -50,9 +50,13 @@ The one thing it won't retry is a contact the server refuses on purpose — a
 relay says `rejected` and moves on; the contact is still in WSJT-X's own
 `wsjtx_log.adi` and can be brought in with an ADIF import.
 
-Queued contacts are stamped by the server when they finally arrive, not when
-they were made, so a long outage shifts their times. If exact times matter for
-a submission, import `wsjtx_log.adi` instead — ADIF carries the original.
+Queued contacts keep the time WSJT-X logged them. The relay sends how long ago
+that was, measured on this machine's clock when the contact goes out, and the
+server dates the contact by its own clock minus that age, so a contact that
+waited out an outage lands at the time it was made. The relay also sends the
+dial frequency and the WSJT-X mode (`FT8`, `FT4`, ...), which the ADIF export
+writes back out as `FREQ` and `MODE`. A contact queued by a relay older than
+this change has no time recorded in the spool and is dated when it arrives.
 
 ### Configuring WSJT-X
 
@@ -69,8 +73,14 @@ an N1MM export, N3FJP, or a hand-built file.
 
 Records are matched to bands by the `BAND` field, falling back to `FREQ`.
 Mode is mapped to the app's three buckets: `CW` stays CW, SSB/USB/LSB/FM/AM
-become phone, everything else becomes digital. The Field Day exchange is read
-from `CLASS` and `ARRL_SECT`, falling back to `SRX_STRING`.
+become phone, everything else becomes digital. The file's own `MODE` and
+`FREQ` are kept beside that, so an imported FT8 contact exports as FT8 on its
+real frequency rather than as generic digital at the band's default. The
+Field Day exchange is read from `CLASS` and `ARRL_SECT`, falling back to
+`SRX_STRING`.
+
+The whole file goes in as one transaction: if anything fails partway, nothing
+from that file is in the log and importing it again is safe.
 
 Imports are **idempotent**. A record already in the log — matched on callsign,
 band, mode and a ±2 minute window — is skipped rather than inserted, so
@@ -82,7 +92,7 @@ can't double the log. The result reports four counts:
 | imported | New QSOs added |
 | dupes | Added, but flagged as duplicates under the event's dupe rule |
 | already in log | Skipped as already present |
-| skipped | Unusable, usually an unrecognised band |
+| skipped | Unusable: an unrecognised band, or a callsign that is not one |
 
 The ±2 minute window exists because ADIF only carries minute resolution and
 loggers round differently.

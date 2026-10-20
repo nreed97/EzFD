@@ -355,7 +355,7 @@ A test that has never been observed failing is a test you don't know works.
 
 | Job | Runs |
 |---|---|
-| `build` | The fourteen pure suites, then lint, typecheck and build, then the end-to-end suite against the built server |
+| `build` | `npm audit` of the runtime dependencies, the pure suites, then lint, typecheck and build, then the end-to-end suite against the built server, connected as the app's own `ezfd` role |
 | `schema` | Schema applied twice for idempotency, then the constraint, query and restore suites |
 | `shell` | `bash -n` on every tracked `.sh`, the rig-bridge copy check, then `shellcheck` |
 | `docker` | Builds the Compose install from scratch, then the live stack checks and the end-to-end suite through its proxy |
@@ -368,6 +368,14 @@ reports now is something the change introduced.
 The pure suites run first in `build` because they need no database and no
 compile: a drifted section list or a broken scorer fails in seconds rather
 than after the build and a server start.
+
+The audit step fails on a known high-severity advisory in anything the server
+runs (`npm audit --omit=dev --audit-level=high`); development-only packages
+never reach a server and are not gated. Dependabot opens a weekly pull request
+for dependency updates (`.github/dependabot.yml`), minor and patch releases
+grouped into one, so an advisory normally arrives as a PR to review rather than
+as a red step on someone else's change. The fix is to update the package, not
+to relax the step.
 
 ## Conventions
 

@@ -3,14 +3,13 @@ import { getPool } from '@/lib/db';
 import { encryptField } from '@/lib/crypto';
 import { refreshCallHistory } from '@/lib/callHistory';
 import { refreshMasterCallsignsIfStale } from '@/lib/masterCallsigns';
-
-function generateJoinCode(): string {
-  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  return Array.from({ length: 6 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-}
+import { adminKeyOk, generateJoinCode } from '@/lib/adminKey';
+import { DUPE_RULES } from '@/lib/events';
+import { badRequest, callsign, jsonBody, text } from '@/lib/validate';
 
 export async function POST(request: Request) {
-  const body = await request.json();
+  const body = await jsonBody(request);
+  if (!body) return badRequest('Body must be a JSON object');
   const {
     club_name, club_call, event_year, class: fdClass, arrl_section, location,
     qrz_username, qrz_password, admin_key, event_type, power,
@@ -18,24 +17,22 @@ export async function POST(request: Request) {
     starts_at, ends_at, ses_description, ses_qsl_info,
     slot_enforcement, slot_minutes, dupe_rule, require_operator_approval,
     gota_call,
-  } = body;
+  } = body as Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
 
   const isSesEvent = event_type === 'SES';
 
   // A special event station has no contest exchange, so class and section
   // aren't just optional — they're meaningless and stored as NULL.
-  if (!club_name || !club_call) {
+  if (!text(club_name) || !club_call) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
-  if (!isSesEvent && (!fdClass || !arrl_section)) {
+  if (!callsign(club_call)) return badRequest('Club callsign is not a callsign');
+  if (!isSesEvent && (!text(fdClass) || !text(arrl_section))) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
-  const requiredKey = process.env.EZFD_ADMIN_KEY;
-  if (requiredKey) {
-    if (!admin_key || admin_key !== requiredKey) {
-      return NextResponse.json({ error: 'Invalid admin key' }, { status: 403 });
-    }
+  if (!adminKeyOk(admin_key)) {
+    return NextResponse.json({ error: 'Invalid admin key' }, { status: 403 });
   }
 
   const pool = getPool();
@@ -63,7 +60,9 @@ export async function POST(request: Request) {
   // history downloader only knows FD and WFD, and only ever runs for those.
   const contestType: 'FD' | 'WFD' = event_type === 'WFD' ? 'WFD' : 'FD';
   const resolvedEventType = isSesEvent ? 'SES' : contestType;
-  const resolvedYear = event_year ?? new Date().getFullYear();
+  const year = Number(event_year);
+  const resolvedYear = Number.isInteger(year) && year >= 1900 && year <= 2200
+    ? year : new Date().getFullYear();
 
   // The N1MM call history file is contest- and year-specific (an FD/WFD
   // station's usual class and section), so it has nothing to offer an SES.
@@ -87,18 +86,16 @@ export async function POST(request: Request) {
      RETURNING id, join_code`,
     [
       join_code,
-      club_name.trim(),
-      club_call.toUpperCase().trim(),
+      text(club_name, { max: 120 }),
+      callsign(club_call),
       resolvedYear,
       // A special event station has no contest class, ever. Its section is
       // optional: plenty of special events run outside FD/WFD but are still
       // worth recording a section for, and it feeds ADIF MY_ARRL_SECT.
-      isSesEvent ? null : fdClass.toUpperCase().trim(),
-      isSesEvent
-        ? (arrl_section?.toUpperCase().trim() || null)
-        : arrl_section.toUpperCase().trim(),
-      location?.trim() ?? null,
-      qrz_username?.trim() ?? null,
+      isSesEvent ? null : text(fdClass, { upper: true, max: 4 }),
+      text(arrl_section, { upper: true, max: 5 }),
+      text(location, { max: 120 }),
+      text(qrz_username, { max: 60 }),
       encryptedPassword,
       resolvedEventType,
       ['HIGH','LOW','QRP'].includes(power) ? power : 'HIGH',
@@ -106,17 +103,17 @@ export async function POST(request: Request) {
       !!use_master_callsign_file,
       isSesEvent ? parseDate(starts_at) : null,
       isSesEvent ? parseDate(ends_at) : null,
-      isSesEvent ? (ses_description?.trim() || null) : null,
-      isSesEvent ? (ses_qsl_info?.trim() || null) : null,
+      isSesEvent ? text(ses_description, { max: 2000 }) : null,
+      isSesEvent ? text(ses_qsl_info, { max: 2000 }) : null,
       slot_enforcement === 'HARD' ? 'HARD' : 'SOFT',
       Number(slot_minutes) > 0 ? Math.round(Number(slot_minutes)) : 120,
-      ['EVENT','DAY','NONE'].includes(dupe_rule) ? dupe_rule : (isSesEvent ? 'DAY' : 'EVENT'),
+      (DUPE_RULES as readonly string[]).includes(dupe_rule) ? dupe_rule : (isSesEvent ? 'DAY' : 'EVENT'),
       isSesEvent && !!require_operator_approval,
       // Field Day only. Rule 7.3.13.1 lists the GOTA bonus for classes A and
       // F; Winter Field Day has no bonuses at all and a special event has no
       // contest structure, so storing a GOTA call on either would offer an
       // operator a station that can never score.
-      resolvedEventType === 'FD' ? (gota_call?.toUpperCase().trim() || null) : null,
+      resolvedEventType === 'FD' ? callsign(gota_call) : null,
     ]
   );
 

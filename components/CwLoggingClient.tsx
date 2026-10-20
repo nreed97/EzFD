@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStoredFlag } from '@/lib/useStoredFlag';
 import { applyQsoEvent } from '@/lib/qsoStream';
 import { useRigBridge } from '@/lib/useRigBridge';
-import { useQsoQueue } from '@/lib/useQsoQueue';
+import { useQsoQueue, rigFrequencyKhz } from '@/lib/useQsoQueue';
 import { transmitterCount } from '@/lib/types';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
 import QSOForm, { type QSOFormHandle } from './QSOForm';
@@ -54,6 +54,8 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
   }
 
   const rig = useRigBridge({ onBand: setCurrentBand, onMode: setCurrentMode });
+  const rigFreqRef = useRef(rig.freq);
+  useEffect(() => { rigFreqRef.current = rig.freq; }, [rig.freq]);
 
   const getFormValues = useCallback(
     () => formRef.current?.getValues() ?? {
@@ -93,7 +95,9 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
       // Queued to localStorage before the network is touched, so a failure
       // here leaves the contact on disk instead of losing it. QSOForm clears
       // the fields either way, which is only safe because of this.
-      const { qso, queued, error } = await submitQSO(data);
+      const { qso, queued, error } = await submitQSO({
+        ...data, freq_khz: rigFrequencyKhz(data.band, rigFreqRef.current),
+      });
       setLastLogged(queued);
       if (qso) {
         setConfirmedQSOs(prev => prev.some(q => q.id === qso.id) ? prev : [qso, ...prev]);

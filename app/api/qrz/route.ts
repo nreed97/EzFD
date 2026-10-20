@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { lookupCallsign } from '@/lib/qrz';
+import { badRequest, callsign as asCallsign, isUuid } from '@/lib/validate';
 
 export async function GET(request: Request) {
   const url = new URL(request.url);
@@ -9,6 +10,7 @@ export async function GET(request: Request) {
   if (!callsign || !eventId) {
     return NextResponse.json({ error: 'callsign and event_id required' }, { status: 400 });
   }
+  if (!isUuid(eventId) || !asCallsign(callsign)) return badRequest('Not a valid callsign or event id');
 
   try {
     const result = await lookupCallsign(eventId, callsign);

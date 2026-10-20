@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
+import { badRequest, callsign as asCallsign, isBand, isMode, isUuid, jsonBody, text } from '@/lib/validate';
 import {
   EXCLUSION_VIOLATION,
   RESERVATION_COLUMNS,
@@ -9,7 +10,6 @@ import {
   overlappingHolder,
   describeHolder,
 } from '@/lib/ses';
-import { BANDS, MODES } from '@/lib/types';
 
 /**
  * Current and upcoming call checkouts for the coordination grid.
@@ -32,6 +32,7 @@ export async function GET(request: Request) {
   const params = new URL(request.url).searchParams;
   const eventId = params.get('event_id');
   if (!eventId) return NextResponse.json({ error: 'event_id required' }, { status: 400 });
+  if (!isUuid(eventId)) return badRequest('event_id is not a valid id');
 
   const rawPast = Number(params.get('past_hours'));
   // Clamp: a hostile or fat-fingered value must not turn this into a full
@@ -65,22 +66,31 @@ export async function GET(request: Request) {
  * translated into a 409 naming whoever already holds it.
  */
 export async function POST(request: Request) {
-  const body = await request.json();
-  const { event_id, join_code, op_call, band, mode, minutes, starts_at, planned_freq, note,
+  const body = await jsonBody(request);
+  if (!body) return badRequest('Body must be a JSON object');
+  const { event_id, join_code, band, mode, minutes, starts_at,
           station_number } = body;
 
-  if ((!event_id && !join_code) || !op_call || !band || !mode) {
+  if ((!event_id && !join_code) || !body.op_call || !band || !mode) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
-  if (!(BANDS as readonly string[]).includes(band)) {
-    return NextResponse.json({ error: `Unknown band "${band}"` }, { status: 400 });
+  if (event_id && !isUuid(event_id)) return badRequest('event_id is not a valid id');
+  if (join_code && typeof join_code !== 'string') return badRequest('join_code must be text');
+  const opCall = asCallsign(body.op_call);
+  if (!opCall) return badRequest('op_call is not a callsign');
+  const planned_freq = text(body.planned_freq, { max: 40 });
+  const note = text(body.note, { max: 200 });
+  if (!isBand(band)) {
+    return NextResponse.json({ error: `Unknown band "${String(band).slice(0, 10)}"` }, { status: 400 });
   }
-  if (!(MODES as readonly string[]).includes(mode)) {
-    return NextResponse.json({ error: `Unknown mode "${mode}"` }, { status: 400 });
+  if (!isMode(mode)) {
+    return NextResponse.json({ error: `Unknown mode "${String(mode).slice(0, 10)}"` }, { status: 400 });
   }
 
   const pool = getPool();
-  const event = await loadEvent(pool, { event_id, join_code });
+  const event = await loadEvent(pool, {
+    event_id: event_id as string | undefined, join_code: join_code as string | undefined,
+  });
   if (!event) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
   // Contests coordinate the same way. Field Day has the same
   // one-signal-per-band-per-mode rule, and a 3A club running three
@@ -89,7 +99,6 @@ export async function POST(request: Request) {
   // contest.
   const isSes = event.event_type === 'SES';
 
-  const opCall = op_call.toUpperCase().trim();
   // Which position holds the slot. On a contest that is the transmitter, and
   // it is what "mine" is tested against. On a special event the *operator*
   // still holds the callsign — but one operator can run two radios from two
@@ -97,7 +106,7 @@ export async function POST(request: Request) {
   // leaving one band released the other's slot. Recording it disambiguates
   // the windows; describeHolder() still shows an SES holder as their call.
   const stationNumber = Math.max(1, parseInt(String(station_number ?? 1), 10) || 1);
-  const start = starts_at ? new Date(starts_at) : new Date();
+  const start = starts_at ? new Date(String(starts_at)) : new Date();
   if (isNaN(start.getTime())) {
     return NextResponse.json({ error: 'Invalid starts_at' }, { status: 400 });
   }
@@ -109,7 +118,7 @@ export async function POST(request: Request) {
       `INSERT INTO ses_reservations (event_id, op_call, band, mode, during, planned_freq, note, station_number)
        VALUES ($1, $2, $3, $4, tstzrange($5, $6, '[)'), $7, $8, $9)
        RETURNING ${RESERVATION_COLUMNS}`,
-      [event.id, opCall, band, mode, start, end, planned_freq?.trim() || null, note?.trim() || null,
+      [event.id, opCall, band, mode, start, end, planned_freq, note,
        stationNumber]
     );
     return NextResponse.json(rows[0], { status: 201 });

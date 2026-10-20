@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { memo, useState } from 'react';
 import type { Band, Mode, DisplayQSO, QSO } from '@/lib/types';
 import { VALID_EXCHANGES } from '@/lib/types';
 
@@ -196,7 +196,7 @@ function EditModal({ qso, onSave, onClose, currentOpCall }: EditModalProps) {
 // ---------------------------------------------------------------------------
 // Main table
 // ---------------------------------------------------------------------------
-export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, eventId }: Props) {
+function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, eventId }: Props) {
   const [editingQSO, setEditingQSO] = useState<DisplayQSO | null>(null);
   // Deleted contacts are fetched only when asked for: they're the exception,
   // and loading them with every render would put a query on the hot path of
@@ -262,7 +262,9 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, even
               <tr
                 key={qso._local_id ?? qso.id}
                 className={`border-b border-zinc-800/50 light:border-zinc-200 transition-colors ${
-                  qso._pending
+                  qso._rejected
+                    ? 'bg-red-950/30 light:bg-red-50'
+                    : qso._pending
                     ? 'bg-yellow-950/20 light:bg-yellow-50/50 opacity-70'
                     : qso.is_dupe
                       ? 'opacity-40'
@@ -273,7 +275,14 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, even
                 <td className="px-3 py-1.5 font-mono font-semibold text-zinc-100 light:text-zinc-900">
                   <span className="flex items-center gap-1.5 flex-wrap">
                     {qso.callsign}
-                    {qso._pending && (
+                    {qso._rejected ? (
+                      // Refused by the server and kept here rather than
+                      // retried or dropped: it needs a person. Re-log it
+                      // correctly, then delete this row.
+                      <span className="text-2xs font-sans font-normal text-red-400 light:text-red-700" title={qso._rejected}>
+                        not accepted: {qso._rejected}
+                      </span>
+                    ) : qso._pending && (
                       <span className="text-2xs text-yellow-500 animate-pulse">↑ sync</span>
                     )}
                     {qso.is_dupe && !qso._pending && (
@@ -387,3 +396,8 @@ export default function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, even
     </>
   );
 }
+
+/** Memoised because its parent, the logging window, re-renders several times
+ *  a second while the rig is tuning, and every row of a long log would
+ *  re-render with it. The parent passes a memoised list and stable callbacks. */
+export default memo(QSOTable);

@@ -1,10 +1,20 @@
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import { enqueue, dequeue, loadQueue, type PendingQSO } from '@/lib/offline-queue';
+import { enqueue, dequeue, loadQueue, markRejected, type PendingQSO } from '@/lib/offline-queue';
 import { useOnline } from '@/lib/useOnline';
 import type { QSO, DisplayQSO } from '@/lib/types';
 import type { QSOSubmission } from '@/components/QSOForm';
+import { freqToBand } from '@/lib/catProtocol';
+import type { Band } from '@/lib/types';
+
+/** The rig's frequency in kHz for a contact on `band`, or undefined when there
+ *  is no rig or the operator logged a band the rig is not on — a frequency
+ *  that contradicts the logged band is worse in an ADIF file than none. */
+export function rigFrequencyKhz(band: Band, hz: number | null | undefined): number | undefined {
+  if (!hz || freqToBand(hz) !== band) return undefined;
+  return Math.round(hz / 1000);
+}
 
 /**
  * The offline QSO queue for one event, shared by every window that logs.
@@ -38,7 +48,7 @@ async function submitQSOToServer(
   eventId: string,
   pending: PendingQSO,
   replay = false,
-): Promise<{ qso: QSO | null; error?: string; warning?: string }> {
+): Promise<{ qso: QSO | null; error?: string; warning?: string; rejected?: boolean }> {
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), 10_000);
   try {
@@ -62,12 +72,20 @@ async function submitQSOToServer(
         rcvd_qth: pending.rcvd_qth,
         rcvd_grid: pending.rcvd_grid,
         comment: pending.comment,
+        freq_khz: pending.freq_khz,
+        adif_mode: pending.adif_mode,
         replay,
+        // How long ago this was logged, by this browser's clock at both ends,
+        // so the server can date it without trusting the clock itself.
+        age_ms: Math.max(0, Date.now() - Date.parse(pending.submitted_at)),
       }),
     });
     if (!res.ok) {
       const body = await res.json().catch(() => ({})) as { error?: string };
-      return { qso: null, error: body.error ?? `Server error ${res.status}` };
+      // A 4xx is the server refusing on purpose; 408 and 429 are the two that
+      // mean "not now" rather than "no".
+      const rejected = res.status >= 400 && res.status < 500 && res.status !== 408 && res.status !== 429;
+      return { qso: null, error: body.error ?? `Server error ${res.status}`, rejected };
     }
     const qso = await res.json() as QSO & { slot_warning?: string };
     return { qso, warning: qso.slot_warning };
@@ -109,10 +127,11 @@ function pendingToDisplay(
     rcvd_qth: p.rcvd_qth ?? null,
     rcvd_grid: p.rcvd_grid ?? null,
     comment: p.comment ?? null,
-    adif_mode: null,
-    freq_khz: null,
+    adif_mode: p.adif_mode ?? null,
+    freq_khz: p.freq_khz ?? null,
     _pending: true,
     _local_id: p.local_id,
+    ...(p.rejected ? { _rejected: p.rejected } : {}),
   };
 }
 
@@ -172,6 +191,11 @@ export function useQsoQueue(
     }
   }, [eventId, sentClass, sentSection]);
 
+  const reject = useCallback((localId: string, reason: string) => {
+    markRejected(eventId, localId, reason);
+    setPending(prev => prev.map(p => (p._local_id === localId ? { ...p, _rejected: reason } : p)));
+  }, [eventId]);
+
   const flush = useCallback(async () => {
     // A flush already running will report its own progress; returning false
     // here can only cost the timer one backoff step, and the next dequeue
@@ -180,7 +204,13 @@ export function useQsoQueue(
     syncingRef.current = true;
     let progressed = false;
     for (const queued of loadQueue(eventId)) {
+      // Already refused, and waiting on a person rather than on the network.
+      if (queued.rejected) continue;
       const result = await submitQSOToServer(eventId, queued, true);
+      if (result.rejected) {
+        reject(queued.local_id, result.error ?? 'Refused by the server');
+        continue;
+      }
       // Only drop the queued copy once the server has actually taken it.
       // Checking the wrapper object here instead of result.qso meant a failed
       // submit still dequeued, silently losing the contact.
@@ -192,7 +222,7 @@ export function useQsoQueue(
     }
     syncingRef.current = false;
     return progressed;
-  }, [eventId]);
+  }, [eventId, reject]);
 
   // Reached from long-lived callbacks without making either depend on flush's
   // identity — a dependency that would tear down and restart the timer on
@@ -223,10 +253,12 @@ export function useQsoQueue(
   //
   // The timer reschedules itself rather than relying on the effect re-running,
   // because a failed attempt changes no state the effect depends on. A
-  // successful one does — pendingCount drops, this effect restarts, and the
+  // successful one does — the waiting count drops, this effect restarts, and the
   // backoff is back at its shortest step.
+  // Rejected contacts wait on a person, so they keep no timer running.
+  const waiting = pending.filter(p => !p._rejected).length;
   useEffect(() => {
-    if (!isOnline || pendingCount === 0) return;
+    if (!isOnline || waiting === 0) return;
     let cancelled = false;
     let attempt = 0;
     let timer: ReturnType<typeof setTimeout>;
@@ -240,7 +272,7 @@ export function useQsoQueue(
     };
     schedule();
     return () => { cancelled = true; clearTimeout(timer); };
-  }, [isOnline, pendingCount]);
+  }, [isOnline, waiting]);
 
   const submit = useCallback(async (data: QSOSubmission) => {
     // localStorage first, always — this is the line that makes a failed submit
@@ -262,9 +294,13 @@ export function useQsoQueue(
       dequeue(eventId, queued.local_id);
       setPending(prev => prev.filter(p => p._local_id !== queued.local_id));
       setPendingCount(prev => Math.max(0, prev - 1));
+    } else if (result.rejected) {
+      const reason = result.error ?? 'Refused by the server';
+      reject(queued.local_id, reason);
+      return { ...result, queued: { ...display, _rejected: reason } };
     }
     return { ...result, queued: display };
-  }, [eventId, sentClass, sentSection, operatorCall, stationNumber, isGota]);
+  }, [eventId, sentClass, sentSection, operatorCall, stationNumber, isGota, reject]);
 
   const drop = useCallback((localId: string) => {
     dequeue(eventId, localId);

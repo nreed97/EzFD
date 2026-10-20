@@ -1,5 +1,3 @@
-import type { Pool } from 'pg';
-
 /**
  * The column list every page and route uses to load an event.
  *
@@ -45,34 +43,12 @@ export const MERGE_WINDOW_SECONDS = 120;
  *           station again next weekend is normal rather than a mistake.
  *   NONE  — never flag a dupe.
  *
- * `at` is the QSO's own timestamp rather than "now" so that an ADIF import of
- * back-dated contacts is evaluated against the day it actually happened.
+ * The rule is applied in one place, `ezfd_recompute_dupes()` in
+ * `db/schema.sql`, which every insert, edit, delete, restore, import and merge
+ * calls for the groups it touched. This file used to hold a per-row check
+ * that the insert and the import called and the edit reimplemented without the
+ * rule; a check that answers "is this row a dupe?" can set a flag but never
+ * clear one, which is how deleting the first of two contacts left the second
+ * scoring nothing.
  */
-export async function isDupeQSO(
-  pool: Pool,
-  eventId: string,
-  callsign: string,
-  band: string,
-  mode: string,
-  dupeRule: string,
-  at: Date
-): Promise<boolean> {
-  if (dupeRule === 'NONE') return false;
-
-  const params: unknown[] = [eventId, callsign, band, mode];
-  let dayClause = '';
-  if (dupeRule === 'DAY') {
-    params.push(at);
-    dayClause = "AND (datetime_utc AT TIME ZONE 'UTC')::date = ($5::timestamptz AT TIME ZONE 'UTC')::date";
-  }
-
-  const { rows } = await pool.query(
-    `SELECT id FROM qsos
-     WHERE event_id=$1 AND callsign=$2 AND band=$3 AND mode=$4 AND is_dupe=false
-       AND deleted_at IS NULL
-     ${dayClause}
-     LIMIT 1`,
-    params
-  );
-  return rows.length > 0;
-}
+export const DUPE_RULES = ['EVENT', 'DAY', 'NONE'] as const;

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNow } from '@/lib/useNow';
 import dynamic from 'next/dynamic';
 import { calculateScore } from '@/lib/scoring';
@@ -22,6 +22,7 @@ import OperatorStats from './OperatorStats';
 import SiteOverview from './SiteOverview';
 import NavDrawer from './NavDrawer';
 import { slotWords } from '@/lib/slotWords';
+import { useVisibleInterval } from '@/lib/useVisibleInterval';
 
 const MapView = dynamic(() => import('./MapView'), { ssr: false });
 
@@ -35,7 +36,8 @@ interface StationPresence {
   updated_at: string;
 }
 
-const PRESENCE_POLL_MS = 15_000;
+const NOW_TICK_MS = 15_000;
+const SWEEP_MS = 60_000;
 const INACTIVE_MS = 15 * 60 * 1000;
 
 const MODE_COLORS: Record<string, string> = {
@@ -104,6 +106,11 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
   // callsign checkouts) and the site overview's band board reads them; before
   // this the dashboard skipped the fetch entirely on FD and WFD, so every
   // claimed band there would have drawn as free.
+  const fetchPresence = useCallback(async () => {
+    const res = await fetch(`/api/presence?event_id=${event.id}`).catch(() => null);
+    if (res?.ok) setPresence(await res.json());
+  }, [event.id]);
+
   const refreshReservations = useCallback(async () => {
     const res = await fetch(`/api/ses/reservations?event_id=${event.id}`).catch(() => null);
     if (res?.ok) {
@@ -121,8 +128,9 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
     // Call checkouts ride the same stream; the payload carries the raw range
     // column, so this just signals "refetch".
     es.addEventListener('reservation', () => { void refreshReservations(); });
+    es.addEventListener('presence', () => { void fetchPresence(); });
     return () => es.close();
-  }, [event.id, refreshReservations]);
+  }, [event.id, refreshReservations, fetchPresence]);
 
   useEffect(() => {
     // the loader is async: whatever state it sets happens in a promise
@@ -131,30 +139,28 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
     // boundary.
     // eslint-disable-next-line react-hooks/set-state-in-effect
     refreshReservations();
-    const id = setInterval(refreshReservations, PRESENCE_POLL_MS);
-    return () => clearInterval(id);
   }, [refreshReservations]);
+  // Both are pushed over the stream above; these sweeps only catch what no
+  // event announces, so they run slowly and not at all in a hidden tab.
+  useVisibleInterval(refreshReservations, SWEEP_MS);
+  useVisibleInterval(fetchPresence, SWEEP_MS);
 
   // Live band/mode per operator — same presence table BandActivity uses on
   // the logging page. Dashboard is read-only here: it polls but never
   // publishes its own presence row.
-  useEffect(() => {
-    let cancelled = false;
-    async function fetchPresence() {
-      const res = await fetch(`/api/presence?event_id=${event.id}`).catch(() => null);
-      if (!cancelled && res?.ok) setPresence(await res.json());
-    }
-    fetchPresence();
-    const id = setInterval(fetchPresence, PRESENCE_POLL_MS);
-    return () => { cancelled = true; clearInterval(id); };
-  }, [event.id]);
+  // eslint-disable-next-line react-hooks/set-state-in-effect -- async loader, see above
+  useEffect(() => { void fetchPresence(); }, [fetchPresence]);
 
   // One ticking clock for the whole dashboard: the "last hour" QSO count, the
   // active-reservation filter and the per-operator active dot all read it, and
   // all three previously only updated when something else forced a render.
-  const nowMs = useNow(PRESENCE_POLL_MS);
+  const nowMs = useNow(NOW_TICK_MS);
 
-  const score = calculateScore(qsos, bonuses, event.power, { eventType: event.event_type, entryClass: event.class });
+  // Memoised: the dashboard re-renders on every presence sweep and clock tick,
+  // and none of those change the score.
+  const score = useMemo(
+    () => calculateScore(qsos, bonuses, event.power, { eventType: event.event_type, entryClass: event.class }),
+    [qsos, bonuses, event.power, event.event_type, event.class]);
   const oneHourAgo = new Date(nowMs - 60 * 60 * 1000).toISOString();
   const recentQSOs = qsos.filter(q => !q.is_dupe && (typeof q.datetime_utc === 'string' ? q.datetime_utc : q.datetime_utc.toISOString()) > oneHourAgo).length;
 

@@ -75,6 +75,18 @@ console.log('\n── parseAdif ──');
   eq(recs[1].band, '20m', 'band falls back to FREQ in MHz when BAND is absent');
   eq(recs[1].rcvd_class, '1A', 'class falls back to SRX_STRING');
   eq(recs[1].rcvd_section, 'MDC', 'section falls back to SRX_STRING');
+  // Kept so an imported contact exports with its own FREQ and MODE rather
+  // than the band default and the generic PH/CW/DIG bucket.
+  eq(recs[1].freq_khz, 14030, 'FREQ is kept, in kHz');
+  eq(recs[1].adif_mode, 'CW', 'the file\'s MODE is kept');
+  eq(recs[0].freq_khz, undefined, 'no FREQ field leaves the frequency unset');
+}
+{
+  // MODE, not SUBMODE: the export writes this value into MODE, where FT4 or
+  // USB would not be valid ADIF.
+  const recs = parseAdif('<EOH>\n<CALL:5>K1ABC<BAND:3>20m<MODE:4>MFSK<SUBMODE:3>FT4<EOR>');
+  eq(recs[0].adif_mode, 'MFSK', 'MODE is kept rather than SUBMODE');
+  eq(recs[0].mode, 'DIG', 'and it still maps to digital');
 }
 {
   // Length-prefixed values are authoritative — a value containing '<' or a

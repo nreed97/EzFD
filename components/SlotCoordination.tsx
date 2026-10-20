@@ -7,6 +7,7 @@ import { slotWords } from '@/lib/slotWords';
 import { useStoredFlag } from '@/lib/useStoredFlag';
 import { BANDS, MODES } from '@/lib/types';
 import DateTimeField from './DateTimeField';
+import { useVisibleInterval } from '@/lib/useVisibleInterval';
 
 /**
  * The band/mode slot panel on the logging screen.
@@ -138,10 +139,7 @@ export default function SlotCoordination({
     fetchReservations();
   }, [fetchReservations, refreshToken]);
 
-  useEffect(() => {
-    const id = setInterval(fetchReservations, POLL_MS);
-    return () => clearInterval(id);
-  }, [fetchReservations]);
+  useVisibleInterval(fetchReservations, POLL_MS);
 
   useEffect(() => {
     const id = setInterval(() => setTick(t => t + 1), 30_000);

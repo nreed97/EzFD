@@ -136,7 +136,7 @@ export default function EventJoinPage() {
                 required
                 value={opCall}
                 onChange={e => setOpCall(e.target.value.toUpperCase())}
-                placeholder="W0NY"
+                placeholder="N0CALL"
                 className="input w-full font-mono text-lg tracking-widest"
                 autoFocus
               />
@@ -196,7 +196,7 @@ export default function EventJoinPage() {
                   <input
                     value={opState}
                     onChange={e => setOpState(e.target.value.toUpperCase())}
-                    placeholder="MN"
+                    placeholder="ST"
                     className="input w-full font-mono"
                     maxLength={4}
                   />

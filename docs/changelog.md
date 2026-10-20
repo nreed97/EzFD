@@ -23,6 +23,100 @@ only run events.
 
 ---
 
+## 2026-10-20
+
+### Added
+
+- **Frequency on logged contacts** `Exports` — With a rig connected, each
+  contact now records the frequency it was made on, so the ADIF export carries
+  the real `FREQ` instead of the band's default. The WSJT-X relay sends the
+  dial frequency and the mode (FT8, FT4), and an ADIF import keeps the file's
+  own `FREQ` and `MODE`. ([#109])
+  Docs: [Digital modes → ADIF import](digital-modes.md#adif-import), [HTTP API → POST /api/qso](api.md#post-apiqso)
+
+### Changed
+
+- **Queued contacts keep the time you logged them** `Exports` — A contact that
+  waited out an outage used to be stamped with the time the server came back,
+  which moved it in the log and could break LoTW matching. It now lands at the
+  time you logged it, still dated by the server's clock, in the logging
+  windows and the WSJT-X relay alike. ([#109])
+  Docs: [Operating → Working offline](operating.md#working-offline), [Architecture → Offline tolerance](architecture.md#offline-tolerance)
+- **A contact the server refuses waits for you instead of blocking the queue**
+  `Display` — A queued contact the server could never accept used to retry
+  every minute and hold back every contact queued behind it. It is now kept in
+  the log list in red with the reason, the rest sync around it, and you re-log
+  it correctly and delete the red row. ([#109])
+  Docs: [Troubleshooting → A queued contact is shown in red as "not accepted"](troubleshooting.md#a-queued-contact-is-shown-in-red-as-not-accepted)
+- **Live updates use one database connection, not one per window** `Setup` —
+  Every open logging window, CW window and dashboard used to hold its own
+  database connection, and about a hundred of them exhausted the server, after
+  which every request failed. A hundred now use one, which matters most on a
+  small server. ([#109])
+  Docs: [Architecture → Real-time updates](architecture.md#real-time-updates), [Configuration → EZFD_MAX_STREAMS](configuration.md#ezfd_max_streams)
+- **Who is on the air updates live** `Display` — A window changing band or
+  mode, arriving or going QRT now shows on every screen as it happens, rather
+  than up to 15 seconds later, and screens in a background tab stop polling
+  the server. ([#109])
+  Docs: [Operating → Who else is on](operating.md#who-else-is-on)
+- **An admin key by default on a server with a domain** `Setup` — `deploy.sh`
+  now offers a generated admin key whenever you give it a domain, so a new
+  server on the internet does not let anybody create or import events. An
+  IP-only field server keeps the old default. ([#109])
+  Docs: [Deployment → Configuration file](deployment.md#configuration-file), [Configuration → EZFD_ADMIN_KEY](configuration.md#ezfd_admin_key)
+- **Placeholders read N0CALL and SEC** `Display` — The example callsign and
+  section in the entry forms are now the generic `N0CALL` and `SEC`, and the
+  new-event form no longer arrives with a section already picked, so nobody
+  creates an event in a section that is not theirs by accident. ([#109])
+  Docs: [Getting started → Create an event](getting-started.md#create-an-event)
+- **ADIF import is all or nothing** `Exports` — A file now goes in as one
+  transaction, so a failure partway leaves nothing behind and the import can
+  simply be run again, and a large file imports in one step rather than
+  thousands. ([#109])
+  Docs: [Digital modes → ADIF import](digital-modes.md#adif-import)
+
+### Fixed
+
+- **Deleting the first of two contacts left the second scoring nothing**
+  `Scoring` — Log a station twice and delete the first: the second stayed
+  marked as a dupe and was left out of the score. Dupes are now worked out
+  again whenever the log changes, after an edit, a delete, a restore, an
+  import or a late contact from the queue, under the event's own dupe rule. If
+  you deleted contacts before submitting, check the claimed score. ([#109])
+  Docs: [Operating → Duplicates](operating.md#duplicates)
+- **A long comment made a contact impossible to log** — A comment of a few
+  thousand characters failed the whole contact, and from the offline queue it
+  retried forever. Long text is now trimmed instead, and nothing the database
+  announces can fail the write it announces. ([#109])
+  Docs: [Database → Notification triggers](database.md#notification-triggers)
+- **Bad requests answered with a server error** — A wrong mode, band, id or
+  callsign came back as a 500, which the offline queue and the WSJT-X relay
+  retry. They are now a 400 that says what was wrong. ([#109])
+  Docs: [HTTP API → Errors](api.md#errors)
+- **QRZ lookups that hung or went quiet** — A lookup now gives up after five
+  seconds, signs in again when QRZ ends the session early, and remembers recent
+  answers so the same call is not looked up twice. ([#109])
+  Docs: [HTTP API → GET /api/qrz](api.md#get-apiqrzcallsignevent_id)
+
+### Security
+
+- **SQL in the live-update address** — The real-time endpoint ran part of its
+  URL as SQL, so one unauthenticated request could delete every contact on
+  the server. It now refuses anything that is not a real event's id. Update any
+  server that is reachable from the internet. ([#109])
+  Docs: [Architecture → Real-time updates](architecture.md#real-time-updates)
+- **Next.js 16.4.2** `Setup` — Up from 16.3.6, which six published advisories
+  affect, among them server-side request forgery and cache poisoning on
+  self-hosted servers. CI now fails on a known high-severity advisory in
+  anything the server runs. ([#109])
+  Docs: [Development](development.md)
+- **Stronger join codes and admin key checks** — Join codes now come from a
+  cryptographic random source, including for restored events, which had used a
+  smaller alphabet. The admin key is compared in constant time, every response
+  keeps the event URL out of other sites' `Referer` headers, and pages refuse
+  to be framed. ([#109])
+  Docs: [Configuration → Security notes](configuration.md#security-notes)
+
 ## 2026-10-18
 
 ### Fixed
@@ -881,3 +975,4 @@ continuous enough to be worth summarising.
 [#106]: https://github.com/nreed97/EzFD/pull/106
 [#107]: https://github.com/nreed97/EzFD/pull/107
 [#108]: https://github.com/nreed97/EzFD/pull/108
+[#109]: https://github.com/nreed97/EzFD/pull/109

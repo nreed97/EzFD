@@ -34,8 +34,9 @@
 import pg from 'pg';
 
 const BASE = process.argv[2] ?? 'http://127.0.0.1:3000';
-// The spread needs the database directly -- there is no route that backdates a
-// contact, and there should not be one.
+// The spread needs the database directly. The API's age_ms dates a contact by
+// how long it waited in an offline queue, measured by the sender; a fixture
+// spreading a weekend is not that, and should not pretend to be.
 const DB = process.argv[3] ?? process.env.DATABASE_URL;
 if (!DB) throw new Error('set DATABASE_URL (or pass it as the second argument) so the contacts can be spread across the weekend');
 

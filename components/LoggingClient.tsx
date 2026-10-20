@@ -1,12 +1,12 @@
 'use client';
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import { useStoredFlag } from '@/lib/useStoredFlag';
 import { useRouter } from 'next/navigation';
 import { calculateScore } from '@/lib/scoring';
 import { useRigBridge, rigPortForStation } from '@/lib/useRigBridge';
 import { useSerialRig } from '@/lib/useSerialRig';
-import { useQsoQueue } from '@/lib/useQsoQueue';
+import { useQsoQueue, rigFrequencyKhz } from '@/lib/useQsoQueue';
 import { applyQsoEvent } from '@/lib/qsoStream';
 import { ARRL_SECTIONS, transmitterCount } from '@/lib/types';
 import { bandsFor, MODES } from '@/lib/bands';
@@ -102,6 +102,7 @@ export default function LoggingClient({
   // Bumped on each SSE reservation event so SlotCoordination refetches without
   // opening a second EventSource for the same event.
   const [reservationVersion, setReservationVersion] = useState(0);
+  const [presenceVersion, setPresenceVersion] = useState(0);
 
   const isSes = event.event_type === 'SES';
 
@@ -138,6 +139,10 @@ export default function LoggingClient({
   // saw before this existed.
   const rigConnected = rig.connected || serialRig.connected;
   const rigFreq = rig.connected ? rig.freq : serialRig.freq;
+  // Read at submit time through a ref: the frequency changes several times a
+  // second while tuning, and the log callback must not be rebuilt each time.
+  const rigFreqRef = useRef(rigFreq);
+  useEffect(() => { rigFreqRef.current = rigFreq; }, [rigFreq]);
 
   function toggleNight() {
     setNightMode(prev => !prev);
@@ -195,6 +200,9 @@ export default function LoggingClient({
     // both channels). The payload carries the raw range column rather than the
     // decomposed timestamps the UI wants, so this just signals "refetch".
     es.addEventListener('reservation', () => setReservationVersion(v => v + 1));
+    // A window changing band or mode, arriving or going QRT. The band panel
+    // refetches on it rather than polling every 15 seconds.
+    es.addEventListener('presence', () => setPresenceVersion(v => v + 1));
 
     // A dropped stream is the earliest signal available that the server went
     // away, and the reconnect is the earliest that it came back — sooner than
@@ -279,7 +287,9 @@ export default function LoggingClient({
     try {
       // The queue takes the contact before the network is touched, so a failed
       // submit leaves it safely on disk rather than losing it.
-      const { qso, queued, error, warning } = await submitQSO(data);
+      const { qso, queued, error, warning } = await submitQSO({
+        ...data, freq_khz: rigFrequencyKhz(data.band, rigFreqRef.current),
+      });
       setLastLogged(queued);
       if (warning) setSlotWarning(warning);
       if (qso) {
@@ -310,11 +320,18 @@ export default function LoggingClient({
     setConfirmedQSOs(prev => prev.filter(q => q.id !== id));
   }, [dropQueued, operatorCall]);
 
-  const displayQSOs: DisplayQSO[] = [
+  // Memoised, with the score below, because this component re-renders on
+  // every rig frequency change while tuning — several times a second — and
+  // rebuilding the list and rescoring the whole log each time is wasted work
+  // that grows with the log. A stable array is also what lets QSOTable skip
+  // re-rendering every row.
+  const displayQSOs: DisplayQSO[] = useMemo(() => [
     ...pendingQSOs,
     ...confirmedQSOs.map(q => q as DisplayQSO),
-  ];
-  const score = calculateScore(confirmedQSOs, {}, event.power, { eventType: event.event_type, entryClass: event.class });
+  ], [pendingQSOs, confirmedQSOs]);
+  const score = useMemo(
+    () => calculateScore(confirmedQSOs, {}, event.power, { eventType: event.event_type, entryClass: event.class }),
+    [confirmedQSOs, event.power, event.event_type, event.class]);
 
   // Most recent confirmed QSO by this operator — SlotCoordination auto-extends
   // a slot only for someone actually working the band.
@@ -563,6 +580,7 @@ export default function LoggingClient({
             qsos={displayQSOs}
             onConflict={setBandConflict}
             onBandOccupancy={setBandOccupancy}
+            presenceVersion={presenceVersion}
           />
           {/* Contest scoring and section chasing don't apply to an SES. */}
           {!isSes && (

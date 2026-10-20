@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
+import { badRequest, callsign as asCallsign, isUuid, jsonBody, text } from '@/lib/validate';
 
 /**
  * The SES operator roster — each operator's own station location.
@@ -13,6 +14,7 @@ import { getPool } from '@/lib/db';
 export async function GET(request: Request) {
   const eventId = new URL(request.url).searchParams.get('event_id');
   if (!eventId) return NextResponse.json({ error: 'event_id required' }, { status: 400 });
+  if (!isUuid(eventId)) return badRequest('event_id is not a valid id');
 
   const pool = getPool();
   const { rows } = await pool.query(
@@ -24,10 +26,15 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const { event_id, op_call, op_name, grid, state, county, dxcc } = await request.json();
-  if (!event_id || !op_call) {
+  const body = await jsonBody(request);
+  if (!body) return badRequest('Body must be a JSON object');
+  const { event_id, op_name, grid, state, county, dxcc } = body;
+  if (!event_id || !body.op_call) {
     return NextResponse.json({ error: 'event_id and op_call required' }, { status: 400 });
   }
+  if (!isUuid(event_id)) return badRequest('event_id is not a valid id');
+  const op_call = asCallsign(body.op_call);
+  if (!op_call) return badRequest('op_call is not a callsign');
 
   const pool = getPool();
   const { rows: evRows } = await pool.query(
@@ -54,11 +61,11 @@ export async function POST(request: Request) {
      RETURNING event_id, op_call, op_name, grid, state, county, dxcc, approved, created_at`,
     [
       event_id,
-      op_call.toUpperCase().trim(),
-      op_name?.trim() || null,
-      grid?.toUpperCase().trim() || null,
-      state?.toUpperCase().trim() || null,
-      county?.trim() || null,
+      op_call,
+      text(op_name, { max: 60 }),
+      text(grid, { upper: true, max: 10 }),
+      text(state, { upper: true, max: 10 }),
+      text(county, { max: 60 }),
       Number.isFinite(Number(dxcc)) && dxcc !== null && dxcc !== '' ? Number(dxcc) : null,
       approved,
     ]

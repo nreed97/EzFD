@@ -127,7 +127,7 @@ if [[ -n "${BASE_URL:-}" ]]; then
   done
 
   code=$(curl -s -X POST "$BASE/api/events" -H 'Content-Type: application/json' \
-    -d '{"club_name":"Docker Stream","club_call":"W0NY","event_type":"FD","class":"1A","arrl_section":"MN","power":"LOW"}' \
+    -d '{"club_name":"Docker Stream","club_call":"N0CALL","event_type":"FD","class":"1A","arrl_section":"MN","power":"LOW"}' \
     | jq_get join_code)
   ev_id=$(curl -s "$BASE/api/events/$code" | jq_get id)
   if [[ -z "$ev_id" ]]; then

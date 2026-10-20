@@ -25,6 +25,16 @@ export interface PendingQSO {
   rcvd_qth?: string;
   rcvd_grid?: string;
   comment?: string;
+  /** From the rig when one is connected, so the ADIF export carries FREQ. */
+  freq_khz?: number;
+  adif_mode?: string;
+  /** The server refused this contact on purpose (a 4xx) and said why.
+   *  Retrying cannot change that answer, so a rejected contact is skipped by
+   *  the drain rather than retried — it used to sit at the head of the queue
+   *  and hold back every contact behind it — but it is *kept*, and shown,
+   *  until an operator fixes it by re-logging or deletes it. A contact that
+   *  happened on the air is never thrown away by the software. */
+  rejected?: string;
 }
 
 function queueKey(eventId: string) {
@@ -74,6 +84,11 @@ export function enqueue(eventId: string, data: Omit<PendingQSO, 'local_id' | 'su
   queue.push(entry);
   saveQueue(eventId, queue);
   return entry;
+}
+
+export function markRejected(eventId: string, localId: string, reason: string) {
+  const queue = loadQueue(eventId).map(q => (q.local_id === localId ? { ...q, rejected: reason } : q));
+  saveQueue(eventId, queue);
 }
 
 export function dequeue(eventId: string, localId: string) {

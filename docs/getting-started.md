@@ -41,7 +41,9 @@ you pick, because the three types genuinely differ:
 | **Special Event** | A callsign activated over a date range, often by operators in different places | Date range, checkout rules, optional section |
 
 Fill in the club or event name and the callsign that will be signed on the
-air. Everything else has a working default.
+air, and for a contest pick your ARRL/RAC section: the list starts empty on
+purpose, so nobody creates an event in a section that is not theirs by
+accident. Everything else has a working default.
 
 Optional, and all safe to skip:
 
@@ -53,12 +55,13 @@ Optional, and all safe to skip:
   Both download at event creation and are best-effort: a failed download
   degrades the hint, never blocks the event.
 - **Admin key** — if the server sets `EZFD_ADMIN_KEY`, event creation requires
-  it. See [Configuration](configuration.md).
+  it. `deploy.sh` sets one by default on a server with a domain and prints it
+  at the end of the install. See [Configuration](configuration.md#ezfd_admin_key).
 
 Submitting gives you a **six-character join code**. That code is how operators
 get in — there are no accounts.
 
-![Create Field Day event form: club info, class, section and power category](images/create-event-fd.png)
+![Create Field Day event form: event type, club name and callsign, then the class and an ARRL/RAC section list that starts on SEC until a section is picked](images/create-event-fd.png)
 
 ## Joining an event
 

@@ -96,9 +96,10 @@ Indexes cover the three access patterns: by event, the duplicate lookup
 
 ## `presence`
 
-Ephemeral, one row per operator per event, TTL-based rather than explicitly
-cleaned. Drives the Operators panel. Rows older than 90 seconds are treated as
-gone; the read filters them rather than a job deleting them.
+Ephemeral, one row per radio per event, TTL-based. Drives the Operators panel.
+Rows older than 90 seconds are treated as gone; the read filters them. Rows
+older than a day, windows that closed without going QRT, are deleted on the
+next heartbeat so the table does not grow all weekend.
 
 ## `ses_operators`
 
@@ -167,6 +168,8 @@ Optional callsign databases.
 
 `call_history_entries` is per-event, imported from the N1MM file, and carries
 a station's usual class and section. The file is contest- and year-specific.
+Lookups use the index behind `UNIQUE (event_id, callsign)`; a second index on
+`event_id` alone was dropped, since it only cost writes on every refresh.
 
 `master_callsigns` is a single global list from `MASTER.SCP`, shared by every
 event that opts in and refreshed at most once a day. It is not event-scoped
@@ -185,31 +188,44 @@ caught it round-tripped a shape the menu never produced.
 | `ezfd_export_events(uuid)` | One event or all of them as JSONB. Names its columns explicitly and omits every `qrz_` field by construction |
 | `ezfd_restore_events(jsonb)` | Recreates events with **new** ids and join codes. Never overwrites |
 | `ezfd_merge_event(uuid, jsonb, int, bool)` | Reconciles an export into an event that already exists. Returns a report |
-| `ezfd_recompute_dupes(uuid)` | Re-derives `is_dupe` across a whole event under its `dupe_rule` |
+| `ezfd_recompute_dupes(uuid, text, text, text)` | Re-derives `is_dupe` under the event's `dupe_rule`, for the whole event or, given a callsign, band and mode, for that one group |
+| `ezfd_new_join_code()` | A fresh join code from the same 32-symbol alphabet the API uses, retried until unused. Restore calls it |
+| `ezfd_notify_row(text, text, jsonb, uuid)` | Sends a row on a channel, or its id alone when the row would exceed the `NOTIFY` limit |
 
 The export deliberately does **not** filter `deleted_at` — a backup that drops
 the audit trail is not one. The ADIF and Cabrillo exports do filter it,
 because those are submissions rather than archives.
 
-`ezfd_recompute_dupes` is a whole-table pass, not a per-row decision, because
-that is the only thing that is correct after a merge: each instance computed
-its flags against a different subset. Earliest contact wins, with `created_at`
-then `id` breaking ties so the result is deterministic. Soft-deleted contacts
-are excluded, so deleting the first promotes the second.
+`ezfd_recompute_dupes` is a pass over a group, not a per-row decision. After a
+merge it runs over the whole event, because each instance computed its flags
+against a different subset. The API runs it scoped to the (call, band, mode)
+groups each insert, edit, delete, restore and ADIF import touched; the per-row
+check that ran there before could set a flag but never clear one. Earliest
+contact wins, with `created_at` then `id` breaking ties so the result is
+deterministic. Soft-deleted contacts are excluded, so deleting the first
+promotes the second. The one-argument form still works: the other three
+arguments default to NULL.
 
 See [Administration → Merging two instances of one event](administration.md#merging-two-instances-of-one-event).
 
 ## Notification triggers
 
-Two triggers publish to `pg_notify`:
+Three triggers publish to `pg_notify`:
 
 | Trigger | Channel | Fires on |
 |---|---|---|
 | `qso_notify` | `qsos_<event_id>` | INSERT, UPDATE, DELETE on `qsos` |
 | `ses_reservation_notify` | `ses_<event_id>` | INSERT, UPDATE, DELETE on `ses_reservations` |
+| `presence_notify` | `presence_<event_id>` | INSERT, DELETE, and an UPDATE that changes band or mode, on `presence` |
 
-Both send the operation and the full row as JSON. The reservation payload
-carries the raw range column rather than decomposed timestamps, so the client
-treats it as a signal to refetch rather than parsing it.
+The first two send the operation and the full row as JSON, through
+`ezfd_notify_row`. A row of 7,900 bytes or more goes as `{ op, id, truncated }`
+instead, because `NOTIFY` raises on a payload of 8,000 bytes inside the
+trigger, which rolled back the write it was announcing; the app's listener
+fetches the row and delivers it whole. The reservation payload carries the raw
+range column rather than decomposed timestamps, so the client treats it as a
+signal to refetch rather than parsing it. The presence trigger sends only the
+operator, station, band and mode, and stays silent for a heartbeat that only
+refreshes `updated_at`.
 
 See [Architecture](architecture.md#real-time-updates).
