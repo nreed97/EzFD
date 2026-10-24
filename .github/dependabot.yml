@@ -12,6 +12,17 @@ updates:
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+    ignore:
+      # The servers run the Node major in .nvmrc. Types from a newer major
+      # describe APIs those servers do not have, so code using them typechecks
+      # and then fails at runtime. Move this with .nvmrc, not ahead of it.
+      - dependency-name: "@types/node"
+        update-types: ["version-update:semver-major"]
+      # The lint tooling eslint-config-next pulls in supports TypeScript below
+      # 6.1 only, and 7 rejects how the unit suites call tsc. Lift this when a
+      # Next.js release supports the new major.
+      - dependency-name: "typescript"
+        update-types: ["version-update:semver-major"]
   - package-ecosystem: github-actions
     directory: /
     schedule:

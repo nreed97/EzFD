@@ -23,6 +23,16 @@ only run events.
 
 ---
 
+## 2026-10-24
+
+### Changed
+
+- **Dependency updates** — React 19.3, the `pg` database driver 8.23 and the
+  GitHub Actions used by CI moved up a version ([#110], [#111], [#112]).
+  Dependabot no longer offers a `@types/node` major beyond the Node version the
+  servers run, or TypeScript 7 before Next.js supports it. ([#116])
+  Docs: [Development → CI](development.md#ci)
+
 ## 2026-10-20
 
 ### Added
@@ -976,3 +986,7 @@ continuous enough to be worth summarising.
 [#107]: https://github.com/nreed97/EzFD/pull/107
 [#108]: https://github.com/nreed97/EzFD/pull/108
 [#109]: https://github.com/nreed97/EzFD/pull/109
+[#110]: https://github.com/nreed97/EzFD/pull/110
+[#111]: https://github.com/nreed97/EzFD/pull/111
+[#112]: https://github.com/nreed97/EzFD/pull/112
+[#116]: https://github.com/nreed97/EzFD/pull/116

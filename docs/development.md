@@ -377,6 +377,11 @@ grouped into one, so an advisory normally arrives as a PR to review rather than
 as a red step on someone else's change. The fix is to update the package, not
 to relax the step.
 
+Two majors are held back in that file on purpose. `@types/node` stays on the
+major in `.nvmrc`, because types for a newer Node describe APIs the servers do
+not have. `typescript` stays below 7 until `eslint-config-next` supports it.
+Move each rule when its reason goes away, not before.
+
 ## Conventions
 
 `AGENTS.md` in the repository root is the authority and is worth reading
