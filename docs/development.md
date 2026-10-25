@@ -85,6 +85,7 @@ $ node scripts/test-last-position.cjs   # what the position picker preselects
 $ node scripts/test-changelog-links.cjs # the changelog's links into these guides
 $ node scripts/test-docs-nav.cjs        # the /docs sidebar and its reading order
 $ node scripts/test-cat-protocol.cjs    # Kenwood CAT decoding for native rig control
+$ node scripts/build-site.cjs           # the GitHub Pages site, and that its links resolve
 ```
 
 **Five need a database, or a running server:**
@@ -171,6 +172,18 @@ get presence rows so the panels fed by presence show a live state. The section
 list stops short of a clean sweep, because the gaps are what the Needed view
 and the map's unworked fill are for. It is seeded deterministically, so a
 re-taken screenshot differs only where the app changed.
+
+**`scripts/record-gifs.cjs`** records the three animations — signing in,
+logging a contact and catching a dupe, and a contact reaching the dashboard
+live — into `docs/images/*.gif`, against an event `seed-demo.mjs` created. It
+drives the built app with Playwright, so the clips show what the app does
+rather than a mock-up, and converts each with ffmpeg. It logs real contacts
+into the event as it goes, so seed a fresh one before recording again:
+
+```bash
+$ node scripts/seed-demo.mjs http://127.0.0.1:3000      # prints a join code
+$ node scripts/record-gifs.cjs http://127.0.0.1:3000 <join code>
+```
 
 **`scripts/test-map-labels.cjs`** covers which section labels the map draws at
 which zoom. At the default zoom 54 of the 85 labels overlapped another one, so
@@ -355,7 +368,7 @@ A test that has never been observed failing is a test you don't know works.
 
 | Job | Runs |
 |---|---|
-| `build` | `npm audit` of the runtime dependencies, the pure suites, then lint, typecheck and build, then the end-to-end suite against the built server, connected as the app's own `ezfd` role |
+| `build` | `npm audit` of the runtime dependencies, the pure suites and the project site build, then lint, typecheck and build, then the end-to-end suite against the built server, connected as the app's own `ezfd` role |
 | `schema` | Schema applied twice for idempotency, then the constraint, query and restore suites |
 | `shell` | `bash -n` on every tracked `.sh`, the rig-bridge copy check, then `shellcheck` |
 | `docker` | Builds the Compose install from scratch, then the live stack checks and the end-to-end suite through its proxy |
@@ -376,6 +389,39 @@ for dependency updates (`.github/dependabot.yml`), minor and patch releases
 grouped into one, so an advisory normally arrives as a PR to review rather than
 as a red step on someone else's change. The fix is to update the package, not
 to relax the step.
+
+## The project site
+
+[nreed97.github.io/EzFD](https://nreed97.github.io/EzFD/) is a front page
+and every guide in `docs/`, published by `.github/workflows/pages.yml` on each
+push to `master`. Nothing on it is written twice:
+
+- The guides are rendered by `renderMarkdown()` in `lib/docs.ts`, the same
+  function behind the app's `/docs`, with only the link targets swapped
+  (`DocLinks`). The sidebar and the previous/next order come from `docsNav()`,
+  so `docs/README.md` arranges the site exactly as it arranges the app.
+- The front page's feature list is read from the **What it does** section of
+  the root `README.md`, one card per paragraph that opens with a bold
+  sentence. Edit the README and the site follows.
+- Each screenshot's alt text is taken from the guide that uses it, and each
+  guide's one-line description from its row in the index.
+
+The front page's own prose — why EzFD exists, the install summary, rig
+control — lives in `scripts/build-site.cjs`, and the styles in
+`site/style.css`.
+
+The build checks every relative link and image in its output and fails on one
+that does not resolve, including an `#anchor` to a heading that has since been
+renamed, so CI's `build` job runs it on every pull request. To look at it
+locally:
+
+```bash
+$ node scripts/build-site.cjs
+$ python3 -m http.server -d _site 8080   # then open http://localhost:8080/
+```
+
+Publishing needs **Settings → Pages → Build and deployment → Source: GitHub
+Actions** set once on the repository.
 
 ## Conventions
 

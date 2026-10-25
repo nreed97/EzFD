@@ -138,20 +138,43 @@ export function readDoc(slug: string): { title: string; markdown: string } | nul
 }
 
 /**
- * Markdown to HTML, with the links rewritten for the app.
- *
- * The guides cross-link as `operating.md#dupes` and embed `images/foo.png`,
- * both correct on GitHub. Here they are rewritten to absolute `/docs/...`
- * paths rather than left relative: a relative link resolves against the
- * *directory* of the current URL, so `getting-started` works from
- * `/docs/operating` but lands on `/getting-started` from the index at
- * `/docs`. Absolute paths behave the same from every page.
+ * Where a rendered guide's links point. The guides are written for GitHub —
+ * `operating.md#dupes`, `images/foo.png`, `README.md` for the index — and each
+ * place that serves them rewrites those three shapes to its own URLs.
+ */
+export interface DocLinks {
+  /** The index, `docs/README.md`. */
+  index: string;
+  /** A guide, from its path without `.md` — `operating`. */
+  page: (path: string) => string;
+  /** A file under `docs/images/`. */
+  image: (file: string) => string;
+}
+
+/**
+ * The app's links: absolute `/docs/...` paths rather than relative ones. A
+ * relative link resolves against the *directory* of the current URL, so
+ * `getting-started` works from `/docs/operating` but lands on
+ * `/getting-started` from the index at `/docs`. Absolute paths behave the same
+ * from every page.
+ */
+export const APP_DOC_LINKS: DocLinks = {
+  index: '/docs',
+  page: path => `/docs/${path}`,
+  image: file => `/docs/images/${file}`,
+};
+
+/**
+ * Markdown to HTML, with the links rewritten for wherever it is served — the
+ * app by default, or the GitHub Pages site (`scripts/build-site.cjs`), which
+ * renders the same files through this same function so the two cannot render
+ * a guide differently.
  *
  * Absolute and external links are left alone.
  */
-export function renderMarkdown(markdown: string): string {
+export function renderMarkdown(markdown: string, links: DocLinks = APP_DOC_LINKS): string {
   const html = marked.parse(markdown, { async: false, gfm: true, breaks: false });
-  return addHeadingIds(withAppLinks(html));
+  return addHeadingIds(withDocLinks(html, links));
 }
 
 /** GitHub's heading slug, so the `#anchor` in a cross-link written for GitHub
@@ -187,7 +210,7 @@ function addHeadingIds(html: string): string {
   });
 }
 
-function withAppLinks(html: string): string {
+function withDocLinks(html: string, links: DocLinks): string {
   return html
     // The index is `docs/README.md` on GitHub but is served at `/docs`, not at
     // a slug — `SLUG_RE` is lower-case only, so `/docs/README` is not a page.
@@ -195,15 +218,15 @@ function withAppLinks(html: string): string {
     // on GitHub, which is the one direction nothing here would notice.
     .replace(
       /href="(?!https?:|\/|#)README\.md(#[^"]*)?"/g,
-      (_m, hash: string | undefined) => `href="/docs${hash ?? ''}"`,
+      (_m, hash: string | undefined) => `href="${links.index}${hash ?? ''}"`,
     )
     .replace(
       /href="(?!https?:|\/|#)([^"]*?)\.md(#[^"]*)?"/g,
-      (_m, path: string, hash: string | undefined) => `href="/docs/${path}${hash ?? ''}"`,
+      (_m, path: string, hash: string | undefined) => `href="${links.page(path)}${hash ?? ''}"`,
     )
     .replace(
       /src="(?!https?:|\/)images\/([^"]+)"/g,
-      (_m, file: string) => `src="/docs/images/${file}"`,
+      (_m, file: string) => `src="${links.image(file)}"`,
     );
 }
 
