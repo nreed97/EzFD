@@ -23,6 +23,21 @@ only run events.
 
 ---
 
+## 2026-10-25
+
+### Added
+
+- **A project website** — The guides are now published at
+  [nreed97.github.io/EzFD](https://nreed97.github.io/EzFD/), with a front page
+  covering what EzFD does and why, how to install it, and rig control. It is
+  rebuilt from these same files on every change, so it never says something
+  the guides in your install do not. ([#117])
+  Docs: [Development → The project site](development.md#the-project-site), [EzFD documentation → Reading these in the app](README.md#reading-these-in-the-app)
+- **Screen recordings in the guides** — Short animations show signing in,
+  logging a contact and catching a dupe, and a contact arriving live on the
+  dashboard, so a new operator can see the flow before the event. ([#117])
+  Docs: [Quick start → Pick where you're operating](quick-start.md#pick-where-youre-operating), [Operating → The entry form](operating.md#the-entry-form), [Getting started → While it runs](getting-started.md#while-it-runs)
+
 ## 2026-10-20
 
 ### Added
@@ -976,3 +991,4 @@ continuous enough to be worth summarising.
 [#107]: https://github.com/nreed97/EzFD/pull/107
 [#108]: https://github.com/nreed97/EzFD/pull/108
 [#109]: https://github.com/nreed97/EzFD/pull/109
+[#117]: https://github.com/nreed97/EzFD/pull/117

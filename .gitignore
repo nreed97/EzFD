@@ -44,3 +44,6 @@ next-env.d.ts
 
 # Pinned upstream boundary data, refetched by scripts/build-section-geo.mjs
 .cache/
+
+# The GitHub Pages site, written by scripts/build-site.cjs
+/_site/
