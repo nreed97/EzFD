@@ -109,6 +109,11 @@ score, rate, sections worked, and who is on which band.
 
 ![The dashboard during a Field Day event](images/dashboard.png)
 
+Nothing needs refreshing. A contact logged at one position reaches the
+dashboard, and every other logging screen, within about a second:
+
+![Live updates, animated: on the left an operator logs VY2ABC in section PE; on the right, the dashboard on another screen shows the contact at the top of its log without being touched](images/live-update.gif)
+
 **Visitor mode** is the same view with no callsign and no ability to log, for
 a screen visitors can see. It has no export buttons and no operator actions,
 and **Leave** in the ☰ menu goes to the home page rather than asking for a callsign.

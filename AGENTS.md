@@ -36,6 +36,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-last-position.cjs` | What the position picker preselects — a claim outranks a remembered position, and a remembered one is validated against the event's bands |
 | `scripts/test-changelog-links.cjs` | Every guide and `#anchor` the changelog points at resolves — a renamed section is otherwise invisible — and every `[#nn]` citation has a definition, or it renders as literal brackets |
 | `scripts/test-docs-nav.cjs` | The `/docs` sidebar — every guide appears exactly once, grouped and ordered by the index |
+| `scripts/build-site.cjs` | The GitHub Pages site — builds it from `docs/` and the README, and fails on any relative link, image or `#anchor` that does not resolve |
 | `scripts/test-clock.cjs` | What is holding the server's clock and what the devices make of it — an unknown never reads as a warning, and one device never convicts the server |
 | `scripts/test-deploy-detect.sh` | Which machines `deploy.sh` will install on — Debian derivatives via `ID_LIKE`, a claimed heritage checked against whether apt is really there, and that anything else is refused fatally, before the operator is asked anything, with no second path below |
 | `scripts/test-map-labels.cjs` | Which section labels the map draws at which zoom — nothing drawn overlaps anything else, placement never reads whether a section is worked, and zooming in never takes a label away |
@@ -204,6 +205,13 @@ and it is the half a reader trusts most.
   the generic `N0CALL` and `SEC`, so nobody mistakes them for a real station
   or a section to pick. A test fixture that needs a section the code accepts
   uses a real one.
+- The animations (`docs/images/*.gif`) are recorded by
+  `scripts/record-gifs.cjs` against a fresh `scripts/seed-demo.mjs` event —
+  re-record them when the screens they show change, the same as a still.
+- The GitHub Pages front page reads its feature cards from the **What it
+  does** section of the root `README.md`, one per paragraph opening with a
+  bold sentence, and its gallery alt text from the guides. A feature paragraph
+  without the bold opening drops off the site silently.
 - Prefer a worked example with real numbers over prose for anything
   arithmetic. `docs/field-day.md`'s bonus table carries the rule number on
   every row so a reader can check a line against the source.

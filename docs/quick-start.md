@@ -26,6 +26,10 @@ Two things you may also be asked for:
 - **Your grid and state**, on a special event. Each operator has their own
   location, so this can't come from the event.
 
+The whole sign-in, start to finish, on a Field Day event:
+
+![Signing in, animated: N0CALL is typed as the callsign, 80m phone is picked from the band grid, Start without claiming is pressed, and the logging screen opens on 80m phone](images/sign-in.gif)
+
 ## Pick where you're operating
 
 ![Choosing an operating position: bands laid out by mode, colour-coded for what is free, claimed, or already on air](images/operating-position.png)

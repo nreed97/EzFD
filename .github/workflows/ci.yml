@@ -161,6 +161,13 @@ jobs:
       - name: Docs navigation tests
         run: node scripts/test-docs-nav.cjs
 
+      # The GitHub Pages site renders the same guides, and its build fails on
+      # any relative link or image that does not resolve — including an
+      # #anchor to a heading that has since been renamed. Built here so a pull
+      # request finds out; pages.yml only deploys from master.
+      - name: Pages site builds and its links resolve
+        run: node scripts/build-site.cjs
+
       # The decoding half of browser-native rig control. A misread frequency
       # picks a wrong band, and the band is what a contact is scored on — the
       # failure looks like a plausible number, not like an error.

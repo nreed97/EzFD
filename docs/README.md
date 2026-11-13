@@ -67,6 +67,11 @@ what the app lists and where — a guide moved between sections here moves in
 the app too. Each guide also carries previous and next links following the
 same order, so the whole set can be read straight through.
 
+The same guides are published at
+[nreed97.github.io/EzFD](https://nreed97.github.io/EzFD/), with a front page on
+what EzFD is and how to install it. That site is rebuilt from these files on
+every change, so it is never ahead of or behind them.
+
 ## Conventions used here
 
 Commands prefixed `$` run on your own machine; commands prefixed `#` run as

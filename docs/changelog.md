@@ -23,15 +23,43 @@ only run events.
 
 ---
 
+## 2026-11-13
+
+### Changed
+
+- **Dependabot holds back two majors** — It no longer offers a `@types/node`
+  major beyond the Node version the servers run, or TypeScript 7 before
+  Next.js supports it. Both had to be closed by hand each time. ([#116])
+  Docs: [Development → CI](development.md#ci)
+
+### Fixed
+
+- **The shellcheck gate on newer runners** — GitHub's Ubuntu 26.04 runners ship
+  a shellcheck that reports two deliberately indirect functions in the test
+  scripts as never called, which failed CI on every pull request, including
+  dependency updates. ([#116])
+
+## 2026-10-25
+
+### Added
+
+- **A project website** — The guides are now published at
+  [nreed97.github.io/EzFD](https://nreed97.github.io/EzFD/), with a front page
+  covering what EzFD does and why, how to install it, and rig control. It is
+  rebuilt from these same files on every change, so it never says something
+  the guides in your install do not. ([#117])
+  Docs: [Development → The project site](development.md#the-project-site), [EzFD documentation → Reading these in the app](README.md#reading-these-in-the-app)
+- **Screen recordings in the guides** — Short animations show signing in,
+  logging a contact and catching a dupe, and a contact arriving live on the
+  dashboard, so a new operator can see the flow before the event. ([#117])
+  Docs: [Quick start → Pick where you're operating](quick-start.md#pick-where-youre-operating), [Operating → The entry form](operating.md#the-entry-form), [Getting started → While it runs](getting-started.md#while-it-runs)
+
 ## 2026-10-24
 
 ### Changed
 
 - **Dependency updates** — React 19.3, the `pg` database driver 8.23 and the
-  GitHub Actions used by CI moved up a version ([#110], [#111], [#112]).
-  Dependabot no longer offers a `@types/node` major beyond the Node version the
-  servers run, or TypeScript 7 before Next.js supports it. ([#116])
-  Docs: [Development → CI](development.md#ci)
+  GitHub Actions used by CI moved up a version. ([#110], [#111], [#112])
 
 ## 2026-10-20
 
@@ -990,3 +1018,4 @@ continuous enough to be worth summarising.
 [#111]: https://github.com/nreed97/EzFD/pull/111
 [#112]: https://github.com/nreed97/EzFD/pull/112
 [#116]: https://github.com/nreed97/EzFD/pull/116
+[#117]: https://github.com/nreed97/EzFD/pull/117

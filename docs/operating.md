@@ -55,6 +55,11 @@ That `Tab` behaviour is deliberate. The browser default would move focus into
 the band buttons and out of the form entirely, which at 4 AM is how you end up
 typing a callsign into nothing.
 
+Here is one contact logged with the keyboard alone, then the same call typed
+again and flagged before anything is logged:
+
+![Logging, animated: K0XYZ, class 2A and section WI are typed with Enter between fields, the contact appears at the top of the log, then K0XYZ typed again shows "Already worked on 80m PH, will log as dupe" under the callsign](images/logging.gif)
+
 ### Hints while you type
 
 After three characters, the app looks the callsign up in whatever sources the

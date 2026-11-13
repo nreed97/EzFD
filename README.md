@@ -15,7 +15,9 @@ code and a radio, and five minutes. **Setting the event up?**
 final backup.
 
 **[Full documentation](docs/)** — and the same guides ship inside the app,
-so they work on a field server with no internet.
+so they work on a field server with no internet. They are also published, with
+a front page and screen recordings, at
+[nreed97.github.io/EzFD](https://nreed97.github.io/EzFD/).
 
 <p align="center">
   <img src="docs/images/logging-screen.png" alt="The logging screen: entry form, band/mode, operators and live score" width="100%">
