@@ -89,7 +89,7 @@ detect() {
     if [[ "$apt_present" == "no" ]]; then
       # Shadow the real apt-get for this subshell only. Called from inside the
       # eval'd block below, which shellcheck cannot see into.
-      # shellcheck disable=SC2317
+      # shellcheck disable=SC2317,SC2329
       command() {
         # `command -v apt-get` arrives here as $1="-v" $2="apt-get".
         if [[ "${2:-}" == "apt-get" ]]; then return 1; fi

@@ -23,6 +23,22 @@ only run events.
 
 ---
 
+## 2026-11-13
+
+### Changed
+
+- **Dependabot holds back two majors** — It no longer offers a `@types/node`
+  major beyond the Node version the servers run, or TypeScript 7 before
+  Next.js supports it. Both had to be closed by hand each time. ([#116])
+  Docs: [Development → CI](development.md#ci)
+
+### Fixed
+
+- **The shellcheck gate on newer runners** — GitHub's Ubuntu 26.04 runners ship
+  a shellcheck that reports two deliberately indirect functions in the test
+  scripts as never called, which failed CI on every pull request, including
+  dependency updates. ([#116])
+
 ## 2026-10-25
 
 ### Added
@@ -37,6 +53,13 @@ only run events.
   logging a contact and catching a dupe, and a contact arriving live on the
   dashboard, so a new operator can see the flow before the event. ([#117])
   Docs: [Quick start → Pick where you're operating](quick-start.md#pick-where-youre-operating), [Operating → The entry form](operating.md#the-entry-form), [Getting started → While it runs](getting-started.md#while-it-runs)
+
+## 2026-10-24
+
+### Changed
+
+- **Dependency updates** — React 19.3, the `pg` database driver 8.23 and the
+  GitHub Actions used by CI moved up a version. ([#110], [#111], [#112])
 
 ## 2026-10-20
 
@@ -991,4 +1014,8 @@ continuous enough to be worth summarising.
 [#107]: https://github.com/nreed97/EzFD/pull/107
 [#108]: https://github.com/nreed97/EzFD/pull/108
 [#109]: https://github.com/nreed97/EzFD/pull/109
+[#110]: https://github.com/nreed97/EzFD/pull/110
+[#111]: https://github.com/nreed97/EzFD/pull/111
+[#112]: https://github.com/nreed97/EzFD/pull/112
+[#116]: https://github.com/nreed97/EzFD/pull/116
 [#117]: https://github.com/nreed97/EzFD/pull/117
