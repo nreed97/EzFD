@@ -28,7 +28,7 @@ ok() { echo "ok    $1"; }
 no() { echo "FAIL  $1  ${2:-}"; FAILURES=$((FAILURES + 1)); }
 
 # Invoked by the EXIT trap below, which shellcheck can't see.
-# shellcheck disable=SC2317
+# shellcheck disable=SC2317,SC2329
 cleanup() { rm -rf "$WORK"; }
 trap cleanup EXIT
 
