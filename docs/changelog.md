@@ -23,6 +23,68 @@ only run events.
 
 ---
 
+## 2026-11-15
+
+### Changed
+
+- **Contest events refuse 60m and WARC contacts from a relay or script**
+  `Display` — The entry form never offered 60m, 30m, 17m or 12m on Field Day
+  or Winter Field Day, but the server accepted them from anything else that
+  posted. It now answers `400`, and the logger stays on its band when a radio
+  moves to one of those during a contest. Special events log every band, as
+  before.
+  Docs: [API → POST /api/qso](api.md#post-apiqso), [Rig control and CW keying → What it does](rig-control.md#what-it-does)
+
+### Fixed
+
+- **Contacts stored twice after a slow or dropped connection** `Scoring`
+  `Exports` — A contact whose first send was slow, or whose answer was lost,
+  was sent again and logged a second time, as was one queued while both the
+  logger and the CW window were open. The second copy sat in the log as a
+  dupe. Every contact now carries an id and the server keeps one copy per id.
+  Existing duplicates are not removed; delete them from the log.
+  Docs: [Operating → Working offline](operating.md#working-offline), [Architecture → Offline tolerance](architecture.md#offline-tolerance)
+- **A window that lost the server shows what it missed** `Display` — After a
+  server restart or a network drop, the logger and the CW window kept the log
+  as it was when the connection went, so contacts logged elsewhere in the gap
+  were missing from the list, the score and the dupe check until the page was
+  reloaded. The dashboard never recovered at all. All three now fetch the log
+  again when the live connection returns.
+  Docs: [Operating → Working offline](operating.md#working-offline), [Architecture → Real-time updates](architecture.md#real-time-updates)
+- **60m, 30m, 17m and 12m from the radio and from WSJT-X** `Display` — Rig
+  control showed no band on those four, and the WSJT-X relay skipped every
+  contact made on them, so a special event had to log them by hand. The rig
+  bridge, the direct serial connection and both relays now know the same
+  fourteen bands the ADIF import always did. Download the rig bridge and the
+  relay again to pick it up.
+  Docs: [Rig control and CW keying → What it does](rig-control.md#what-it-does), [Digital modes → Which bands are relayed](digital-modes.md#which-bands-are-relayed)
+- **Large restores, merges and ADIF imports behind nginx** `Setup` — nginx's
+  default 1 MB upload limit refused a backup of more than about 1,400 contacts
+  with a `413` before the app saw it. `deploy.sh` now allows 50 MB, the app's
+  own largest limit. Re-run it to apply.
+  Docs: [Troubleshooting → A large import or restore fails with "413" or "Request Entity Too Large"](troubleshooting.md#a-large-import-or-restore-fails-with-413-or-request-entity-too-large)
+- **Settings added to `.env` by hand survive an update** `Setup` — `deploy.sh`
+  rewrote the file from the nine settings it knows, so an optional one such as
+  a call history URL was gone after the next deploy. It also removed the file
+  briefly on every run, and a run interrupted at that moment left the server
+  without its database password or encryption key. Other lines are now kept
+  and the file is never absent.
+  Docs: [Deployment → Configuration file](deployment.md#configuration-file), [Configuration → Applying changes](configuration.md#applying-changes)
+- **An update stops when the database schema fails to apply** `Setup` —
+  `deploy.sh` reported "Database schema applied" whatever happened and went on
+  to deploy the new build over the old tables. It now stops before building,
+  prints the error and leaves the running app alone.
+  Docs: [Deployment → Updating](deployment.md#updating)
+
+### Security
+
+- **The WSJT-X relay download checks what it writes into the file** `Setup` —
+  The Windows `.bat` download put its link's parameters straight into a script
+  the operator runs, so a crafted link to a club's own server could deliver a
+  file that ran someone else's commands. Each value is now validated, the
+  server address must be the server's own, and anything else is refused.
+  Docs: [API → GET /api/download/relay?join_code=&operator=&station=&api_url=](api.md#get-apidownloadrelayjoin_codeoperatorstationapi_url)
+
 ## 2026-11-13
 
 ### Changed

@@ -58,6 +58,22 @@ dial frequency and the WSJT-X mode (`FT8`, `FT4`, ...), which the ADIF export
 writes back out as `FREQ` and `MODE`. A contact queued by a relay older than
 this change has no time recorded in the spool and is dated when it arrives.
 
+A post that timed out may still have reached the server, in which case the
+copy in the spool is a second copy. Each contact is sent with its own id and
+the server keeps one per id, so the retry is recognised and nothing is logged
+twice.
+
+### Which bands are relayed
+
+The relay works out the band from the dial frequency, and knows every band
+EzFD logs: 160m through 70cm, including 60m, 30m, 17m and 12m. A special event
+logs all of them. Field Day and Winter Field Day do not use 60m or the WARC
+bands, so a contact relayed from one of those to a contest event is refused,
+and the relay prints `rejected`. It is still in WSJT-X's own log.
+
+Before this the relay did not know 60m or the WARC bands at all, and skipped
+those contacts on a special event too.
+
 ### Configuring WSJT-X
 
 In **Settings → Reporting**, enable UDP Server on `127.0.0.1` port `2237`

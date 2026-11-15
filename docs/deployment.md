@@ -96,7 +96,7 @@ generated automatically and stored in `/opt/ezfd/.env`.
 |---|---|
 | Node.js | The major in `.nvmrc` (24 LTS), from NodeSource — amd64 and arm64 only |
 | PostgreSQL | Database `ezfd`, role `ezfd` with DML-only grants |
-| nginx | Reverse proxy, with SSE buffering disabled |
+| nginx | Reverse proxy, with SSE buffering disabled and uploads allowed up to 50 MB |
 | certbot | TLS certificate and automatic renewal |
 | systemd | `ezfd.service`, restart on failure, starts at boot |
 | Swap | Only if the machine has little RAM and none configured |
@@ -128,6 +128,11 @@ whatever the file already has.
 `EZFD_REPO_DIR` records where you cloned the source, so the admin console's
 update action knows where to `git pull` from.
 
+Those, with `NODE_ENV`, `PORT` and `HOSTNAME`, are the lines `deploy.sh`
+manages, and it rewrites them on every run. Any other line in the file is
+yours: a setting from [Configuration](configuration.md) that you added by hand
+is carried over unchanged, comments included.
+
 ## Updating
 
 ```bash
@@ -136,8 +141,12 @@ update action knows where to `git pull` from.
 ```
 
 Re-running detects the existing install and preserves the domain, certificate
-email, database password, encryption key and admin key. It re-applies the
-schema, rebuilds, and restarts.
+email, database password, encryption key and admin key, along with any setting
+you added to `.env` yourself. It re-applies the schema, rebuilds, and restarts.
+
+If the schema does not apply cleanly the update stops there, before anything
+is built or copied, and prints the database's error. The running app is left
+as it was.
 
 An update also brings Node.js up to the major in `.nvmrc` if the server is
 running an older one. Servers installed before this was added were left on
@@ -151,8 +160,10 @@ server is below the version in `.nvmrc` it says so and carries on; re-run
 `deploy.sh` to upgrade.
 
 > **The rsync that deploys the build must keep `--exclude='.env'`.** Without
-> it, `rsync --delete` wipes the live secrets file on every redeploy. This is
-> load-bearing; don't remove it while tidying.
+> it, `rsync --delete` removes the live secrets file on every redeploy, and a
+> deploy interrupted before the file is rewritten leaves the server with no
+> database password and no encryption key. This is load-bearing; don't remove
+> it while tidying. `scripts/test-deploy-detect.sh` fails if it goes.
 
 ## Database schema
 

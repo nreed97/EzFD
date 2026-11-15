@@ -90,6 +90,14 @@ Consequences:
   in well under a second. Each
   browser sees its stream drop and reconnects once the new process is up, which
   is also the signal that drains its offline queue.
+- The stream carries changes and replays nothing, so a window that was not
+  connected when a change was announced never hears of it. On the `onopen`
+  that follows an `onerror`, the logger, the CW window and the dashboard each
+  refetch the log (`createLogCatchUp` in `lib/qsoStream.ts`) and the panels
+  fed by the same stream. Events that arrive while that fetch is in flight are
+  applied on top of it, so the snapshot cannot erase a contact newer than
+  itself. Before this a window that sat through a restart kept the log as it
+  was when the stream dropped, dupe check included, until it was reloaded.
 
 ## Offline tolerance
 
@@ -108,6 +116,15 @@ The queue flushes on reconnect and can be retried manually. A QSO leaves the
 queue only when the server confirms it — an earlier version checked the wrong
 value and dropped QSOs whenever a submit failed, which is exactly the failure
 this design exists to prevent.
+
+Every queued contact is sent with its queue id as `client_id`, and the server
+stores one contact per id per event: a second send gets the stored row back
+with a `200` instead of a second row. That matters because "no answer" does not
+mean "not stored". A POST that the browser gave up on after ten seconds may
+have been committed, the retry timer can fire while a slow first attempt is
+still in flight, and the logger and the CW window drain one shared queue. Each
+of those used to put the same contact in the log twice. The WSJT-X relay sends
+an id of its own for the same reason.
 
 Replayed QSOs carry a `replay` flag. The server accepts those unconditionally,
 bypassing the special event checkout and approval gates, because by reconnect

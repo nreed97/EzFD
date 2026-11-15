@@ -139,7 +139,11 @@ while that action silently dropped the SES roster.
 **`scripts/test-deploy-detect.sh`** covers the one decision `deploy.sh` makes
 before it touches anything: whether this is a machine it supports. It reads the
 detection block back out of `deploy.sh` rather than keeping a copy, and drives
-it with real `/etc/os-release` contents from nine distributions.
+it with real `/etc/os-release` contents from nine distributions. It also
+checks what a redeploy does to a server that is already running: the `.env`
+filter is run against a fixture, and the `--exclude='.env'`, the
+`ON_ERROR_STOP` on the schema and nginx's upload limit are each read back out
+of the script.
 
 Both directions are quiet failures. Believe a claimed Debian heritage on a
 machine with no apt and the install dies halfway through, having already

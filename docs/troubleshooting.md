@@ -16,8 +16,10 @@ or connect directly.
 deployed config disables proxy buffering. If you replaced that config, updates
 arrive in bursts or not at all.
 
-**The browser lost the stream.** SSE reconnects automatically, but a reload
-confirms it. The QSO list is fetched fresh on load, so a reload also resyncs.
+**The browser lost the stream.** SSE reconnects automatically, and on
+reconnecting the logger, the CW window and the dashboard fetch the log again,
+so contacts logged while the stream was down appear without a reload. A reload
+does the same thing by hand.
 
 Check the server is publishing at all:
 
@@ -365,6 +367,22 @@ doesn't match.
 
 **Warnings about call databases** — the event was created; only the optional
 prefill degraded. Upstream was slow or unreachable.
+
+## A large import or restore fails with "413" or "Request Entity Too Large"
+
+**Symptom.** Restoring or merging a full-event backup, or importing a large
+ADIF file, fails at once. The browser shows a `413`, and nothing about it
+appears in the app's own log.
+
+**Cause.** nginx refuses a request body over 1 MB unless its configuration
+says otherwise, and answers before the app sees the upload. A backup is about
+750 bytes a contact, so this starts at roughly 1,400 contacts. Servers
+installed with an older `deploy.sh` have no limit set, which means 1 MB.
+
+**Fix.** Update and re-run `deploy.sh`, which writes
+`client_max_body_size 50m;` into the site it manages. On a server whose nginx
+configuration you maintain yourself, add that line to the `server` block and
+reload nginx. The Docker install is not affected: Caddy has no such limit.
 
 ## Restore fails or loses data
 

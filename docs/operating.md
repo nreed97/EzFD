@@ -172,7 +172,7 @@ need to. That last point matters more than it looks: a server restart or an
 nginx reload leaves your own network up, so the browser never sees a
 connectivity change. The retry and the stream reconnect are what cover it.
 
-Three consequences worth knowing:
+Some consequences worth knowing:
 
 - **Nothing is lost to a flaky link, or to the server going away.** This is the
   point of the design. It holds in the CW window too, and in the WSJT-X relay,
@@ -186,6 +186,15 @@ Three consequences worth knowing:
   from queueing to sending, and the server takes that off. How far your own
   clock is out does not matter, because both ends of that interval come from
   it.
+- **A contact sent twice is stored once.** A retry can overlap a first attempt
+  that was only slow, and the logger and the CW window drain the same queue.
+  Each queued contact carries its own id and the server keeps one copy per id,
+  so neither puts a second copy in the log.
+- **A window that lost the server catches up when it comes back.** Contacts
+  other operators logged while your live connection was down were never
+  announced to your window, so on reconnecting it fetches the log again. The
+  list, the score and the dupe check are current without a reload. The
+  dashboard does the same.
 - **A contact the server refuses is kept, not retried and not thrown away.**
   This is rare: a callsign with characters no callsign has, say. The row stays
   in the log list in red with the server's reason and is skipped by the

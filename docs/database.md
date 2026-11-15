@@ -85,6 +85,7 @@ column existed still carries its `id`, which is that same value.
 | `rcvd_name`, `rcvd_qth`, `rcvd_grid`, `comment` | Special event exchange |
 | `adif_mode` | The real submode, e.g. `FT8` |
 | `freq_khz` | Actual frequency when known |
+| `client_id` | The sender's own UUID for the contact, when it sent one. Unique per event, so a resend is recognised instead of stored again. NULL for imports, restores and merges; a restore does not carry it over |
 
 The `mode` CHECK constraint stays at three values deliberately. Scoring,
 duplicate detection and the band/mode UI all rely on that split. The real
@@ -92,7 +93,9 @@ submode goes in `adif_mode`, which ADIF export prefers when set. Widening the
 CHECK would break the three things that depend on it.
 
 Indexes cover the three access patterns: by event, the duplicate lookup
-(`event_id, callsign, band, mode`), and chronological listing.
+(`event_id, callsign, band, mode`), and chronological listing. A fourth,
+`qsos_client_id_idx`, is unique on `(event_id, client_id)` where the id is
+set, and is what makes a contact sent twice one row.
 
 ## `presence`
 

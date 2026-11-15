@@ -190,6 +190,80 @@ else
   ok "no second non-apt path survives below the pre-flight"
 fi
 
+# ── What a redeploy does to a server that is already running ─────────────────
+# None of this is distro detection, but it is the same kind of check: read the
+# real lines back out of deploy.sh and fail when one goes missing, because
+# every one of these failures is silent on the day it is introduced.
+
+# rsync --delete without the exclude removes the live .env. The file is
+# rewritten a few lines later, so nothing shows — until a deploy is interrupted
+# in between and the server comes back with no secrets at all.
+if grep -Eq "^rsync .*--delete .*--exclude='\.env' .*standalone" deploy.sh; then
+  ok "the standalone rsync keeps --exclude='.env'"
+else
+  no "the standalone rsync keeps --exclude='.env'"
+fi
+
+# psql fed on stdin exits 0 whatever happened in the file.
+if grep -Eq 'psql .*ON_ERROR_STOP=1.*schema\.sql' deploy.sh; then
+  ok "the schema is applied with ON_ERROR_STOP"
+else
+  no "the schema is applied with ON_ERROR_STOP"
+fi
+
+# nginx's default body limit is 1 MB and the app accepts a 50 MB import.
+if grep -Eq '^ *client_max_body_size +50m;' deploy.sh; then
+  ok "nginx accepts a body as large as the app's largest import"
+else
+  no "nginx accepts a body as large as the app's largest import"
+fi
+
+# The keys deploy.sh does not manage have to survive it. The function is run,
+# not grepped for: a filter that drops the wrong lines still contains its name.
+ENVBLOCK="$(sed -n '/^# ── .env: the keys deploy.sh owns/,/^# ── end of .env handling/p' deploy.sh)"
+if [[ -z "$ENVBLOCK" ]] || ! grep -q 'env_extra_lines()' <<<"$ENVBLOCK"; then
+  no "could not find the .env handling block in deploy.sh"
+else
+  cat > "$FIX/env" <<'ENVEOF'
+NODE_ENV=production
+PORT=3000
+DATABASE_URL=postgresql://ezfd:old@localhost/ezfd
+EZFD_ENCRYPTION_KEY=aaaa
+# added by hand for the 2026 file
+EZFD_FD_CALL_HISTORY_URL=https://example.org/fd_{year}.txt?a=b&c=d
+EZFD_REPO_DIR=/home/op/EzFD
+MY_OWN_SETTING=has spaces = and equals
+ENVEOF
+  printf 'NO_TRAILING_NEWLINE=1' >> "$FIX/env"
+  KEPT="$(eval "$ENVBLOCK"; env_extra_lines "$FIX/env")"
+  WANT='# added by hand for the 2026 file
+EZFD_FD_CALL_HISTORY_URL=https://example.org/fd_{year}.txt?a=b&c=d
+MY_OWN_SETTING=has spaces = and equals
+NO_TRAILING_NEWLINE=1'
+  if [[ "$KEPT" == "$WANT" ]]; then
+    ok "a redeploy keeps the .env lines it does not manage, and only those"
+  else
+    no "a redeploy keeps the .env lines it does not manage, and only those"
+    echo "         got: ${KEPT//$'\n'/ | }"
+  fi
+  if [[ -z "$(eval "$ENVBLOCK"; env_extra_lines "$FIX/does-not-exist")" ]]; then
+    ok "a first install, with no .env yet, carries nothing over"
+  else
+    no "a first install, with no .env yet, carries nothing over"
+  fi
+  # Every key the file is written with must be one the filter drops, or that
+  # key is written twice on every deploy after the first.
+  WRITTEN="$(sed -n '/^  cat <<EOF$/,/^EOF$/p' deploy.sh | grep -o '^[A-Z_]*=' | tr -d '=' | sort | tr '\n' ' ')"
+  MANAGED="$(eval "$ENVBLOCK"; tr ' ' '\n' <<<"$MANAGED_ENV_KEYS" | sort | tr '\n' ' ')"
+  if [[ -n "$WRITTEN" && "$WRITTEN" == "$MANAGED" ]]; then
+    ok "the managed key list is exactly the keys deploy.sh writes"
+  else
+    no "the managed key list is exactly the keys deploy.sh writes"
+    echo "         written: $WRITTEN"
+    echo "         managed: $MANAGED"
+  fi
+fi
+
 echo
 if [[ "$fail" -eq 0 ]]; then
   echo "All ${pass} deploy detection checks passed."

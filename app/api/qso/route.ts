@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
 import { checkSlot, isOperatorApproved } from '@/lib/ses';
+import { bandsFor } from '@/lib/bands';
 import { badRequest, callsign, isBand, isMode, isUuid, jsonBody, text } from '@/lib/validate';
 
 /** How far back a queued contact may be dated. A browser can hold a contact
@@ -17,6 +18,10 @@ export async function POST(request: Request) {
     rst_sent, rst_rcvd, rcvd_name, rcvd_qth, rcvd_grid, comment, adif_mode, freq_khz,
     replay, age_ms,
   } = body;
+  // The sender's own id for this contact, so sending it twice stores it once.
+  // Anything that is not a UUID is ignored rather than refused: the id only
+  // ever protects a contact, and must never be the reason one is turned away.
+  const clientId = isUuid(body.client_id) ? body.client_id.toLowerCase() : null;
 
   if ((!event_id && !join_code) || !body.callsign || !band || !mode) {
     return badRequest('Missing required fields');
@@ -46,6 +51,14 @@ export async function POST(request: Request) {
   const resolvedEventId = event.id;
   const isSes = event.event_type === 'SES';
   const station = Math.max(1, Math.round(Number(station_number)) || 1);
+
+  // 60m and the WARC bands are not Field Day or Winter Field Day bands. The
+  // entry form never offers them on a contest; this is the same rule for the
+  // clients that are not the form — a WSJT-X relay left running on 30m would
+  // otherwise put contacts into a contest log that the rules do not count.
+  if (!bandsFor(event.event_type).includes(band)) {
+    return badRequest(`${band} is not a band this event logs`);
+  }
 
   // The server's clock stamps every contact, and that stays true. What a
   // queued contact adds is how long ago it was logged, measured by the browser
@@ -115,14 +128,28 @@ export async function POST(request: Request) {
     await client.query('SELECT pg_advisory_xact_lock(hashtext($1))',
       [`${resolvedEventId}|${call}|${band}|${mode}`]);
 
+    // A contact this server already took. The sender did not hear the answer
+    // the first time — a timeout, a dropped connection, a second window
+    // draining the same queue — and is sending it again. It gets the stored
+    // row back, deleted or not: the contact was taken, and a resend must not
+    // bring back one an operator has since removed.
+    if (clientId) {
+      const { rows: seen } = await client.query(
+        'SELECT * FROM qsos WHERE event_id = $1 AND client_id = $2', [resolvedEventId, clientId]);
+      if (seen[0]) {
+        await client.query('COMMIT');
+        return NextResponse.json(seen[0], { status: 200 });
+      }
+    }
+
     const { rows } = await client.query(
       `INSERT INTO qsos
          (event_id, callsign, band, mode, datetime_utc, sent_class, sent_section,
           rcvd_class, rcvd_section, operator_call, station_number, is_dupe,
           rst_sent, rst_rcvd, rcvd_name, rcvd_qth, rcvd_grid, comment, adif_mode, freq_khz,
-          is_gota)
+          is_gota, client_id)
        VALUES ($1,$2,$3,$4,NOW() - make_interval(secs => $20::double precision),$5,$6,$7,$8,$9,$10,false,
-               $11,$12,$13,$14,$15,$16,$17,$18,$19)
+               $11,$12,$13,$14,$15,$16,$17,$18,$19,$21)
        RETURNING id`,
       [
         resolvedEventId,
@@ -153,6 +180,7 @@ export async function POST(request: Request) {
         // does not exist for that event type.
         event.event_type === 'FD' ? is_gota === true : false,
         ageSeconds,
+        clientId,
       ]
     );
 
@@ -165,6 +193,14 @@ export async function POST(request: Request) {
     await client.query('COMMIT');
   } catch (err) {
     await client.query('ROLLBACK').catch(() => {});
+    // The same id arriving for a different call, band or mode takes a
+    // different lock, so the check above can miss it and the unique index is
+    // what answers. Still the same contact, still stored once.
+    if (clientId && (err as { code?: string }).code === '23505') {
+      const { rows: seen } = await pool.query(
+        'SELECT * FROM qsos WHERE event_id = $1 AND client_id = $2', [resolvedEventId, clientId]);
+      if (seen[0]) return NextResponse.json(seen[0], { status: 200 });
+    }
     throw err;
   } finally {
     client.release();

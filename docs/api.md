@@ -64,7 +64,8 @@ Replace the bonus object. Body is the bonuses map itself.
 
 ### `POST /api/qso`
 
-Log a QSO. Returns the created row, `201`.
+Log a QSO. Returns the created row, `201`, or the row already stored, `200`,
+when the `client_id` has been seen before on this event.
 
 | Field | Notes |
 |---|---|
@@ -75,6 +76,7 @@ Log a QSO. Returns the created row, `201`.
 | `rst_sent`, `rst_rcvd`, `rcvd_name`, `rcvd_qth`, `rcvd_grid`, `comment` | Special event exchange |
 | `adif_mode`, `freq_khz` | Optional detail for export. The logging windows send the rig's frequency when it agrees with the logged band |
 | `replay` | Marks a QSO replayed from the offline queue |
+| `client_id` | Optional UUID chosen by the sender. The server stores one contact per id per event, so a sender that did not hear the answer can send again safely. A value that is not a UUID is ignored |
 | `age_ms` | How long ago the contact was logged, by the sender's own clock. The server dates it `NOW() - age_ms`, capped at seven days |
 
 Duplicate status is computed server-side from the event's dupe rule, for the
@@ -85,6 +87,8 @@ never rejected. A free-text field over 500 characters is trimmed.
 On a special event the server may add `slot_warning` to the response — the
 QSO was logged, but on a band and mode the operator hasn't checked out.
 
+`400` if the band is not one the event logs. A contest does not log 60m, 30m,
+17m or 12m; a special event logs every band.
 `403` if roster approval is required and the operator isn't approved.
 `409` if enforcement is `HARD` and the operator doesn't hold the slot.
 
@@ -408,3 +412,8 @@ The relay script.
 ### `GET /api/download/relay?join_code=&operator=&station=&api_url=`
 
 A Windows `.bat` wrapper with the event details filled in.
+
+The values are written into a script the operator runs, so each is checked and
+a bad one is a `400`: `join_code` is 4 to 8 letters and digits, `operator` is a
+callsign or empty, `station` is a number, and `api_url` must be this server's
+own address. Only its scheme and host are used.

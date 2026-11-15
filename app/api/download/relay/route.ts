@@ -1,24 +1,68 @@
 import { NextResponse } from 'next/server';
 import type { NextRequest } from 'next/server';
+import { badRequest, callsign } from '@/lib/validate';
+import { BAND_EDGES } from '@/lib/catProtocol';
 
 // Generates a single self-contained .bat file that embeds a PowerShell
 // ADIF-watcher script. Double-clicking it on any Windows 10/11 machine
 // will start relaying WSJT-X / JTDX QSOs to this EzFD server.
 // No installation required -- PowerShell is built into Windows.
 
+/** Where the script starts inside the .bat. The .bat finds it by searching for
+ *  this text, so nothing a request supplies may ever contain it. */
+const PS_MARKER = '#ezfd-ps-start#';
+
 export async function GET(request: NextRequest) {
   const { searchParams, protocol, host } = request.nextUrl;
 
-  const joinCode = (searchParams.get('join_code') ?? searchParams.get('event_id') ?? '').toUpperCase();
-  const operator = searchParams.get('operator')   ?? '';
-  const station  = searchParams.get('station')    ?? '1';
-  const apiUrl   = searchParams.get('api_url')    ?? `${protocol}//${host}`;
+  // Every value here is written into a script the operator then runs, so each
+  // is checked against the narrow shape it can legitimately have rather than
+  // escaped. Escaping was not enough: the .bat locates its PowerShell by the
+  // last marker in the file, so a value carrying the marker and a line break
+  // replaced the start of the script with text of the link's author's choosing
+  // -- a link to a club's own server that downloaded somebody else's commands.
+  const rawCode = (searchParams.get('join_code') ?? searchParams.get('event_id') ?? '').trim().toUpperCase();
+  if (!rawCode) return badRequest('join_code required');
+  if (!/^[A-Z0-9]{4,8}$/.test(rawCode)) return badRequest('join_code is not a join code');
 
-  if (!joinCode) {
-    return NextResponse.json({ error: 'join_code required' }, { status: 400 });
+  const rawOperator = searchParams.get('operator') ?? '';
+  const operator = rawOperator ? callsign(rawOperator) : '';
+  if (operator === null) return badRequest('operator is not a callsign');
+
+  const rawStation = searchParams.get('station') ?? '1';
+  if (!/^\d{1,3}$/.test(rawStation)) return badRequest('station is not a station number');
+  const station = Math.max(1, parseInt(rawStation, 10));
+
+  // The server the relay posts to is the one the file was downloaded from. A
+  // different api_url would let a link send a station's contacts elsewhere,
+  // so one is accepted only when it names this same origin (the setup panel
+  // sends window.location.origin, which is exactly that).
+  const origin = `${protocol}//${host}`;
+  const rawApi = searchParams.get('api_url');
+  let apiUrl = origin;
+  if (rawApi) {
+    let parsed: URL | null = null;
+    try { parsed = new URL(rawApi); } catch { /* not a URL */ }
+    // Behind a proxy the address the browser used arrives in the Host or
+    // X-Forwarded-Host header. Those are set by whoever makes the request,
+    // not by whoever wrote the link, so matching them is still "this server".
+    const here = new Set(
+      [host, request.headers.get('host'), request.headers.get('x-forwarded-host')]
+        .filter((h): h is string => !!h).map(h => h.toLowerCase()),
+    );
+    if (!parsed || !/^https?:$/.test(parsed.protocol) || !here.has(parsed.host.toLowerCase())) {
+      return badRequest('api_url must be this server');
+    }
+    apiUrl = `${parsed.protocol}//${parsed.host}`;
   }
+  // Belt and braces: the host header is the one value above not matched
+  // against a fixed alphabet.
+  if (!/^https?:\/\/[A-Za-z0-9.\-:\[\]]+$/.test(apiUrl)) return badRequest('Unusable server address');
 
-  const content = buildBatFile(joinCode, apiUrl, operator, parseInt(station, 10) || 1);
+  const content = buildBatFile(rawCode, apiUrl, operator, station);
+  // The marker appears exactly twice in a sound file: once in the command
+  // that searches for it and once where the script starts.
+  if (content.split(PS_MARKER).length - 1 !== 2) return badRequest('Unusable request');
 
   return new NextResponse(content, {
     headers: {
@@ -57,7 +101,7 @@ function buildBatFile(joinCode: string, apiUrl: string, operator: string, statio
     'pause',
     'exit /b',
     '',
-    '#ezfd-ps-start#',
+    PS_MARKER,
     ps,
   ].join('\r\n');
 
@@ -119,22 +163,17 @@ function buildPsScript(joinCode: string, apiUrl: string, operator: string, stati
     'function Get-Band($band, $freq) {',
     '    if ($band) {',
     '        $b = ([string]$band).ToLower().Trim()',
-    '        if (@(' + [
-      '160m','80m','40m','20m','15m','10m','6m','2m','1.25m','70cm',
-    ].map(b => Q + b + Q).join(',') + ') -contains $b) { return $b }',
+    '        if (@(' + BAND_EDGES.map(e => Q + e[2] + Q).join(',') + ') -contains $b) { return $b }',
     '    }',
     '    if ($freq) {',
     '        $n = 0.0',
     '        if ([double]::TryParse([string]$freq, [ref]$n)) {',
     '            $k = $n * 1000',
-    '            if ($k -ge 1800  -and $k -lt 2000)    { return ' + Q + '160m' + Q + ' }',
-    '            if ($k -ge 3500  -and $k -lt 4000)    { return ' + Q + '80m'  + Q + '  }',
-    '            if ($k -ge 7000  -and $k -lt 7300)    { return ' + Q + '40m'  + Q + '  }',
-    '            if ($k -ge 14000 -and $k -lt 14350)   { return ' + Q + '20m'  + Q + '  }',
-    '            if ($k -ge 21000 -and $k -lt 21450)   { return ' + Q + '15m'  + Q + '  }',
-    '            if ($k -ge 28000 -and $k -lt 29700)   { return ' + Q + '10m'  + Q + '  }',
-    '            if ($k -ge 50000 -and $k -lt 54000)   { return ' + Q + '6m'   + Q + '   }',
-    '            if ($k -ge 144000 -and $k -lt 148000) { return ' + Q + '2m'   + Q + '   }',
+    // Written out from the one table in lib/catProtocol.ts, so this script
+    // cannot fall behind it. It had: the WARC bands and 60m were missing, and
+    // a special event's contacts on them were skipped without a word.
+    ...BAND_EDGES.map(e =>
+      '            if ($k -ge ' + (e[0] / 1000) + ' -and $k -le ' + (e[1] / 1000) + ') { return ' + Q + e[2] + Q + ' }'),
     '        }',
     '    }',
     '    return $null',

@@ -353,8 +353,14 @@ fi
 # sudo'd process: schema.sql lives in the repo checkout, which the deploying
 # user can read and the postgres user generally cannot. SC2024 warns about the
 # opposite case (a redirect needing the elevated user's privileges).
+#
+# ON_ERROR_STOP is what makes a failure visible at all: psql fed on stdin
+# exits 0 whatever happened inside the file, so without it a schema that
+# stopped halfway was logged as applied and the new build was deployed on top
+# of the old tables. Stopping here leaves the running app untouched.
 # shellcheck disable=SC2024
-sudo -u postgres psql -d ezfd >/dev/null < "$REPO_DIR/db/schema.sql"
+sudo -u postgres psql -v ON_ERROR_STOP=1 -d ezfd >/dev/null < "$REPO_DIR/db/schema.sql" \
+  || die "The database schema did not apply. Nothing has been deployed and the running app is unchanged; the error is printed above."
 log "Database schema applied"
 
 # ── Schema migrations ─────────────────────────────────────────────────────────
@@ -473,13 +479,47 @@ log "Build complete"
 info "Deploying to $APP_DIR..."
 mkdir -p "$APP_DIR"
 
-# Sync standalone server and assets; --delete removes files no longer present
-rsync -a --delete "${REPO_DIR}/.next/standalone/"  "$APP_DIR/"
+# ── .env: the keys deploy.sh owns, and everything else in the file ───────────
+# deploy.sh writes these nine and nothing else. Anything an operator added by
+# hand — a call history URL, a setting from docs/configuration.md — is theirs,
+# and used to vanish on the next deploy because the file was rewritten from
+# this list alone.
+MANAGED_ENV_KEYS='NODE_ENV PORT HOSTNAME DATABASE_URL EZFD_ENCRYPTION_KEY EZFD_ADMIN_KEY EZFD_DOMAIN EZFD_CERT_EMAIL EZFD_REPO_DIR'
+
+# Every line of an existing .env that is not one of the managed keys, exactly
+# as written — comments and blank lines included.
+env_extra_lines() {
+  local file="$1" line="" key=""
+  [[ -f "$file" ]] || return 0
+  while IFS= read -r line || [[ -n "$line" ]]; do
+    key="${line%%=*}"
+    if [[ "$line" == *=* && " $MANAGED_ENV_KEYS " == *" $key "* ]]; then
+      continue
+    fi
+    printf '%s\n' "$line"
+  done < "$file"
+}
+# ── end of .env handling ─────────────────────────────────────────────────────
+
+ENV_EXTRA="$(env_extra_lines "$APP_DIR/.env")"
+
+# Sync standalone server and assets; --delete removes files no longer present.
+# The .env exclude is load-bearing: without it --delete removes the live
+# secrets file here, and a deploy interrupted before the rewrite below leaves
+# a server with no database password and no encryption key — and the next run,
+# finding no key to reuse, generates a new one that cannot read what the old
+# one encrypted.
+rsync -a --delete --exclude='.env' "${REPO_DIR}/.next/standalone/"  "$APP_DIR/"
 rsync -a --delete "${REPO_DIR}/.next/static/"      "$APP_DIR/.next/static/"
 rsync -a --delete "${REPO_DIR}/public/"            "$APP_DIR/public/"
 
-# Environment file — owns secrets, restricted to app user
-cat > "$APP_DIR/.env" <<EOF
+# Environment file — owns secrets, restricted to app user. Written beside the
+# real one and moved into place, so there is no moment at which .env exists
+# half-written.
+ENV_TMP="$(mktemp "$APP_DIR/.env.XXXXXX")"
+chmod 600 "$ENV_TMP"
+{
+  cat <<EOF
 NODE_ENV=production
 PORT=3000
 HOSTNAME=127.0.0.1
@@ -490,6 +530,9 @@ EZFD_DOMAIN=${DOMAIN}
 EZFD_CERT_EMAIL=${CERT_EMAIL}
 EZFD_REPO_DIR=${REPO_DIR}
 EOF
+  if [[ -n "$ENV_EXTRA" ]]; then printf '%s\n' "$ENV_EXTRA"; fi
+} > "$ENV_TMP"
+mv -f "$ENV_TMP" "$APP_DIR/.env"
 chmod 600   "$APP_DIR/.env"
 chown -R "$APP_USER:$APP_USER" "$APP_DIR"
 log "Files deployed"
@@ -561,6 +604,13 @@ server {
     proxy_read_timeout  3600s;
     proxy_send_timeout  3600s;
     send_timeout        3600s;
+
+    # nginx refuses a request body over 1 MB unless told otherwise, and answers
+    # 413 before the app sees it. A full-event backup is roughly 750 bytes a
+    # contact, so restoring or merging a log past about 1,400 contacts failed
+    # here, as did a large ADIF import. 50 MB is the app's own largest limit
+    # (the event import); the app still enforces the smaller ones itself.
+    client_max_body_size 50m;
 
     location / {
         proxy_pass         http://127.0.0.1:3000;

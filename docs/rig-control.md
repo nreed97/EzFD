@@ -97,6 +97,12 @@ Band and mode are polled about four times a second and pushed to the browser,
 so the QSY drawer tracks the radio without anyone touching it. Logging a QSO
 records whatever the VFO was on.
 
+Every amateur band from 160m to 70cm is recognised, including 60m, 30m, 17m
+and 12m. On a special event the logger follows the radio onto any of them. On
+Field Day and Winter Field Day, which do not use 60m or the WARC bands, the
+logger stays on the band it was on when the radio moves to one of those,
+because the contest has nowhere to log it.
+
 Frequency is displayed in the header. On a special event you can also record a
 planned frequency on your checkout, which is free text for other operators to
 read.
