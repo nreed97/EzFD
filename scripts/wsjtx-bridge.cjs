@@ -31,6 +31,7 @@
 
 'use strict';
 
+const crypto = require('crypto');
 const dgram  = require('dgram');
 const https  = require('https');
 const http   = require('http');
@@ -164,18 +165,31 @@ class Reader {
 // Frequency → EzFD band
 // ──────────────────────────────────────────
 
+// Every band the app can log on, in Hz. 60m and the WARC bands are here
+// because a special event offers them; the server refuses them for a contest,
+// which does not. Kept in step with BAND_EDGES in lib/catProtocol.ts by
+// scripts/test-cat-protocol.cjs.
+const BAND_EDGES = [
+  [1800000, 2000000, '160m'],
+  [3500000, 4000000, '80m'],
+  [5330000, 5410000, '60m'],
+  [7000000, 7300000, '40m'],
+  [10100000, 10150000, '30m'],
+  [14000000, 14350000, '20m'],
+  [18068000, 18168000, '17m'],
+  [21000000, 21450000, '15m'],
+  [24890000, 24990000, '12m'],
+  [28000000, 29700000, '10m'],
+  [50000000, 54000000, '6m'],
+  [144000000, 148000000, '2m'],
+  [222000000, 225000000, '1.25m'],
+  [420000000, 450000000, '70cm'],
+];
+
 function hzToBand(hz) {
-  const khz = hz / 1000;
-  if (khz >= 1800  && khz < 2000)    return '160m';
-  if (khz >= 3500  && khz < 4000)    return '80m';
-  if (khz >= 7000  && khz < 7300)    return '40m';
-  if (khz >= 14000 && khz < 14350)   return '20m';
-  if (khz >= 21000 && khz < 21450)   return '15m';
-  if (khz >= 28000 && khz < 29700)   return '10m';
-  if (khz >= 50000 && khz < 54000)   return '6m';
-  if (khz >= 144000 && khz < 148000) return '2m';
-  if (khz >= 222000 && khz < 225000) return '1.25m';
-  if (khz >= 420000 && khz < 450000) return '70cm';
+  for (const [lo, hi, band] of BAND_EDGES) {
+    if (hz >= lo && hz <= hi) return band;
+  }
   return null;
 }
 
@@ -365,10 +379,11 @@ async function drainSpool() {
       } catch {
         break;                       // still unreachable
       }
-      if (status !== 201 && isRetryable(status)) break;
+      const taken = status === 201 || status === 200;   // 200: it already had this one
+      if (!taken && isRetryable(status)) break;
       // A permanent rejection is dropped rather than retried forever — it is
       // still in WSJT-X's own log if it needs chasing.
-      if (status !== 201) {
+      if (!taken) {
         console.log(`[wsjtx-bridge] ${qso.callsign} permanently rejected (${status}) — dropped from the queue`);
       }
       entries.shift();
@@ -447,6 +462,9 @@ sock.on('message', async (msg) => {
     // that waited in the spool is dated when it happened rather than when the
     // server came back, without the server trusting this clock's setting.
     logged_at:      (dateOff ?? new Date()).toISOString(),
+    // The server stores a given id once. A post that timed out here may still
+    // have been taken there, and the spool will send it again.
+    client_id:      crypto.randomUUID(),
   };
 
   const ts = (dateOff ?? new Date()).toISOString().slice(11, 19);
@@ -460,7 +478,7 @@ sock.on('message', async (msg) => {
 
   try {
     const { status, body } = await postQso(payload);
-    if (status === 201) {
+    if (status === 201 || status === 200) {
       const dupe = body.is_dupe ? ' [DUPE]' : '';
       console.log(`→ logged${dupe}`);
     } else if (isRetryable(status)) {

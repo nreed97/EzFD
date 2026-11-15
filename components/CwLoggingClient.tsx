@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useStoredFlag } from '@/lib/useStoredFlag';
-import { applyQsoEvent } from '@/lib/qsoStream';
+import { applyQsoEvent, createLogCatchUp } from '@/lib/qsoStream';
 import { useRigBridge } from '@/lib/useRigBridge';
 import { useQsoQueue, rigFrequencyKhz } from '@/lib/useQsoQueue';
 import { transmitterCount } from '@/lib/types';
+import { bandsFor } from '@/lib/bands';
 import type { Event, QSO, Band, Mode, DisplayQSO } from '@/lib/types';
 import QSOForm, { type QSOFormHandle } from './QSOForm';
 import CwMacroPanel, { type CwMacroPanelHandle } from './CwMacroPanel';
@@ -53,7 +54,11 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
     setEsm(prev => !prev);
   }
 
-  const rig = useRigBridge({ onBand: setCurrentBand, onMode: setCurrentMode });
+  // Only onto a band this event offers; see the same guard in LoggingClient.
+  const followRigBand = useCallback((b: Band) => {
+    if (bandsFor(event.event_type).includes(b)) setCurrentBand(b);
+  }, [event.event_type]);
+  const rig = useRigBridge({ onBand: followRigBand, onMode: setCurrentMode });
   const rigFreqRef = useRef(rig.freq);
   useEffect(() => { rigFreqRef.current = rig.freq; }, [rig.freq]);
 
@@ -68,8 +73,10 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
   // QSOs logged from the main tab (or any other operator on the event).
   useEffect(() => {
     const es = new EventSource(`/api/realtime/${event.id}`);
+    const catchUp = createLogCatchUp(event.id, true, setConfirmedQSOs);
     es.addEventListener('qso', (e: MessageEvent) => {
       const { op, record } = JSON.parse(e.data) as { op: string; record: QSO };
+      catchUp.saw(op, record);
       setConfirmedQSOs(prev => applyQsoEvent(prev, op, record, true));
     });
     // A reconnect is the earliest evidence the server is back — navigator
@@ -81,6 +88,9 @@ export default function CwLoggingClient({ event, initialQSOs, operatorCall, stat
       if (!dropped) return;   // the initial connect is not a recovery
       dropped = false;
       noteReconnect();
+      // Contacts logged elsewhere while the stream was down were announced to
+      // nobody, and this window's dupe check is only as good as its list.
+      void catchUp.run();
     };
     return () => es.close();
   }, [event.id, noteReconnect]);

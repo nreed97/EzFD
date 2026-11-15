@@ -71,6 +71,17 @@ ALTER TABLE qsos ADD COLUMN IF NOT EXISTS updated_by TEXT;
 ALTER TABLE qsos ADD COLUMN IF NOT EXISTS deleted_at TIMESTAMPTZ;
 ALTER TABLE qsos ADD COLUMN IF NOT EXISTS deleted_by TEXT;
 
+-- The sender's id for a contact, so that sending it twice stores it once.
+-- A browser queues a contact before it touches the network and retries until
+-- the server answers; when the answer was lost rather than the request, the
+-- retry used to store the contact a second time. The browser sends its queue
+-- id and the WSJT-X bridge sends one of its own. NULL for everything else
+-- (ADIF import, restore, merge), which is why the index is partial. A restore
+-- does not carry it over: a restored event is a new event, and nothing is
+-- still holding an id to resend against it.
+ALTER TABLE qsos ADD COLUMN IF NOT EXISTS client_id UUID;
+CREATE UNIQUE INDEX IF NOT EXISTS qsos_client_id_idx ON qsos(event_id, client_id) WHERE client_id IS NOT NULL;
+
 CREATE INDEX IF NOT EXISTS qsos_event_idx      ON qsos(event_id);
 CREATE INDEX IF NOT EXISTS qsos_dupe_idx       ON qsos(event_id, callsign, band, mode);
 CREATE INDEX IF NOT EXISTS qsos_datetime_idx   ON qsos(event_id, datetime_utc DESC);

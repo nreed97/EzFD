@@ -129,6 +129,24 @@ console.log('\n── the native path agrees with the bridge ──');
   const pyJoined = pyBands.map(b => `${b[0]}-${b[1]}:${b[2]}`).join(' ');
   eq(tsBands, pyJoined, 'every band edge matches the bridge, edge for edge');
 
+  // The WSJT-X bridge is a third copy, in a file that runs on its own.
+  const WSJTX = fs.readFileSync(path.join(__dirname, 'wsjtx-bridge.cjs'), 'utf8');
+  const jsBlock = /^const BAND_EDGES = \[$([\s\S]*?)^\];$/m.exec(WSJTX);
+  eq(!!jsBlock, true, "found the WSJT-X bridge's BAND_EDGES table");
+  const jsJoined = [...(jsBlock ? jsBlock[1] : '').matchAll(/\[\s*(\d+),\s*(\d+),\s*'([^']+)'\]/g)]
+    .map(m => `${Number(m[1])}-${Number(m[2])}:${m[3]}`).join(' ');
+  eq(jsJoined, tsBands, 'and the WSJT-X bridge matches it too');
+
+  // Agreement between copies says nothing about a row missing from all of
+  // them. Every band an event can offer must have a frequency range, SAT
+  // aside, which is a mode of operation rather than a place on the dial.
+  const { bandsFor } = compile(['lib/bands.ts']).load('bands');
+  const mapped = new Set(BAND_EDGES.map(b => b[2]));
+  for (const type of ['FD', 'WFD', 'SES']) {
+    const missing = bandsFor(type).filter(b => b !== 'SAT' && !mapped.has(b));
+    eq(missing.join(','), '', `every band a ${type} event offers has a frequency range`);
+  }
+
   // MODE_MAP in ezfd-rig-bridge.py.
   const modeBlock = /^MODE_MAP = \{$([\s\S]*?)^\}$/m.exec(BRIDGE);
   eq(!!modeBlock, true, "found the bridge's MODE_MAP");
@@ -161,7 +179,14 @@ console.log('\n── frequency to band ──');
   eq(freqToBand(7150000), '40m', '40m');
   eq(freqToBand(50313000), '6m', '6m');
   eq(freqToBand(440000000), '70cm', '70cm');
-  eq(freqToBand(10125000), null, '30m is not a contest band and maps to nothing');
+  // A special event offers 60m and the WARC bands. They were missing from
+  // this table and from the bridge's, identically, so the comparison above
+  // passed while a rig on 30m left the form on the wrong band.
+  eq(freqToBand(10125000), '30m', '30m maps, for a special event');
+  eq(freqToBand(18100000), '17m', '17m');
+  eq(freqToBand(24915000), '12m', '12m');
+  eq(freqToBand(5357000), '60m', '60m');
+  eq(freqToBand(12000000), null, 'between bands is still nothing');
   eq(freqToBand(0), null, 'zero is not a band');
 }
 

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react';
 import { useNow } from '@/lib/useNow';
 import dynamic from 'next/dynamic';
 import { calculateScore } from '@/lib/scoring';
-import { applyQsoEvent } from '@/lib/qsoStream';
+import { applyQsoEvent, createLogCatchUp } from '@/lib/qsoStream';
 import { operatorStats, UNATTRIBUTED } from '@/lib/opStats';
 import { toggleLightMode } from '@/lib/useLightMode';
 import type { Event, QSO, Bonuses, SesReservation } from '@/lib/types';
@@ -121,14 +121,28 @@ export default function DashboardClient({ event, initialQSOs, isVisitor = false 
 
   useEffect(() => {
     const es = new EventSource(`/api/realtime/${event.id}`);
+    const catchUp = createLogCatchUp(event.id, false, setQSOs);
     es.addEventListener('qso', (e: MessageEvent) => {
       const { op, record } = JSON.parse(e.data) as { op: string; record: QSO };
+      catchUp.saw(op, record);
       setQSOs(prev => applyQsoEvent(prev, op, record, false));
     });
     // Call checkouts ride the same stream; the payload carries the raw range
     // column, so this just signals "refetch".
     es.addEventListener('reservation', () => { void refreshReservations(); });
     es.addEventListener('presence', () => { void fetchPresence(); });
+    // The dashboard is the screen left running at the site all weekend, so it
+    // is the one most likely to sit through a server restart. The stream
+    // replays nothing, so on the reconnect everything it feeds is refetched.
+    let dropped = false;
+    es.onerror = () => { dropped = true; /* the browser reconnects by itself */ };
+    es.onopen = () => {
+      if (!dropped) return;   // the initial connect is not a recovery
+      dropped = false;
+      void catchUp.run();
+      void refreshReservations();
+      void fetchPresence();
+    };
     return () => es.close();
   }, [event.id, refreshReservations, fetchPresence]);
 

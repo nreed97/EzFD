@@ -157,18 +157,34 @@ export function parseFrame(frame: string): CatFrame | null {
 }
 
 /**
- * Band edges in Hz.
+ * Band edges in Hz — every band the app can log on, not only the contest ones.
  *
- * Transcribed from `BANDS` in `ezfd-rig-bridge.py`. The test asserts the two
- * agree edge for edge: an operator moving between transports must not see the
- * band change under them, and the band is what the log records.
+ * This is the one frequency table on the TypeScript side: the ADIF import and
+ * the generated Windows relay read it too, and `scripts/test-cat-protocol.cjs`
+ * holds the two standalone scripts (`ezfd-rig-bridge.py`,
+ * `scripts/wsjtx-bridge.cjs`) to it edge for edge.
+ *
+ * 60m, 30m, 17m and 12m used to be absent here and in three other copies,
+ * with only the ADIF import carrying them. A special event offers those
+ * bands, so a rig tuned to 30m left the form on whatever band it had been on
+ * and the contact was logged there, and both WSJT-X relays dropped every
+ * contact made on them. The test that compares the copies passed throughout,
+ * because the rows were missing from all of them alike; it now also asserts
+ * that every band an event can offer has a row.
+ *
+ * Whether an event *offers* a band is `bandsFor()` in `lib/bands.ts` and is
+ * decided by the caller. A Field Day logger ignores a rig sitting on 30m.
  */
 export const BAND_EDGES: ReadonlyArray<readonly [number, number, Band]> = [
   [1_800_000, 2_000_000, '160m'],
   [3_500_000, 4_000_000, '80m'],
+  [5_330_000, 5_410_000, '60m'],
   [7_000_000, 7_300_000, '40m'],
+  [10_100_000, 10_150_000, '30m'],
   [14_000_000, 14_350_000, '20m'],
+  [18_068_000, 18_168_000, '17m'],
   [21_000_000, 21_450_000, '15m'],
+  [24_890_000, 24_990_000, '12m'],
   [28_000_000, 29_700_000, '10m'],
   [50_000_000, 54_000_000, '6m'],
   [144_000_000, 148_000_000, '2m'],

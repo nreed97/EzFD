@@ -7,7 +7,7 @@ import { calculateScore } from '@/lib/scoring';
 import { useRigBridge, rigPortForStation } from '@/lib/useRigBridge';
 import { useSerialRig } from '@/lib/useSerialRig';
 import { useQsoQueue, rigFrequencyKhz } from '@/lib/useQsoQueue';
-import { applyQsoEvent } from '@/lib/qsoStream';
+import { applyQsoEvent, createLogCatchUp } from '@/lib/qsoStream';
 import { ARRL_SECTIONS, transmitterCount } from '@/lib/types';
 import { bandsFor, MODES } from '@/lib/bands';
 import { rememberPosition } from '@/lib/lastPosition';
@@ -119,8 +119,15 @@ export default function LoggingClient({
 
   // One bridge process per radio, each on its own port, so a second window
   // drives a second rig instead of both fighting over one connection.
+  // A rig reports whatever band it is on, including ones this event does not
+  // offer — 30m during Field Day. The form follows the rig only onto a band
+  // the event can log; otherwise it stays where the operator put it.
+  const followRigBand = useCallback((b: Band) => {
+    if (bandsFor(event.event_type).includes(b)) setCurrentBand(b);
+  }, [event.event_type]);
+
   const rig = useRigBridge({
-    onBand: setCurrentBand,
+    onBand: followRigBand,
     onMode: setCurrentMode,
     port: rigPortForStation(stationNumber),
   });
@@ -131,7 +138,7 @@ export default function LoggingClient({
   // plain-HTTP field server.
   // It drives band and mode through the same callbacks the bridge uses, so
   // the logging screen does not care which transport is talking.
-  const serialRig = useSerialRig({ onBand: setCurrentBand, onMode: setCurrentMode });
+  const serialRig = useSerialRig({ onBand: followRigBand, onMode: setCurrentMode });
 
   // Either transport lights the RIG chip. The bridge's frequency wins when
   // both are live: it goes through Hamlib, so it is the better-informed of
@@ -190,9 +197,11 @@ export default function LoggingClient({
   // SSE subscription for real-time QSO updates
   useEffect(() => {
     const es = new EventSource(`/api/realtime/${event.id}`);
+    const catchUp = createLogCatchUp(event.id, true, setConfirmedQSOs);
 
     es.addEventListener('qso', (e: MessageEvent) => {
       const { op, record } = JSON.parse(e.data) as { op: string; record: QSO };
+      catchUp.saw(op, record);
       setConfirmedQSOs(prev => applyQsoEvent(prev, op, record, true));
     });
 
@@ -218,6 +227,11 @@ export default function LoggingClient({
       if (!dropped) return;   // the initial connect is not a recovery
       dropped = false;
       noteReconnect();
+      // Whatever was announced while the stream was down was announced to
+      // nobody. Fetch the log, and have the two panels refetch theirs.
+      void catchUp.run();
+      setReservationVersion(v => v + 1);
+      setPresenceVersion(v => v + 1);
     };
 
     return () => es.close();

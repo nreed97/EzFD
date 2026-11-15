@@ -123,13 +123,20 @@ except ImportError:
 CONFIG_FILE = Path.home() / ".ezfd-rig.json"
 POLL_HZ     = 4   # frequency/mode queries per second
 
-# Field Day band edges (Hz)
+# Band edges (Hz). Every band the app can log on: a special event offers 60m
+# and the WARC bands, which a contest does not. The logging window decides
+# which of these its event offers and ignores the rest. Kept in step with
+# BAND_EDGES in lib/catProtocol.ts by scripts/test-cat-protocol.cjs.
 BANDS = [
     (1_800_000,   2_000_000,  "160m"),
     (3_500_000,   4_000_000,  "80m"),
+    (5_330_000,   5_410_000,  "60m"),
     (7_000_000,   7_300_000,  "40m"),
+    (10_100_000, 10_150_000,  "30m"),
     (14_000_000, 14_350_000,  "20m"),
+    (18_068_000, 18_168_000,  "17m"),
     (21_000_000, 21_450_000,  "15m"),
+    (24_890_000, 24_990_000,  "12m"),
     (28_000_000, 29_700_000,  "10m"),
     (50_000_000, 54_000_000,  "6m"),
     (144_000_000, 148_000_000, "2m"),

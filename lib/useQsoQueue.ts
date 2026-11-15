@@ -75,6 +75,11 @@ async function submitQSOToServer(
         freq_khz: pending.freq_khz,
         adif_mode: pending.adif_mode,
         replay,
+        // The queue's own id for this contact. The server stores a given id
+        // once, so a retry that overlaps a slow first attempt, or a second
+        // window draining the same queue, gets the stored row back instead
+        // of logging the contact again.
+        client_id: pending.local_id,
         // How long ago this was logged, by this browser's clock at both ends,
         // so the server can date it without trusting the clock itself.
         age_ms: Math.max(0, Date.now() - Date.parse(pending.submitted_at)),

@@ -150,6 +150,11 @@ See [Digital modes](digital-modes.md).
 
 The service reads the file at start, so a restart is required.
 
+`deploy.sh` rewrites the lines it manages (the database URL, the two keys, the
+domain, the certificate email, the repository path, and `NODE_ENV`, `PORT` and
+`HOSTNAME`) on every run and leaves every other line as you wrote it, so an
+optional setting added here survives an update.
+
 On a Docker install, edit `.env` beside `compose.yaml` and recreate the
 containers, which a plain restart does not do:
 

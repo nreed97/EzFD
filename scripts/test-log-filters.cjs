@@ -16,7 +16,7 @@
 //     view exists to help correct
 
 const { compile } = require('./_compile-ts.cjs');
-const ts = compile(['lib/logFilters.ts', 'lib/logColumns.ts']);
+const ts = compile(['lib/logFilters.ts', 'lib/logColumns.ts', 'lib/qsoStream.ts']);
 const { applyLogFilters, filterOptions, isFiltered, EMPTY_FILTERS } = ts.load('logFilters');
 const { LOG_COLUMNS, defaultColumns, resolveColumns, hhmmss } = ts.load('logColumns');
 
@@ -234,6 +234,73 @@ console.log('\n── cell formatting handles both date shapes ──');
   eq(threw, null, 'every column renders a string for a row with no optional fields');
 }
 
-console.log(failures === 0 ? '\nAll log view tests passed.' : `\n${failures} failure(s).`);
-ts.cleanup();
-process.exit(failures === 0 ? 0 : 1);
+// ── Catching up after the live stream reconnects ────────────────────────────
+// The stream carries changes and replays nothing, so a window that sat through
+// a server restart came back showing the log as it was when the stream
+// dropped. These run the real catch-up against a stubbed fetch.
+async function catchUpTests() {
+  const { createLogCatchUp, applyQsoEvent } = ts.load('qsoStream');
+  const fs = require('fs');
+  const realFetch = global.fetch;
+  const row = (id, over = {}) => ({ id, callsign: id.toUpperCase(), deleted_at: null, ...over });
+  // The route answers newest first.
+  const SERVER = [row('c'), row('b'), row('a')];
+
+  {
+    let list = [row('a')];
+    global.fetch = async () => ({ ok: true, json: async () => SERVER.slice() });
+    await createLogCatchUp('ev', true, rows => { list = rows; }).run();
+    eq(list.map(q => q.id).join(), 'c,b,a', 'a newest-first list is replaced by the fetched log');
+  }
+  {
+    let list = [row('a')];
+    global.fetch = async () => ({ ok: true, json: async () => SERVER.slice() });
+    await createLogCatchUp('ev', false, rows => { list = rows; }).run();
+    eq(list.map(q => q.id).join(), 'a,b,c', 'the dashboard gets it oldest first, the order it keeps');
+  }
+  {
+    // A contact announced after the server ran its query but before the answer
+    // arrived: the snapshot does not have it, and must not erase it.
+    let list = [row('a')];
+    let release;
+    global.fetch = () => new Promise(r => { release = () => r({ ok: true, json: async () => SERVER.slice() }); });
+    const cu = createLogCatchUp('ev', true, rows => { list = rows; });
+    const running = cu.run();
+    cu.saw('INSERT', row('d'));
+    list = applyQsoEvent(list, 'INSERT', row('d'), true);
+    cu.saw('UPDATE', row('b', { deleted_at: '2026-06-27T19:00:00Z' }));
+    release();
+    await running;
+    eq(list.map(q => q.id).join(), 'd,c,a',
+       'events that arrive during the fetch are applied on top of it, a delete included');
+    // And once it has finished, it stops collecting.
+    cu.saw('INSERT', row('e'));
+    global.fetch = async () => ({ ok: true, json: async () => SERVER.slice() });
+    await cu.run();
+    eq(list.map(q => q.id).join(), 'c,b,a', 'a later catch-up does not replay events from an earlier one');
+  }
+  {
+    let list = [row('a')];
+    global.fetch = async () => ({ ok: false, json: async () => ({ error: 'x' }) });
+    await createLogCatchUp('ev', true, rows => { list = rows; }).run();
+    global.fetch = async () => { throw new Error('unreachable'); };
+    await createLogCatchUp('ev', true, rows => { list = rows; }).run();
+    eq(list.map(q => q.id).join(), 'a', 'a failed fetch leaves the list on screen alone');
+  }
+  global.fetch = realFetch;
+
+  // Every window that shows the log has to do this, and the dashboard is the
+  // one that had no reconnect handling at all.
+  for (const f of ['LoggingClient', 'CwLoggingClient', 'DashboardClient']) {
+    const src = fs.readFileSync(`components/${f}.tsx`, 'utf8');
+    const wired = /createLogCatchUp\(/.test(src) && /catchUp\.saw\(/.test(src)
+      && /es\.onopen = \(\) => \{[\s\S]{0,400}?catchUp\.run\(\)/.test(src);
+    eq(wired, true, `${f} refetches the log when its stream reconnects`);
+  }
+}
+
+catchUpTests().then(() => {
+  console.log(failures === 0 ? '\nAll log view tests passed.' : `\n${failures} failure(s).`);
+  ts.cleanup();
+  process.exit(failures === 0 ? 0 : 1);
+});

@@ -320,6 +320,140 @@ print(next((q['id'] for q in json.load(sys.stdin) if q['callsign']=='$c'), ''))"
   [[ -n "$id" ]] && req DELETE "/api/qso/$id" > /dev/null
 done
 
+# ── A contact sent twice is stored once ──────────────────────────────────────
+# The offline queue retries until the server answers. When it was the answer
+# that got lost — a 10 s timeout on a slow link, a second window draining the
+# same queue — the retry used to store the contact again, and the second copy
+# sat in the log as a dupe of a contact that happened once.
+echo "── Resent contacts ──"
+CID="5f0c6d3e-8a51-4b7e-9c1d-2e4f6a8b0c1d"
+RS_BODY="{\"event_id\":\"$FD_ID\",\"callsign\":\"K1RSN\",\"band\":\"15m\",\"mode\":\"CW\",\"rcvd_class\":\"1D\",\"rcvd_section\":\"CT\",\"operator_call\":\"W0AAA\",\"client_id\":\"$CID\"}"
+RS1_CODE=$(status POST /api/qso "$RS_BODY")
+RS2=$(curl -s -w '\n%{http_code}' -X POST "$BASE/api/qso" -H 'Content-Type: application/json' -d "${RS_BODY/\"client_id\"/\"replay\":true,\"client_id\"}")
+RS2_CODE="${RS2##*$'\n'}"
+RS_ROWS=$(req GET "/api/qso?event_id=$FD_ID" | python3 -c "
+import sys,json
+print([(q['is_dupe']) for q in json.load(sys.stdin) if q['callsign']=='K1RSN'])")
+if [[ "$RS1_CODE" == "201" && "$RS2_CODE" == "200" && "$RS_ROWS" == "[False]" ]]; then
+  ok "  the same client_id twice is one contact, and the repeat answers 200"
+else
+  no "  the same client_id twice is one contact, and the repeat answers 200" "$RS1_CODE $RS2_CODE $RS_ROWS"
+fi
+RS_ID=$(echo "${RS2%$'\n'*}" | jq_get id)
+if [[ -n "$RS_ID" && "$(echo "${RS2%$'\n'*}" | jq_get callsign)" == "K1RSN" ]]; then
+  ok "  and the repeat gets the stored row back"
+else
+  no "  and the repeat gets the stored row back"
+fi
+# Ten at once is the race the advisory lock and the unique index exist for.
+PIDS=()
+for _ in $(seq 1 10); do
+  curl -s -o /dev/null -X POST "$BASE/api/qso" -H 'Content-Type: application/json' \
+    -d "{\"event_id\":\"$FD_ID\",\"callsign\":\"K1RCE\",\"band\":\"15m\",\"mode\":\"CW\",\"client_id\":\"6a1d7e4f-9b62-4c8f-8d2e-3f5a7b9c1d2e\"}" &
+  PIDS+=("$!")
+done
+wait "${PIDS[@]}"
+RACE=$(req GET "/api/qso?event_id=$FD_ID" | python3 -c "
+import sys,json
+print(len([q for q in json.load(sys.stdin) if q['callsign']=='K1RCE']))")
+if [[ "$RACE" == "1" ]]; then
+  ok "  ten simultaneous sends of one contact store it once"
+else
+  no "  ten simultaneous sends of one contact store it once" "$RACE rows"
+fi
+# A resend must not bring back a contact an operator has since deleted.
+req DELETE "/api/qso/$RS_ID" > /dev/null
+RS3_CODE=$(status POST /api/qso "$RS_BODY")
+RS_LIVE=$(req GET "/api/qso?event_id=$FD_ID" | python3 -c "
+import sys,json
+print(len([q for q in json.load(sys.stdin) if q['callsign']=='K1RSN']))")
+if [[ "$RS3_CODE" == "200" && "$RS_LIVE" == "0" ]]; then
+  ok "  a resend of a deleted contact does not bring it back"
+else
+  no "  a resend of a deleted contact does not bring it back" "$RS3_CODE, $RS_LIVE live"
+fi
+# The id protects a contact; a malformed one must never cost it.
+BADID_CODE=$(status POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":\"K1BID\",\"band\":\"15m\",\"mode\":\"CW\",\"client_id\":\"not-a-uuid\"}")
+if [[ "$BADID_CODE" == "201" ]]; then
+  ok "  a client_id that is not a UUID is ignored, not refused"
+else
+  no "  a client_id that is not a UUID is ignored, not refused" "got $BADID_CODE"
+fi
+# The same id on another event is a different contact.
+OTHER_CODE=$(status POST /api/qso "{\"event_id\":\"$SOFT_ID\",\"callsign\":\"K1RSN\",\"band\":\"15m\",\"mode\":\"CW\",\"operator_call\":\"W0AAA\",\"client_id\":\"$CID\"}")
+if [[ "$OTHER_CODE" == "201" ]]; then
+  ok "  the id is per event"
+else
+  no "  the id is per event" "got $OTHER_CODE"
+fi
+for c in K1RCE K1BID; do
+  id=$(req GET "/api/qso?event_id=$FD_ID" | python3 -c "
+import sys,json
+print(next((q['id'] for q in json.load(sys.stdin) if q['callsign']=='$c'), ''))")
+  [[ -n "$id" ]] && req DELETE "/api/qso/$id" > /dev/null
+done
+
+# ── Bands an event does not log ──────────────────────────────────────────────
+# 60m and the WARC bands are in every rig and WSJT-X band table now, so a
+# special event can log them from the radio. They are still not contest bands,
+# and the form never offered them there; this is the same rule for a relay.
+echo "── Bands per event type ──"
+WARC_FD=$(status POST /api/qso "{\"event_id\":\"$FD_ID\",\"callsign\":\"K1WRC\",\"band\":\"30m\",\"mode\":\"DIG\"}")
+WARC_SES=$(status POST /api/qso "{\"event_id\":\"$SOFT_ID\",\"callsign\":\"K1WRC\",\"band\":\"30m\",\"mode\":\"DIG\",\"operator_call\":\"W0AAA\"}")
+if [[ "$WARC_FD" == "400" && "$WARC_SES" == "201" ]]; then
+  ok "  30m is refused on Field Day and logged on a special event"
+else
+  no "  30m is refused on Field Day and logged on a special event" "FD $WARC_FD, SES $WARC_SES"
+fi
+
+# ── The WSJT-X relay download ────────────────────────────────────────────────
+# The route writes its query string into a .bat file the operator then runs.
+# The script inside is found by a marker line, so a parameter carrying the
+# marker and a newline replaced the script with the attacker's — from a link
+# that points at the club's own server.
+echo "── Relay download ──"
+RELAY=$(curl -s "$BASE/api/download/relay?join_code=$FD&operator=N0CALL&station=2")
+if [[ "$RELAY" == *"$FD"* && "$RELAY" == *"N0CALL"* && "$RELAY" == *"#ezfd-ps-start#"* ]]; then
+  ok "  a normal download still builds"
+else
+  no "  a normal download still builds"
+fi
+if [[ "$(grep -o '#ezfd-ps-start#' <<<"$RELAY" | wc -l)" == "2" ]]; then
+  ok "  the script marker appears exactly where the batch file expects it"
+else
+  no "  the script marker appears exactly where the batch file expects it"
+fi
+for b in 60m 30m 17m 12m; do
+  [[ "$RELAY" == *"'$b'"* ]] || no "  the relay's band table has $b"
+done
+[[ "$RELAY" == *"'30m'"* && "$RELAY" == *"'17m'"* ]] && ok "  the relay's band table carries the WARC bands"
+relay_code() { curl -s -o /dev/null -w '%{http_code}' -G "$BASE/api/download/relay" "$@"; }
+R_INJ=$(relay_code --data-urlencode "join_code=$FD" --data-urlencode $'operator=X\n#ezfd-ps-start#\nStart-Process calc')
+R_JC=$(relay_code --data-urlencode $'join_code=AB12\n#ezfd-ps-start#')
+R_QUOTE=$(relay_code --data-urlencode "join_code=$FD" --data-urlencode "operator=N0CALL'; calc; '")
+R_STN=$(relay_code --data-urlencode "join_code=$FD" --data-urlencode 'station=1; calc')
+R_URL=$(relay_code --data-urlencode "join_code=$FD" --data-urlencode 'api_url=https://evil.example')
+R_OWN=$(relay_code --data-urlencode "join_code=$FD" --data-urlencode "api_url=$BASE")
+if [[ "$R_INJ $R_JC $R_QUOTE $R_STN $R_URL" == "400 400 400 400 400" ]]; then
+  ok "  a marker, a newline, a quote or another server in a parameter is a 400"
+else
+  no "  a marker, a newline, a quote or another server in a parameter is a 400" "$R_INJ $R_JC $R_QUOTE $R_STN $R_URL"
+fi
+# A URL parser drops a newline and treats what follows a # as a fragment, so
+# this one names this server and is accepted — what matters is that only the
+# origin reaches the file.
+R_FRAG=$(curl -s -G "$BASE/api/download/relay" --data-urlencode "join_code=$FD" --data-urlencode $'api_url='"$BASE"$'\n#ezfd-ps-start#\ncalc')
+if [[ "$(grep -o '#ezfd-ps-start#' <<<"$R_FRAG" | wc -l)" -le 2 && "$R_FRAG" != *calc* ]]; then
+  ok "  nothing after the origin of api_url reaches the file"
+else
+  no "  nothing after the origin of api_url reaches the file"
+fi
+if [[ "$R_OWN" == "200" ]]; then
+  ok "  the server's own address is still accepted as api_url"
+else
+  no "  the server's own address is still accepted as api_url" "got $R_OWN"
+fi
+
 # ── Section accounting and bonus arithmetic ──────────────────────────────────
 #
 # calculateScore runs server-side for the Cabrillo CLAIMED-SCORE header, so the

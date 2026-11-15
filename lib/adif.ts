@@ -1,4 +1,5 @@
 import type { QSO, Event, Band, Mode, SesOperator } from './types';
+import { freqToBand } from './catProtocol';
 
 // ──────────────────────────────────────────────
 // ADIF import / parsing
@@ -21,22 +22,7 @@ export interface AdifQSO {
 }
 
 function mhzToBand(mhz: number): Band | null {
-  const khz = mhz * 1000;
-  if (khz >= 1800  && khz < 2000)    return '160m';
-  if (khz >= 3500  && khz < 4000)    return '80m';
-  if (khz >= 5330  && khz < 5410)    return '60m';
-  if (khz >= 7000  && khz < 7300)    return '40m';
-  if (khz >= 10100 && khz < 10150)   return '30m';
-  if (khz >= 14000 && khz < 14350)   return '20m';
-  if (khz >= 18068 && khz < 18168)   return '17m';
-  if (khz >= 21000 && khz < 21450)   return '15m';
-  if (khz >= 24890 && khz < 24990)   return '12m';
-  if (khz >= 28000 && khz < 29700)   return '10m';
-  if (khz >= 50000 && khz < 54000)   return '6m';
-  if (khz >= 144000 && khz < 148000) return '2m';
-  if (khz >= 222000 && khz < 225000) return '1.25m';
-  if (khz >= 420000 && khz < 450000) return '70cm';
-  return null;
+  return freqToBand(Math.round(mhz * 1_000_000));
 }
 
 const ADIF_BAND_MAP: Record<string, Band> = {
