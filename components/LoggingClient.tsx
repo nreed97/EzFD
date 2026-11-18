@@ -612,7 +612,7 @@ export default function LoggingClient({
         </aside>
 
         <main className={`${mobileTab === 'qsos' ? 'flex flex-col' : 'hidden'} md:flex md:flex-col flex-1 overflow-hidden`}>
-          <QSOTable qsos={displayQSOs} onDelete={deleteQSO} onUpdate={updateQSO} currentOpCall={operatorCall} eventId={event.id} />
+          <QSOTable qsos={displayQSOs} onDelete={deleteQSO} onUpdate={updateQSO} currentOpCall={operatorCall} eventId={event.id} eventType={event.event_type} />
         </main>
       </div>
 

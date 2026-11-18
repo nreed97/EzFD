@@ -27,6 +27,16 @@ only run events.
 
 ### Fixed
 
+- **10m on the dashboard Overview** `Display` — The band board showed only the
+  first five bands until others were worked, which stopped at 15m, so 10m had
+  no row until somebody logged a contact there. All six HF bands, 160m through
+  10m, now always appear; other bands still join once they are in use.
+  Docs: [Operating → The Overview](operating.md#the-overview)
+- **Bands in the contact edit form** `Display` — Editing a contact offered only
+  nine bands, so a contact on 1.25m or 70cm, or on 60m or a WARC band at a
+  special event, showed no band selected and could not be moved onto one. The
+  edit form now offers the same bands as the entry form.
+  Docs: [Operating → Editing and deleting](operating.md#editing-and-deleting)
 - **A deploy that stopped at Next.js's upgrade prompt** `Setup` — `deploy.sh`
   could stop in the middle of the build at a "Next.js upgrade" message, report
   "Build complete", and then fail copying files. The reminder is now off,
