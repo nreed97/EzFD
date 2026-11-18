@@ -19,11 +19,6 @@ export interface AdifQSO {
    *  because the export writes this value into MODE and USB or FT4 there is
    *  not valid ADIF. */
   adif_mode?: string;
-  /** The ADIF OPERATOR field — who was at the key for this contact. N1MM,
-   *  N3FJP, WSJT-X and EzFD's own export all write it. STATION_CALLSIGN is
-   *  deliberately not a fallback: on a club log it is the club call, the
-   *  call signed on the air, not the person who made the contact. */
-  operator_call?: string;
 }
 
 function mhzToBand(mhz: number): Band | null {
@@ -109,8 +104,6 @@ export function parseAdif(text: string): AdifQSO[] {
     if (Number.isFinite(mhz) && mhz > 0) qso.freq_khz = Math.round(mhz * 1000);
     const realMode = (fields['MODE'] ?? '').trim().toUpperCase();
     if (realMode) qso.adif_mode = realMode.slice(0, 20);
-    const op = fields['OPERATOR']?.trim().toUpperCase();
-    if (op) qso.operator_call = op;
     results.push(qso);
   }
 

@@ -41,12 +41,6 @@ only run events.
   asks for a power category on WFD, and the Cabrillo header now says `QRP` when
   the QRP objective is ticked and `LOW` otherwise. The score was never affected.
   Docs: [Field Day and Winter Field Day → Winter Field Day](field-day.md#winter-field-day)
-- **ADIF import keeps each contact's operator** `Exports` `Display` — Importing
-  a log filed every contact under whoever was signed in, ignoring the file's
-  `OPERATOR` field, so a merged club log from N1MM or N3FJP credited one person
-  with everything. Each contact now keeps its own operator; a record without
-  one still goes to the person importing.
-  Docs: [Digital modes → ADIF import](digital-modes.md#adif-import), [HTTP API → POST /api/import/adif](api.md#post-apiimportadif)
 - **A deploy that stopped at Next.js's upgrade prompt** `Setup` — `deploy.sh`
   could stop in the middle of the build at a "Next.js upgrade" message, report
   "Build complete", and then fail copying files. The reminder is now off,

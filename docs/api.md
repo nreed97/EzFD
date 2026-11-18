@@ -300,7 +300,7 @@ for when you would.
 | Field | Notes |
 |---|---|
 | `event_id`, `adif` | Required |
-| `operator_call`, `station_number` | Attributed to the imported QSOs. A record's own `OPERATOR` field takes precedence over `operator_call` |
+| `operator_call`, `station_number` | Attributed to the imported QSOs |
 
 Returns `{ imported, dupes, already_present, skipped, total }`. The file goes
 in as one transaction, so a failure leaves nothing half-imported. Each
