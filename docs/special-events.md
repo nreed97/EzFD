@@ -223,7 +223,10 @@ Operators who logged in N1MM or N3FJP can merge with **Import ADIF**, in the
 already present — matched on callsign, band, mode and a ±2 minute window — are
 skipped rather than inserted, so re-importing the same file, or two operators
 importing overlapping exports, can't double the log. The result reports them
-separately as "already in log".
+separately as "already in log". Each contact keeps the operator the file names
+on it, so one person can import a file holding several operators' contacts
+without becoming the operator of all of them — see
+[Digital modes → ADIF import](digital-modes.md#adif-import).
 
 ## Limits worth knowing
 

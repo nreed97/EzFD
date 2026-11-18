@@ -14,7 +14,7 @@
 
 const { compile } = require('./_compile-ts.cjs');
 const ts = compile(['lib/adif.ts']);
-const { adifModeToEzfd, parseAdif, generateADIF } = ts.load('adif');
+const { adifModeToEzfd, parseAdif, generateADIF, importOperator } = ts.load('adif');
 
 let failures = 0;
 const ok = m => console.log(`ok    ${m}`);
@@ -109,6 +109,37 @@ console.log('\n── parseAdif ──');
 {
   const recs = parseAdif('<EOH>\n<CALL:5>K1ABC<BAND:3>20m<QSO_DATE:8>notadate<TIME_ON:4>2500<EOR>');
   eq(recs[0].datetime_utc, undefined, 'an unparseable date is left undefined rather than invented');
+}
+
+// ── who an imported contact is credited to ─────────────────────────────
+// Every record used to go in under whoever clicked Import, so merging a club
+// log credited one operator with the whole weekend.
+console.log('\n── import operator ──');
+{
+  const recs = parseAdif('<EOH>\n' +
+    '<CALL:5>K1ABC<BAND:3>20m<OPERATOR:5>w0aaa<STATION_CALLSIGN:6>N0CALL<EOR>\n' +
+    '<CALL:5>K2DEF<BAND:3>20m<STATION_CALLSIGN:5>W0BBB<EOR>\n' +
+    '<CALL:5>K3GHI<BAND:3>20m<EOR>');
+  eq(recs[0].operator_call, 'W0AAA', 'OPERATOR is parsed, upper-cased');
+  eq(recs[0].station_callsign, 'N0CALL', 'STATION_CALLSIGN is parsed');
+  eq(recs[2].operator_call, undefined, 'no OPERATOR leaves it unset');
+
+  const valid = v => (typeof v === 'string' && /^[A-Z0-9/]{3,}$/.test(v) ? v : null);
+  eq(importOperator(recs[0], 'N0CALL', 'W0ME', valid), 'W0AAA', "the record's OPERATOR wins over the importer");
+  eq(importOperator(recs[1], 'N0CALL', 'W0ME', valid), 'W0BBB', 'without OPERATOR, a personal STATION_CALLSIGN is the operator');
+  eq(importOperator({ station_callsign: 'N0CALL' }, 'n0call', 'W0ME', valid), 'W0ME',
+    "the event's own call is not a person, so it falls through to the importer");
+  eq(importOperator(recs[2], 'N0CALL', 'W0ME', valid), 'W0ME', 'a record naming nobody goes to the importer');
+  eq(importOperator({ operator_call: 'not a call!' }, 'N0CALL', 'W0ME', valid), 'W0ME', 'an invalid OPERATOR is ignored');
+}
+{
+  // Our own export, re-imported, keeps every contact with its operator.
+  const out = generateADIF(evt({ club_call: 'N0CALL' }), [
+    qso({ operator_call: 'W0AAA' }),
+    qso({ callsign: 'K2XYZ', operator_call: 'W0BBB' }),
+  ]);
+  const ops = parseAdif(out).map(r => importOperator(r, 'N0CALL', 'W0ME', v => v ?? null));
+  eq(ops.join(','), 'W0AAA,W0BBB', 'an exported log round-trips with each operator intact');
 }
 
 // ── generateADIF: identity fields ───────────────────────────────────────

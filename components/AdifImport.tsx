@@ -78,7 +78,8 @@ export default function AdifImport({ eventId, operatorCall, stationNumber, onClo
 
         <p className="text-xs text-zinc-500">
           Import QSOs from a WSJT-X / JTDX ADIF log file, or paste ADIF text directly.
-          Duplicate contacts are flagged but still recorded.
+          Duplicate contacts are flagged but still recorded. Each contact is
+          credited to the operator named in the file, or to you if it names none.
         </p>
 
         {/* File picker */}
