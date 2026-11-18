@@ -23,6 +23,22 @@ only run events.
 
 ---
 
+## 2026-11-18
+
+### Fixed
+
+- **A deploy that stopped at Next.js's upgrade prompt** `Setup` — `deploy.sh`
+  could stop in the middle of the build at a "Next.js upgrade" message, report
+  "Build complete", and then fail copying files. The reminder is now off,
+  `deploy.sh` and the admin console's update check the build really produced
+  the app before touching the running server, and a failed build says so.
+  Docs: [Troubleshooting → Deploy stops at a Next.js upgrade prompt](troubleshooting.md#deploy-stops-at-a-nextjs-upgrade-prompt)
+
+### Security
+
+- **Next.js 16.4.6** `Setup` — Moves from 16.4.2, which is affected by a
+  published Next.js security advisory. Update your server to pick it up.
+
 ## 2026-11-15
 
 ### Changed

@@ -464,3 +464,26 @@ the old app. Updating from the admin console avoids the second case; see
 `next build` needs more than 1 GB. `deploy.sh` adds swap for this, but if you
 disabled it or are building by hand, add swap or build elsewhere and copy the
 output.
+
+## Deploy stops at a Next.js upgrade prompt
+
+**Symptom:** during `deploy.sh`, the build prints `Preparing upgrade...`,
+`Upgrade: Next.js 16.4.2 → 16.4.6` and a long "copy this upgrade prompt" block,
+then the deploy fails with `rsync: change_dir ".../.next/standalone" failed`.
+Newer copies of `deploy.sh` stop instead with "The build finished without
+producing .next/standalone/server.js".
+
+**Cause:** Next.js 16.4 added an upgrade reminder to `next build`. In a
+terminal it can stop the build part-way while still reporting success, so no
+app bundle was produced. Nothing was copied to `/opt/ezfd`, and the running app
+was not touched.
+
+**Fix:** pull the latest EzFD, which pins a patched Next.js and turns the
+reminder off, then run `deploy.sh` again:
+
+```bash
+cd ~/EzFD && git pull && sudo bash deploy.sh
+```
+
+Do not run the `npx … report-agent-upgrade` command the prompt prints; Next.js
+upgrades for EzFD arrive with the repository.
