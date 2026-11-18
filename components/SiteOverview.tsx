@@ -4,7 +4,7 @@ import { useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { buildSlotBoard } from '@/lib/slotBoard';
 import { buildOverview, activeBands, countCoverage } from '@/lib/overview';
-import { orderedBandsFor, MODES } from '@/lib/bands';
+import { orderedBandsFor, MODES, CORE_BANDS } from '@/lib/bands';
 import { slotWords } from '@/lib/slotWords';
 import type { Coverage, OverviewSlot } from '@/lib/overview';
 import type { PresenceRow } from '@/lib/slotBoard';
@@ -31,9 +31,6 @@ const MapView = dynamic(() => import('./MapView'), { ssr: false });
  * computed its own version of a number shown elsewhere is how this codebase
  * has gone wrong repeatedly.
  */
-
-/** Enough rows that the board never looks broken before the event starts. */
-const MIN_BAND_ROWS = 5;
 
 /**
  * Three states, three colours, and they are deliberately not the position
@@ -153,7 +150,7 @@ export default function SiteOverview({ event, score, reservations, presence, now
     [event.event_type, reservations, presence, nowMs, isSes, score.by_band],
   );
 
-  const rows = useMemo(() => activeBands(board, MIN_BAND_ROWS), [board]);
+  const rows = useMemo(() => activeBands(board, CORE_BANDS), [board]);
   // Counted over the drawn rows, not the whole board -- see countCoverage.
   const counts = useMemo(() => countCoverage(rows), [rows]);
 

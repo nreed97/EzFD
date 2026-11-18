@@ -29,7 +29,7 @@ Changes touching the schema, the SES routes, `lib/scoring.ts`, `lib/adif.ts`,
 | `scripts/test-adif.cjs` | ADIF parse and export — the `Date`/string shapes, per-operator `MY_*`, SES vs contest exchange |
 | `scripts/test-cabrillo.cjs` | Cabrillo submission — `CLAIMED-SCORE`, transmitter numbering, ordering, null class/section |
 | `scripts/test-log-filters.cjs` | The dashboard log view — filters combine, an empty filter restricts nothing, column defaults per event type — and the refetch after a stream reconnect, including events that arrive while it is in flight |
-| `scripts/test-overview.cjs` | The site display — coverage outranks a claim, a booked-but-empty band is its own state, the summary counts the rows drawn under it, and the band rows are the event's own bands in frequency order |
+| `scripts/test-overview.cjs` | The site display — coverage outranks a claim, a booked-but-empty band is its own state, the summary counts the rows drawn under it, the band rows are the event's own bands in frequency order, every HF band keeps a row, and no component writes out its own band list |
 | `scripts/test-nav.cjs` | The menu behind the hamburger — one list for every surface and width, every action wired up, no component keeping its own copy |
 | `scripts/test-op-stats.cjs` | Who worked what — the rows sum to the log, a dupe earns nothing, a section belongs to whoever reached it first, and rate is a rolling hour |
 | `scripts/test-slot-board.cjs` | The operating position board — released/expired claims, station vs operator attribution, the contest band list, and that the contest vocabulary carries no callsign words |
