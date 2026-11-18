@@ -472,7 +472,13 @@ fi
 info "Building application (this takes ~60 seconds)..."
 cd "$REPO_DIR"
 npm ci --silent
-npm run build
+# stdin from /dev/null so nothing in the build can wait on a keypress, and the
+# bundle checked rather than assumed: Next's upgrade reminder once stopped the
+# build with exit status 0 and no .next/standalone, and the rsync below was the
+# first thing to notice.
+npm run build </dev/null
+[[ -f .next/standalone/server.js ]] \
+  || die "The build finished without producing .next/standalone/server.js — nothing was deployed and the running app is untouched. Re-run: cd $REPO_DIR && npm run build"
 log "Build complete"
 
 # ── Deploy files ──────────────────────────────────────────────────────────────

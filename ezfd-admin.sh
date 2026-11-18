@@ -1218,6 +1218,11 @@ update_app() {
   if ! (cd "$REPO_DIR" && npm run build 2>&1 | sed 's/^/    /'); then
     err "Build failed."; pause; return
   fi
+  # A build can exit 0 without a bundle (Next's upgrade reminder did), and the
+  # rsync below would then delete the running install's files.
+  if [[ ! -f "$REPO_DIR/.next/standalone/server.js" ]]; then
+    err "The build produced no .next/standalone/server.js — nothing was changed."; pause; return
+  fi
 
   # Checked before anything is copied over the running install: finding out
   # .env is missing after the rsync leaves the server unable to start at all.

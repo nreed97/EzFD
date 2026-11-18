@@ -19,6 +19,15 @@ const nextConfig: NextConfig = {
   // deliberately absent: Web Serial rig control needs `serial`, and listing
   // features to allow is a list that silently breaks the next one added.
   poweredByHeader: false,
+  // Next 16.4 added an upgrade reminder to `next build`. In a terminal it
+  // opens a menu, and choosing "Upgrade now" — or a keypress left over from
+  // deploy.sh's own prompts — stops the build and exits 0 with no
+  // .next/standalone, so the deploy carried on and failed at the rsync. Builds
+  // here run unattended on field servers; security updates arrive through
+  // Dependabot instead, and deploy.sh checks the bundle exists either way.
+  experimental: {
+    agentUpgrade: false,
+  },
   async headers() {
     return [{
       source: '/:path*',

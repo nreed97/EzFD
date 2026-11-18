@@ -264,6 +264,27 @@ NO_TRAILING_NEWLINE=1'
   fi
 fi
 
+# A build can exit 0 without producing the bundle — Next's upgrade reminder
+# did — and the rsync was the first thing to notice. Both update paths must
+# check for server.js before copying anything over the running install.
+BUILDBLOCK="$(awk '/^# ── Build /,/^# ── Deploy files/' deploy.sh)"
+if grep -q 'npm run build </dev/null' <<<"$BUILDBLOCK" \
+   && grep -q '\.next/standalone/server\.js' <<<"$BUILDBLOCK"; then
+  ok "deploy.sh builds without a terminal and checks the bundle exists before deploying"
+else
+  no "deploy.sh builds without a terminal and checks the bundle exists before deploying"
+fi
+if awk '/npm run build/,/rsync -a --delete/' ezfd-admin.sh | grep -q '\.next/standalone/server\.js'; then
+  ok "the admin console's update checks the bundle exists before its rsync"
+else
+  no "the admin console's update checks the bundle exists before its rsync"
+fi
+if grep -q 'agentUpgrade: false' next.config.ts; then
+  ok "Next's upgrade reminder is off for builds"
+else
+  no "Next's upgrade reminder is off for builds"
+fi
+
 echo
 if [[ "$fail" -eq 0 ]]; then
   echo "All ${pass} deploy detection checks passed."
