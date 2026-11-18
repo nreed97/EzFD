@@ -95,6 +95,12 @@ real frequency rather than as generic digital at the band's default. The
 Field Day exchange is read from `CLASS` and `ARRL_SECT`, falling back to
 `SRX_STRING`.
 
+Each contact is filed under the operator in its own `OPERATOR` field, so a
+merged club log from N1MM or N3FJP keeps every operator's contacts as theirs.
+A record with no `OPERATOR` is filed under whoever is signed in and doing the
+import. `STATION_CALLSIGN` is not used for this: on a club log it is the club
+call, not the person at the key.
+
 The whole file goes in as one transaction: if anything fails partway, nothing
 from that file is in the log and importing it again is safe.
 

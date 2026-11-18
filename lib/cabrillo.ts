@@ -1,6 +1,7 @@
 import type { QSO, Event } from './types';
 import { transmitterCount } from './types';
 import { calculateScore } from './scoring';
+import { cabrilloPower } from './power';
 
 function bandToKhz(band: string): string {
   const map: Record<string, string> = {
@@ -52,7 +53,7 @@ export function generateCabrillo(event: Event, qsos: QSO[]): string {
     `CONTEST: ${event.event_type === 'WFD' ? 'WFD' : 'ARRL-FD'}`,
     `CATEGORY-OPERATOR: MULTI-OP`,
     `CATEGORY-BAND: ALL`,
-    `CATEGORY-POWER: ${event.power ?? 'HIGH'}`,
+    `CATEGORY-POWER: ${cabrilloPower(event.event_type, event.power, event.bonuses)}`,
     `CATEGORY-MODE: MIXED`,
     `CATEGORY-TRANSMITTER: ${numTx}`,
     `CLAIMED-SCORE: ${score.claimed_score}`,

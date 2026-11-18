@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { ARRL_SECTIONS, EVENT_TYPE_LABELS, eventTypeLabel } from '@/lib/types';
 import type { EventType, SlotEnforcement, DupeRule } from '@/lib/types';
 import DateTimeField from '@/components/DateTimeField';
+import { fdPowerOptions, type PowerCategory } from '@/lib/power';
 
 // ARRL Field Day entry classes (rule 4). The number in front is the count of
 // simultaneously-transmitting stations, not the operator count.
@@ -30,7 +31,7 @@ const WFD_CLASS_LETTERS = [
 export default function NewEventPage() {
   const router = useRouter();
   const [eventType, setEventType] = useState<EventType>('FD');
-  const [power, setPower] = useState<'HIGH' | 'LOW' | 'QRP'>('HIGH');
+  const [power, setPower] = useState<PowerCategory>('HIGH');
   const [classNum, setClassNum] = useState(3);
   const [classLetter, setClassLetter] = useState('A');
   const [form, setForm] = useState({
@@ -59,6 +60,13 @@ export default function NewEventPage() {
   const [requireApproval, setRequireApproval] = useState(false);
 
   const isSes = eventType === 'SES';
+  // Only Field Day has a power category to choose, and only the ones the class
+  // may claim (lib/power.ts). Derived rather than reset in an effect, so
+  // picking class D shows LOW selected without a render of HIGH first.
+  const powerOptions = eventType === 'FD' ? fdPowerOptions(classLetter) : [];
+  const effectivePower: PowerCategory =
+    powerOptions.some(p => p.key === power) ? power : 'LOW';
+  const selectedPower = powerOptions.find(p => p.key === effectivePower);
 
   function setSes(key: keyof typeof sesForm, value: string) {
     setSesForm(prev => ({ ...prev, [key]: value }));
@@ -89,7 +97,7 @@ export default function NewEventPage() {
         class: `${classNum}${classLetter}`,
         admin_key: form.admin_key,
         event_type: eventType,
-        power,
+        power: effectivePower,
         use_call_history: useCallHistory,
         use_master_callsign_file: useMasterCallsignFile,
         // A datetime-local value has no timezone. Operators think in UTC
@@ -325,30 +333,43 @@ export default function NewEventPage() {
             )}
             </>
             )}
-            {/* Power category only affects the ARRL score multiplier. */}
-            <fieldset className={`flex flex-col gap-1 ${isSes ? 'hidden' : ''}`}>
+            {/* Field Day only (rule 7.2). Winter Field Day has no power
+                multiplier and no high-power category — every station is
+                capped at 100 W, and QRP is one of its objectives, claimed on
+                the dashboard. */}
+            {eventType === 'FD' && (
+            <fieldset className="flex flex-col gap-1">
               <span className="text-sm text-zinc-400">Power Category</span>
               <span className="text-xs text-zinc-500">
-                Score multiplier only &mdash; HIGH &times;1, LOW &times;2, QRP &times;5. It
-                doesn&apos;t change the exchange you send.
+                The highest output any transmitter will use. It sets the score
+                multiplier and doesn&apos;t change the exchange you send.
+                {classLetter && 'DEF'.includes(classLetter) && (
+                  <> Class {classLetter} is limited to 100 W, so high power isn&apos;t offered.</>
+                )}
               </span>
-              <div className="flex gap-2">
-                {(['HIGH', 'LOW', 'QRP'] as const).map(p => (
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+                {powerOptions.map(p => (
                   <button
-                    key={p}
+                    key={p.key}
                     type="button"
-                    onClick={() => setPower(p)}
-                    className={`flex-1 rounded-lg border py-2 text-sm font-semibold transition-colors ${
-                      power === p
+                    onClick={() => setPower(p.key)}
+                    className={`tap rounded-lg border py-2 text-sm font-semibold transition-colors ${
+                      effectivePower === p.key
                         ? 'border-amber-400 bg-amber-400/10 text-amber-400'
                         : 'border-zinc-700 text-zinc-400 hover:border-zinc-500 light:border-zinc-300 light:text-zinc-600'
                     }`}
                   >
-                    {p}
+                    {p.label} <span className="font-mono font-normal opacity-80">&times;{p.multiplier}</span>
                   </button>
                 ))}
               </div>
+              {selectedPower && (
+                <span className="text-xs text-zinc-500">
+                  {selectedPower.detail} &mdash; &times;{selectedPower.multiplier} (rule {selectedPower.rule}).
+                </span>
+              )}
             </fieldset>
+            )}
             <label className="flex flex-col gap-1">
               <span className="text-sm text-zinc-400">Location (optional)</span>
               <input

@@ -1,5 +1,6 @@
 import { bonusDefs, WFD_OBJECTIVES } from './bonuses';
 import { bandsFor } from './bands';
+import { powerProblem } from './power';
 import { entryClassLetter, isARRLSection, transmitterCount, DX_EXCHANGE, MX_EXCHANGE } from './types';
 import type { Bonuses, Event, QSO, Score } from './types';
 
@@ -204,6 +205,34 @@ export function preflight(
       detail:
         'Fine if the club logs its GOTA station elsewhere. Otherwise the coach bonus ' +
         'is claimed for a station that did not operate.',
+    });
+  }
+
+  // The power category against the class (rules 4 and 7.2). The setup page
+  // only offers what the class allows, but an event created before it did, or
+  // whose class was changed afterwards in the admin console, can still hold a
+  // combination the rules forbid — and the multiplier is the largest single
+  // lever on the claimed score.
+  const powerIssue = powerProblem(event.event_type, event.class, event.power);
+  if (powerIssue) {
+    findings.push({
+      id: 'power-vs-class',
+      severity: 'fix',
+      title: `Power category does not fit class ${event.class ?? '(none)'}`,
+      detail: powerIssue + ' Change it in the admin console under the event\'s settings.',
+    });
+  }
+  // Rule 4.5: a mobile on the vehicle's battery or alternator is on a
+  // motor-driven generator and does not qualify for ×5. A mobile on its own
+  // solar panel would, so this is the operator's call.
+  if (event.event_type === 'FD' && event.power === 'QRP' && entryClassLetter(event.class) === 'C') {
+    findings.push({
+      id: 'qrp-mobile',
+      severity: 'check',
+      title: 'Class C claims QRP at ×5',
+      detail:
+        'A mobile running from the vehicle battery or alternator counts as a motor-driven ' +
+        'generator (rule 4.5) and scores ×2. Only ×5 if the station ran on something else, such as solar.',
     });
   }
 

@@ -226,20 +226,21 @@ function check(name, ok, detail = '') {
             rcvd_class, rcvd_section, operator_call, station_number, is_dupe,
             adif_mode, freq_khz)
          SELECT $1, r.callsign, r.band, r.mode, r.at, $2, $3,
-                NULLIF(r.rcvd_class, ''), NULLIF(r.rcvd_section, ''), $4, $5, false,
+                NULLIF(r.rcvd_class, ''), NULLIF(r.rcvd_section, ''), r.operator_call, $4, false,
                 r.adif_mode, r.freq_khz
-           FROM unnest($6::text[], $7::text[], $8::text[], $9::timestamptz[],
-                       $10::text[], $11::text[], $12::text[], $13::int[])
-                AS r(callsign, band, mode, at, rcvd_class, rcvd_section, adif_mode, freq_khz)
+           FROM unnest($5::text[], $6::text[], $7::text[], $8::timestamptz[],
+                       $9::text[], $10::text[], $11::text[], $12::int[], $13::text[])
+                AS r(callsign, band, mode, at, rcvd_class, rcvd_section, adif_mode, freq_khz,
+                     operator_call)
           WHERE NOT EXISTS (
             SELECT 1 FROM qsos q
              WHERE q.event_id = $1 AND q.callsign = r.callsign AND q.band = r.band
                AND q.mode = r.mode AND q.deleted_at IS NULL
                AND ABS(EXTRACT(EPOCH FROM (q.datetime_utc - r.at))) <= $14)
          RETURNING id`;
-      const importArgs = [fd.id, '2A', 'MN', 'N0CALL', 1,
+      const importArgs = [fd.id, '2A', 'MN', 1,
         ['K3IMP', 'K4IMP'], ['20m', '40m'], ['DIG', 'CW'], [at, at],
-        ['1D', ''], ['MN', ''], ['FT8', null], [14074, null], 120];
+        ['1D', ''], ['MN', ''], ['FT8', null], [14074, null], ['W0OPA', 'N0CALL'], 120];
       const { rows: imp1 } = await pool.query(importSql, importArgs);
       const { rows: imp2 } = await pool.query(importSql, importArgs);
       const { rows: [ft8] } = await pool.query(
@@ -248,6 +249,12 @@ function check(name, ok, detail = '') {
         imp1.length === 2 && imp2.length === 0, `${imp1.length}, ${imp2.length}`);
       check('ADIF import keeps the submode and frequency',
         ft8.adif_mode === 'FT8' && ft8.freq_khz === 14074 && ft8.rcvd_class === '1D');
+      const { rows: impOps } = await pool.query(
+        `SELECT callsign, operator_call FROM qsos WHERE event_id=$1 AND callsign IN ('K3IMP','K4IMP')
+          ORDER BY callsign`, [fd.id]);
+      check('ADIF import files each contact under its own operator',
+        impOps.map(r => r.operator_call).join() === 'W0OPA,N0CALL',
+        impOps.map(r => r.operator_call).join());
 
       // ── restore join codes come from the API's alphabet ─────────────────
       const { rows: [jc] } = await pool.query('SELECT ezfd_new_join_code() AS code');

@@ -39,7 +39,7 @@ export async function POST(request: Request) {
   // the batched insert below checks against what was already in the log, so
   // the file has to be consistent with itself first.
   const now = Date.now();
-  const kept: (AdifQSO & { at: Date; call: string })[] = [];
+  const kept: (AdifQSO & { at: Date; call: string; op: string | null })[] = [];
   for (const rec of records) {
     const call = asCallsign(rec.callsign);
     if (!rec.band || !call) { skipped++; continue; }
@@ -48,7 +48,12 @@ export async function POST(request: Request) {
       k.call === call && k.band === rec.band && k.mode === rec.mode
       && Math.abs(k.at.getTime() - at.getTime()) <= MERGE_WINDOW_SECONDS * 1000);
     if (twin) continue;
-    kept.push({ ...rec, call, at });
+    // Each record's own OPERATOR field wins; the importing operator is only
+    // the fallback for a file that does not say who made the contact. Using
+    // the importer for every row filed a whole club's merged log under
+    // whoever happened to click Import. A value that is not a callsign is
+    // treated as absent rather than refusing the record.
+    kept.push({ ...rec, call, at, op: asCallsign(rec.operator_call) ?? opCall });
   }
 
   // One transaction, one INSERT. This used to be two queries per record
@@ -74,11 +79,12 @@ export async function POST(request: Request) {
           rcvd_class, rcvd_section, operator_call, station_number, is_dupe,
           adif_mode, freq_khz)
        SELECT $1, r.callsign, r.band, r.mode, r.at, $2, $3,
-              NULLIF(r.rcvd_class, ''), NULLIF(r.rcvd_section, ''), $4, $5, false,
+              NULLIF(r.rcvd_class, ''), NULLIF(r.rcvd_section, ''), r.operator_call, $4, false,
               r.adif_mode, r.freq_khz
-         FROM unnest($6::text[], $7::text[], $8::text[], $9::timestamptz[],
-                     $10::text[], $11::text[], $12::text[], $13::int[])
-              AS r(callsign, band, mode, at, rcvd_class, rcvd_section, adif_mode, freq_khz)
+         FROM unnest($5::text[], $6::text[], $7::text[], $8::timestamptz[],
+                     $9::text[], $10::text[], $11::text[], $12::int[], $13::text[])
+              AS r(callsign, band, mode, at, rcvd_class, rcvd_section, adif_mode, freq_khz,
+                   operator_call)
         WHERE NOT EXISTS (
           SELECT 1 FROM qsos q
            WHERE q.event_id = $1 AND q.callsign = r.callsign AND q.band = r.band
@@ -90,7 +96,6 @@ export async function POST(request: Request) {
         // A special event station has no contest exchange to stamp.
         isSes ? null : event.class,
         isSes ? null : event.arrl_section,
-        opCall,
         station,
         kept.map(r => r.call),
         kept.map(r => r.band),
@@ -100,6 +105,7 @@ export async function POST(request: Request) {
         kept.map(r => (isSes ? '' : text(r.rcvd_section, { upper: true, max: 5 }) ?? '')),
         kept.map(r => r.adif_mode ?? null),
         kept.map(r => r.freq_khz ?? null),
+        kept.map(r => r.op),
         MERGE_WINDOW_SECONDS,
       ]
     );

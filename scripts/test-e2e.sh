@@ -540,6 +540,19 @@ fi
 # to add the entire base score again, so a large log over-claimed by thousands
 # — and because the class drives the transmitter count, this is only reachable
 # end to end, through an event created with a real class.
+echo "── power category is checked against the rules (4, 7.2) ──"
+# Classes D, E and F are capped at 100 W, so HIGH is refused; class D is on
+# commercial power, so QRP at x5 is refused. Winter Field Day has no power
+# category at all — whatever is sent, its Cabrillo power comes from the QRP
+# objective, never HIGH.
+HP_D=$(status POST /api/events '{"club_name":"E2E HPD","club_call":"N0CALL","event_type":"FD","class":"1D","arrl_section":"MN","power":"HIGH"}')
+if [[ "$HP_D" == "400" ]]; then ok "  HIGH power on class D is refused"; else no "  HIGH power on class D is refused" "got $HP_D"; fi
+QRP_D=$(status POST /api/events '{"club_name":"E2E QRPD","club_call":"N0CALL","event_type":"FD","class":"1D","arrl_section":"MN","power":"QRP"}')
+if [[ "$QRP_D" == "400" ]]; then ok "  QRP at x5 on class D is refused"; else no "  QRP at x5 on class D is refused" "got $QRP_D"; fi
+WFDP=$(req POST /api/events '{"club_name":"E2E WFD power","club_call":"N0CALL","event_type":"WFD","class":"1H","arrl_section":"MN","power":"HIGH"}' | jq_get join_code)
+WFDP_POWER=$(req GET "/api/export/$WFDP?format=cabrillo" | sed -n 's/^CATEGORY-POWER: //p' | tr -d '\r')
+if [[ "$WFDP_POWER" == "LOW" ]]; then ok "  a WFD event declares LOW, never HIGH"; else no "  a WFD event declares LOW, never HIGH" "got $WFDP_POWER"; fi
+
 echo "── emergency power is per transmitter (7.3.1) ──"
 
 bonus_score() {  # $1 = class, $2 = bonuses JSON → CLAIMED-SCORE

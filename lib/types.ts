@@ -80,7 +80,9 @@ export interface Event {
   club_call: string;
   event_year: number;
   event_type: EventType;
-  power: 'HIGH' | 'LOW' | 'QRP';
+  /** See `lib/power.ts`. QRP_MAINS is Field Day's 5 W on mains or a
+   *  generator, ×2 (rule 7.2.2). Always LOW on Winter Field Day. */
+  power: 'HIGH' | 'LOW' | 'QRP' | 'QRP_MAINS';
   /** null for SES — there is no contest class. */
   class: string | null;
   /** null for SES — there is no contest section. */

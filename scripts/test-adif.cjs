@@ -110,6 +110,23 @@ console.log('\n── parseAdif ──');
   const recs = parseAdif('<EOH>\n<CALL:5>K1ABC<BAND:3>20m<QSO_DATE:8>notadate<TIME_ON:4>2500<EOR>');
   eq(recs[0].datetime_utc, undefined, 'an unparseable date is left undefined rather than invented');
 }
+{
+  // A merged club log names a different operator on each record. Importing it
+  // used to file every contact under whoever clicked Import.
+  const recs = parseAdif(
+    '<EOH>\n<CALL:5>K1ABC<BAND:3>20m<OPERATOR:5>w0opa<STATION_CALLSIGN:6>N0CALL<EOR>' +
+    '<CALL:5>K2ABC<BAND:3>40m<OPERATOR:5>W0OPB<EOR>' +
+    '<CALL:5>K3ABC<BAND:3>15m<STATION_CALLSIGN:6>N0CALL<EOR>');
+  eq(recs[0].operator_call, 'W0OPA', 'OPERATOR is read, and upper-cased');
+  eq(recs[1].operator_call, 'W0OPB', 'each record keeps its own operator');
+  eq(recs[2].operator_call, undefined,
+    'STATION_CALLSIGN is the call on the air, not the operator, so it is no fallback');
+}
+{
+  // Round trip: what the export writes, the import reads back.
+  const out = generateADIF(evt(), [qso({ operator_call: 'W0BBB' })]);
+  eq(parseAdif(out)[0].operator_call, 'W0BBB', 'an exported OPERATOR imports as the same operator');
+}
 
 // ── generateADIF: identity fields ───────────────────────────────────────
 console.log('\n── generateADIF ──');

@@ -106,6 +106,14 @@ console.log('\n── header ──');
 }
 eq(headerValue(generateCabrillo(evt({ event_type: 'WFD' }), [qso()]), 'CONTEST'), 'WFD',
    'Winter Field Day declares WFD');
+// WFD's Cabrillo power is QRP or LOW, and it comes from the QRP objective.
+// Events used to default to HIGH, which WFD does not have.
+eq(headerValue(generateCabrillo(evt({ event_type: 'WFD', class: '1H', power: 'HIGH' }), [qso()]),
+   'CATEGORY-POWER'), 'LOW', 'a WFD event never declares HIGH');
+eq(headerValue(generateCabrillo(evt({ event_type: 'WFD', class: '1H', bonuses: { wfd_qrp: true } }), [qso()]),
+   'CATEGORY-POWER'), 'QRP', 'the WFD QRP objective declares QRP');
+eq(headerValue(generateCabrillo(evt({ power: 'QRP_MAINS' }), [qso()]), 'CATEGORY-POWER'), 'QRP',
+   'Field Day QRP on mains declares QRP');
 
 // ── QSO lines ───────────────────────────────────────────────────────────
 console.log('\n── QSO lines ──');
