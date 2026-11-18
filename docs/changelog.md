@@ -33,6 +33,13 @@ only run events.
   `deploy.sh` and the admin console's update check the build really produced
   the app before touching the running server, and a failed build says so.
   Docs: [Troubleshooting → Deploy stops at a Next.js upgrade prompt](troubleshooting.md#deploy-stops-at-a-nextjs-upgrade-prompt)
+- **Operators on imported contacts** `Display` `Exports` — Importing an ADIF
+  file credited every contact to whoever clicked Import, even when the file
+  named a different operator on each record. Each contact now goes to the
+  record's own `OPERATOR` (or a personal `STATION_CALLSIGN`), so a merged club
+  log keeps who worked what in the Operators view and the per-operator ADIF.
+  Contacts already imported keep the operator they were given.
+  Docs: [Digital modes → ADIF import](digital-modes.md#adif-import)
 
 ### Security
 

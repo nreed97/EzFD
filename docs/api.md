@@ -300,7 +300,7 @@ for when you would.
 | Field | Notes |
 |---|---|
 | `event_id`, `adif` | Required |
-| `operator_call`, `station_number` | Attributed to the imported QSOs |
+| `operator_call`, `station_number` | `operator_call` is credited only to records that name no operator of their own (`OPERATOR`, or a `STATION_CALLSIGN` other than the event call); `station_number` to every imported QSO |
 
 Returns `{ imported, dupes, already_present, skipped, total }`. The file goes
 in as one transaction, so a failure leaves nothing half-imported. Each

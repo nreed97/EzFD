@@ -19,6 +19,11 @@ export interface AdifQSO {
    *  because the export writes this value into MODE and USB or FT4 there is
    *  not valid ADIF. */
   adif_mode?: string;
+  /** The file's OPERATOR, the person at the key. Absent when the file has
+   *  none; the import then decides who to credit (see `importOperator`). */
+  operator_call?: string;
+  /** The file's STATION_CALLSIGN, the call that went out on the air. */
+  station_callsign?: string;
 }
 
 function mhzToBand(mhz: number): Band | null {
@@ -104,10 +109,42 @@ export function parseAdif(text: string): AdifQSO[] {
     if (Number.isFinite(mhz) && mhz > 0) qso.freq_khz = Math.round(mhz * 1000);
     const realMode = (fields['MODE'] ?? '').trim().toUpperCase();
     if (realMode) qso.adif_mode = realMode.slice(0, 20);
+    const operator = fields['OPERATOR']?.trim().toUpperCase();
+    if (operator) qso.operator_call = operator;
+    const stationCall = fields['STATION_CALLSIGN']?.trim().toUpperCase();
+    if (stationCall) qso.station_callsign = stationCall;
     results.push(qso);
   }
 
   return results;
+}
+
+/**
+ * Who an imported record is credited to.
+ *
+ * The file's own OPERATOR first: a club log merged from N1MM, or this app's
+ * own export, names the operator on every record, and stamping them all with
+ * whoever clicked Import credited one person with the whole weekend.
+ *
+ * Without OPERATOR, ADIF treats STATION_CALLSIGN as the operator too, which is
+ * right for a WSJT-X log kept under the operator's own call. It is wrong when
+ * that call is the event's: on Field Day every station sends the club call, and
+ * a club call is not a person, so it falls through to the importer.
+ *
+ * `valid` is the route's callsign check, passed in so this file stays free of
+ * server imports; a value that fails it is treated as absent.
+ */
+export function importOperator(
+  rec: Pick<AdifQSO, 'operator_call' | 'station_callsign'>,
+  eventCall: string | null | undefined,
+  importer: string | null,
+  valid: (v: unknown) => string | null,
+): string | null {
+  const op = valid(rec.operator_call);
+  if (op) return op;
+  const station = valid(rec.station_callsign);
+  if (station && station !== eventCall?.trim().toUpperCase()) return station;
+  return importer;
 }
 
 // ──────────────────────────────────────────────
