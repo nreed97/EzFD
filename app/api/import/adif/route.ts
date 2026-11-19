@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { getPool } from '@/lib/db';
-import { parseAdif, type AdifQSO } from '@/lib/adif';
+import { importOperator, parseAdif, type AdifQSO } from '@/lib/adif';
 import { MERGE_WINDOW_SECONDS } from '@/lib/events';
 import { badRequest, callsign as asCallsign, isUuid, jsonBody, text } from '@/lib/validate';
 
@@ -22,7 +22,7 @@ export async function POST(request: Request) {
 
   const pool = getPool();
   const { rows: evRows } = await pool.query(
-    'SELECT id, class, arrl_section, event_type, dupe_rule FROM events WHERE id = $1',
+    'SELECT id, club_call, class, arrl_section, event_type, dupe_rule FROM events WHERE id = $1',
     [event_id]
   );
   if (!evRows[0]) return NextResponse.json({ error: 'Event not found' }, { status: 404 });
@@ -74,11 +74,12 @@ export async function POST(request: Request) {
           rcvd_class, rcvd_section, operator_call, station_number, is_dupe,
           adif_mode, freq_khz)
        SELECT $1, r.callsign, r.band, r.mode, r.at, $2, $3,
-              NULLIF(r.rcvd_class, ''), NULLIF(r.rcvd_section, ''), $4, $5, false,
+              NULLIF(r.rcvd_class, ''), NULLIF(r.rcvd_section, ''), r.operator_call, $5, false,
               r.adif_mode, r.freq_khz
          FROM unnest($6::text[], $7::text[], $8::text[], $9::timestamptz[],
-                     $10::text[], $11::text[], $12::text[], $13::int[])
-              AS r(callsign, band, mode, at, rcvd_class, rcvd_section, adif_mode, freq_khz)
+                     $10::text[], $11::text[], $12::text[], $13::int[], $4::text[])
+              AS r(callsign, band, mode, at, rcvd_class, rcvd_section, adif_mode, freq_khz,
+                   operator_call)
         WHERE NOT EXISTS (
           SELECT 1 FROM qsos q
            WHERE q.event_id = $1 AND q.callsign = r.callsign AND q.band = r.band
@@ -90,7 +91,9 @@ export async function POST(request: Request) {
         // A special event station has no contest exchange to stamp.
         isSes ? null : event.class,
         isSes ? null : event.arrl_section,
-        opCall,
+        // Each record's own operator, so a merged club log keeps who worked
+        // what; the importer only for records that name nobody.
+        kept.map(r => importOperator(r, event.club_call, opCall, asCallsign)),
         station,
         kept.map(r => r.call),
         kept.map(r => r.band),

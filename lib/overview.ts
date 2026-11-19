@@ -159,16 +159,16 @@ export function buildOverview(
  * Fifteen band rows is right for a picker, where every one of them is a thing
  * you might choose. It is wrong for a display read from across a tent, where
  * eleven empty rows push the four that matter off the bottom. A band earns its
- * row by having contacts on it or somebody on it — and `keep` holds the floor
- * so the board never collapses to nothing at the start of an event, when by
- * definition no band has either.
+ * row by having contacts on it, somebody on it or a claim on it.
+ *
+ * `always` names the bands that keep a row regardless — the HF bands, passed
+ * as `CORE_BANDS` — so the board never collapses to nothing at the start of an
+ * event, and a free HF band is shown as free rather than left out. This was a
+ * row *count* once, topped up from the lowest band upwards: five rows reached
+ * 15m and stopped, so 10m never appeared until somebody worked it.
  */
-export function activeBands(board: OverviewBoard, keep: number): OverviewBand[] {
-  const active = board.bands.filter(b => b.qsos > 0 || b.live || b.slots.some(s => s.coverage === 'claimed'));
-  if (active.length >= keep) return active;
-  // Top up in the event's own band order rather than by any notion of which
-  // band is "likely", which would be a preference dressed up as a rule.
-  const rest = board.bands.filter(b => !active.includes(b));
-  return [...active, ...rest.slice(0, keep - active.length)]
-    .sort((a, b) => board.bands.indexOf(a) - board.bands.indexOf(b));
+export function activeBands(board: OverviewBoard, always: readonly Band[]): OverviewBand[] {
+  const keep = new Set<Band>(always);
+  return board.bands.filter(b =>
+    keep.has(b.band) || b.qsos > 0 || b.live || b.slots.some(s => s.coverage === 'claimed'));
 }

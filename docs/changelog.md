@@ -23,7 +23,7 @@ only run events.
 
 ---
 
-## 2026-11-18
+## 2026-11-19
 
 ### Fixed
 
@@ -41,12 +41,34 @@ only run events.
   asks for a power category on WFD, and the Cabrillo header now says `QRP` when
   the QRP objective is ticked and `LOW` otherwise. The score was never affected.
   Docs: [Field Day and Winter Field Day → Winter Field Day](field-day.md#winter-field-day)
+
+## 2026-11-18
+
+### Fixed
+
+- **10m on the dashboard Overview** `Display` — The band board showed only the
+  first five bands until others were worked, which stopped at 15m, so 10m had
+  no row until somebody logged a contact there. All six HF bands, 160m through
+  10m, now always appear; other bands still join once they are in use.
+  Docs: [Operating → The Overview](operating.md#the-overview)
+- **Bands in the contact edit form** `Display` — Editing a contact offered only
+  nine bands, so a contact on 1.25m or 70cm, or on 60m or a WARC band at a
+  special event, showed no band selected and could not be moved onto one. The
+  edit form now offers the same bands as the entry form.
+  Docs: [Operating → Editing and deleting](operating.md#editing-and-deleting)
 - **A deploy that stopped at Next.js's upgrade prompt** `Setup` — `deploy.sh`
   could stop in the middle of the build at a "Next.js upgrade" message, report
   "Build complete", and then fail copying files. The reminder is now off,
   `deploy.sh` and the admin console's update check the build really produced
   the app before touching the running server, and a failed build says so.
   Docs: [Troubleshooting → Deploy stops at a Next.js upgrade prompt](troubleshooting.md#deploy-stops-at-a-nextjs-upgrade-prompt)
+- **Operators on imported contacts** `Display` `Exports` — Importing an ADIF
+  file credited every contact to whoever clicked Import, even when the file
+  named a different operator on each record. Each contact now goes to the
+  record's own `OPERATOR` (or a personal `STATION_CALLSIGN`), so a merged club
+  log keeps who worked what in the Operators view and the per-operator ADIF.
+  Contacts already imported keep the operator they were given.
+  Docs: [Digital modes → ADIF import](digital-modes.md#adif-import)
 
 ### Security
 

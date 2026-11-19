@@ -95,6 +95,14 @@ real frequency rather than as generic digital at the band's default. The
 Field Day exchange is read from `CLASS` and `ARRL_SECT`, falling back to
 `SRX_STRING`.
 
+Each contact is credited to the operator the file names on that record — its
+`OPERATOR` field, which N1MM, N3FJP and EzFD's own export all write. A record
+without one falls back to `STATION_CALLSIGN`, which is how WSJT-X records a log
+kept under the operator's own call, unless that is the event's callsign: on
+Field Day every station sends the club call, and that says nothing about who
+was at the key. A record naming no one is credited to you, the operator doing
+the import.
+
 The whole file goes in as one transaction: if anything fails partway, nothing
 from that file is in the log and importing it again is safe.
 

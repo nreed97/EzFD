@@ -22,6 +22,17 @@ export const BAND_GRID: Band[][] = [
   ['6m',   '2m',   'SAT'],
 ];
 
+/**
+ * The six HF bands every event offers, contest or special event alike: the top
+ * two rows of `BAND_GRID`. The site display always draws these, worked or not.
+ *
+ * The display used to keep a *count* of rows instead — the first five in band
+ * order — and the sixth HF band is 10m. So before anyone logged on 10m it had
+ * no row, and on a board read as "which bands are free" the band missing was a
+ * free one, reading as though the event did not offer it at all.
+ */
+export const CORE_BANDS: Band[] = BAND_GRID.slice(0, 2).flat();
+
 /** Beyond the grid: VHF/UHF a contest may still work. */
 export const EXTRA_BANDS: Band[] = ['1.25m', '70cm'];
 

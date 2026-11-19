@@ -1,15 +1,9 @@
 'use client';
 
 import { memo, useState } from 'react';
-import type { Band, Mode, DisplayQSO, QSO } from '@/lib/types';
+import type { Band, Mode, DisplayQSO, EventType, QSO } from '@/lib/types';
 import { VALID_EXCHANGES } from '@/lib/types';
-
-const BAND_GRID: Band[][] = [
-  ['160m', '80m',  '40m'],
-  ['20m',  '15m',  '10m'],
-  ['6m',   '2m',   'SAT'],
-];
-const MODES: Mode[] = ['PH', 'CW', 'DIG'];
+import { BAND_GRID, MODES, extraBandsFor } from '@/lib/bands';
 
 interface Props {
   qsos: DisplayQSO[];
@@ -19,6 +13,10 @@ interface Props {
   /** The event's soft-deleted contacts, fetched on demand. Undefined until
    *  the operator asks to see them. */
   eventId?: string;
+  /** Decides which bands the edit form offers, the same set the entry form
+   *  does: a special event's 30m contact must be editable onto 17m, and a
+   *  contest's onto 70cm. */
+  eventType: EventType;
 }
 
 function formatUTC(iso: string | Date) {
@@ -52,9 +50,10 @@ interface EditModalProps {
   onClose: () => void;
   /** Recorded as updated_by — self-asserted, like every identity here. */
   currentOpCall: string;
+  eventType: EventType;
 }
 
-function EditModal({ qso, onSave, onClose, currentOpCall }: EditModalProps) {
+function EditModal({ qso, onSave, onClose, currentOpCall, eventType }: EditModalProps) {
   const [callsign, setCallsign] = useState(qso.callsign);
   const [band, setBand] = useState<Band>(qso.band);
   const [mode, setMode] = useState<Mode>(qso.mode);
@@ -112,7 +111,11 @@ function EditModal({ qso, onSave, onClose, currentOpCall }: EditModalProps) {
           <div>
             <label className="block text-xs text-zinc-400 mb-1 light:text-zinc-600">Band</label>
             <div className="grid grid-cols-3 gap-1">
-              {BAND_GRID.flat().map(b => (
+              {/* The entry form's own layout and set, from lib/bands.ts. This
+                  modal kept a private copy of the nine-band grid, so a contact
+                  logged on 30m, 1.25m or 70cm showed no band selected and
+                  could not be moved onto one of those bands at all. */}
+              {[...BAND_GRID.flat(), ...extraBandsFor(eventType)].map(b => (
                 <button
                   key={b}
                   type="button"
@@ -196,7 +199,7 @@ function EditModal({ qso, onSave, onClose, currentOpCall }: EditModalProps) {
 // ---------------------------------------------------------------------------
 // Main table
 // ---------------------------------------------------------------------------
-function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, eventId }: Props) {
+function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, eventId, eventType }: Props) {
   const [editingQSO, setEditingQSO] = useState<DisplayQSO | null>(null);
   // Deleted contacts are fetched only when asked for: they're the exception,
   // and loading them with every render would put a query on the hot path of
@@ -240,7 +243,7 @@ function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, eventId }: Props) {
   return (
     <>
       {editingQSO && (
-        <EditModal qso={editingQSO} onSave={handleUpdate} onClose={() => setEditingQSO(null)} currentOpCall={currentOpCall} />
+        <EditModal qso={editingQSO} onSave={handleUpdate} onClose={() => setEditingQSO(null)} currentOpCall={currentOpCall} eventType={eventType} />
       )}
 
       <div className="h-full overflow-auto">

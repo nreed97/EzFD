@@ -204,6 +204,9 @@ Some consequences worth knowing:
 ## Editing and deleting
 
 The QSO table supports inline editing of callsign, band, mode and exchange.
+The edit form offers the same bands as the entry form, so a contact can be
+moved onto any band the event logs, including 1.25m and 70cm, and 60m and the
+WARC bands on a special event.
 Duplicate status is re-evaluated after an edit or a delete, for every contact
 it affects (see [Duplicates](#duplicates)). Deleting a QSO removes it
 everywhere in real time.
@@ -339,9 +342,11 @@ question this view answers is *where are the gaps* — and a band with an
 operator on it is not a gap, whatever the checkout board says. The claim is
 still there; it is simply not the useful fact at that moment.
 
-Bands nobody has touched and nobody has booked are left out, so the board stays
-short enough to read. At the start of an event, when that is every band, the
-first few are shown anyway rather than leaving an empty panel. The line above
+The six HF bands, 160m through 10m, always have a row, so a free HF band shows
+as free from the first minute of the event. Any other band (6m, 2m, satellite,
+and 60m or the WARC bands on a special event) gets a row once somebody has
+logged on it, is on it, or has booked it, so the board stays short enough to
+read. The line above
 the board — *3 on air · 1 claimed · 11 free* — counts the rows you can see.
 
 On a contest, claiming a band is optional, so most cells read *free* even at a

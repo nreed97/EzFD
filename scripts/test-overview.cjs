@@ -12,6 +12,7 @@
 //   * a claim with nobody there is its own state, not "free" and not "covered"
 //   * the band rows are the event's own bands in frequency order, so a special
 //     event's 30m row exists and a contest's does not
+//   * every HF band has a row before anyone works it -- 10m was missing
 //   * the counts add up to the grid, or the "N free" line on the display is
 //     describing something other than what is drawn under it
 
@@ -19,7 +20,7 @@ const { compile } = require('./_compile-ts.cjs');
 const ts = compile(['lib/overview.ts', 'lib/slotBoard.ts', 'lib/bands.ts']);
 const { buildOverview, activeBands, countCoverage } = ts.load('overview');
 const { buildSlotBoard } = ts.load('slotBoard');
-const { BAND_ORDER, bandsFor, orderedBandsFor, MODES, BAND_GRID, EXTRA_BANDS, SES_EXTRA_BANDS } = ts.load('bands');
+const { BAND_ORDER, bandsFor, orderedBandsFor, MODES, BAND_GRID, EXTRA_BANDS, SES_EXTRA_BANDS, CORE_BANDS } = ts.load('bands');
 
 let failures = 0;
 const ok = m => console.log(`ok    ${m}`);
@@ -207,7 +208,7 @@ console.log('\n-- the summary counts the rows it is printed above --');
   // first render said "29 free" over five visible rows holding nine free
   // cells. So the display counts the drawn rows, and this is that count.
   const ov = overview([], [here('W0BBB', '40m', 'CW')], { '20m': { ph: 5, cw: 0, dig: 0 } });
-  const rows = activeBands(ov, 0);
+  const rows = activeBands(ov, []);
   const n = countCoverage(rows);
   eq(n.covered + n.claimed + n.free, rows.length * MODES3.length,
     'the counts add up to exactly the cells drawn');
@@ -227,26 +228,71 @@ console.log('\n-- the summary counts the rows it is printed above --');
 console.log('\n-- the display drops rows that say nothing --');
 {
   const ov = overview([], [here('W0BBB', '40m', 'CW')], { '20m': { ph: 5, cw: 0, dig: 0 } });
-  const rows = activeBands(ov, 0).map(b => b.band);
+  const rows = activeBands(ov, []).map(b => b.band);
   same(rows, ['40m', '20m'], 'a band earns a row by having contacts or somebody on it');
 }
 {
   const ov = overview([claim({ band: '80m', mode: 'PH' })], [], {}, { isSes: true });
-  same(activeBands(ov, 0).map(b => b.band), ['80m'], 'a booked band earns one too, before anyone sits down');
+  same(activeBands(ov, []).map(b => b.band), ['80m'], 'a booked band earns one too, before anyone sits down');
 }
 {
   // At the start of an event nothing qualifies, and a board that collapses to
   // nothing looks broken rather than empty.
   const ov = overview([], [], {});
-  eq(activeBands(ov, 3).length, 3, 'an event that has not started yet still draws a floor of rows');
-  same(activeBands(ov, 3).map(b => b.band), BANDS, 'and they are the first rows in band order');
+  same(activeBands(ov, ['40m']).map(b => b.band), ['40m'], 'an event that has not started yet still draws the bands it always keeps');
 }
 {
-  const ov = overview([], [here('W0BBB', '40m', 'CW')], {});
-  const rows = activeBands(ov, 3).map(b => b.band);
-  eq(rows.length, 3, 'topping up to the floor keeps the rows that earned their place');
-  truthy(rows.includes('40m'), 'including the one somebody is on');
-  same(rows, BANDS, 'and the result stays in band order rather than active-first');
+  const ov = overview([], [here('W0BBB', '20m', 'CW')], {});
+  const rows = activeBands(ov, ['80m']).map(b => b.band);
+  same(rows, ['80m', '20m'], 'a kept band and an active one both draw, in band order rather than active-first');
+}
+
+// ── every HF band has a row, worked or not ──────────────────────────────────
+console.log('\n-- the HF bands are always on the board --');
+{
+  // The regression: the floor was a row count, topped up from 160m upwards,
+  // and five rows stopped at 15m. 10m — free, offered, and exactly what the
+  // board exists to advertise — had no row until somebody logged on it.
+  same(CORE_BANDS, ['160m', '80m', '40m', '20m', '15m', '10m'], 'the always-shown bands are the six HF contest bands');
+  for (const type of ['FD', 'WFD', 'SES']) {
+    const offered = orderedBandsFor(type);
+    truthy(CORE_BANDS.every(b => offered.includes(b)), `${type} offers every always-shown band`);
+    const ov = buildOverview(offered, MODES, buildSlotBoard(offered, MODES, [], [], NOW, { isSes: type === 'SES' }), {});
+    const rows = activeBands(ov, CORE_BANDS).map(b => b.band);
+    truthy(rows.includes('10m'), `${type}: 10m has a row before anyone has worked it`);
+    same(rows, CORE_BANDS, `${type}: an untouched board is exactly the HF bands`);
+  }
+  const offered = orderedBandsFor('FD');
+  const ov = buildOverview(offered, MODES,
+    buildSlotBoard(offered, MODES, [], [here('W0BBB', '40m', 'PH'), here('W0CCC', '6m', 'CW')], NOW, {}),
+    { '20m': { ph: 3, cw: 0, dig: 0 } });
+  same(activeBands(ov, CORE_BANDS).map(b => b.band), [...CORE_BANDS, '6m'],
+    'activity on a VHF band adds its row after the HF ones, and activity on HF adds nothing twice');
+}
+
+// ── no component keeps its own band list ────────────────────────────────────
+console.log('\n-- band lists come from lib/bands.ts --');
+{
+  // The contact edit form kept a private nine-band grid, so a contact on 30m,
+  // 1.25m or 70cm could not be moved onto one of those bands. Same shape as
+  // BandBreakdown's missing WARC rows and the section list in two components.
+  const fs = require('fs');
+  const path = require('path');
+  const dirs = ['components', 'app'];
+  const files = [];
+  const walk = d => {
+    for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+      const p = path.join(d, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(e.name)) files.push(p);
+    }
+  };
+  for (const d of dirs) walk(path.join(__dirname, '..', d));
+  // Three or more band names inside one array literal is a copy of the list.
+  const literal = /\[[^\]\n]*(?:'(?:160m|80m|40m|20m|15m|10m)'[^\]\n]*){3,}\]/;
+  const offenders = files.filter(f => literal.test(fs.readFileSync(f, 'utf8')))
+    .map(f => path.relative(path.join(__dirname, '..'), f));
+  same(offenders, [], 'no component or page writes out its own band list');
 }
 
 console.log('');
