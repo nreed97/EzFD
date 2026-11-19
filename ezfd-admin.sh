@@ -531,16 +531,18 @@ view_event_once() {
 
        # Power
        printf "  Current power: ${BOLD}%s${NC}\n" "$cur_power"
-       echo -e "  ${DIM}Options: HIGH, LOW, QRP${NC}"
+       echo -e "  ${DIM}Field Day: HIGH (>100 W, classes A-C only), LOW (<=100 W),${NC}"
+       echo -e "  ${DIM}QRP (<=5 W off the mains, x5), QRP_MAINS (<=5 W on mains/generator, x2)${NC}"
+       echo -e "  ${DIM}Winter Field Day ignores this; its QRP objective sets the Cabrillo power${NC}"
        local new_power=""
        read -rp "$(echo -e "  New power [Enter to keep]: ")" new_power
        new_power="${new_power^^}"
        if [[ -n "$new_power" ]]; then
-         if [[ "$new_power" =~ ^(HIGH|LOW|QRP)$ ]]; then
+         if [[ "$new_power" =~ ^(HIGH|LOW|QRP|QRP_MAINS)$ ]]; then
            PG -c "UPDATE events SET power='$new_power' WHERE id='$uuid';" >/dev/null
            log "Power updated: ${cur_power} → ${new_power}"
          else
-           warn "Invalid power — must be HIGH, LOW, or QRP. Skipping."
+           warn "Invalid power — must be HIGH, LOW, QRP or QRP_MAINS. Skipping."
          fi
        fi
        echo

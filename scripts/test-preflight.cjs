@@ -165,6 +165,24 @@ console.log('\n── claims the log can settle ──');
      'and silent when the log shows them all');
 }
 
+console.log('\n── power category against class ──');
+{
+  const hp = run([qso()], event({ class: '1D', power: 'HIGH' }), {})
+    .find(x => x.id === 'power-vs-class');
+  eq(!!hp, true, 'HIGH power on class D is reported (rule 4: 100 W cap)');
+  eq(hp && hp.severity, 'fix', 'as a fix: the entry contradicts itself');
+  eq(!!run([qso()], event({ class: '1D', power: 'QRP' }), {})
+       .find(x => x.id === 'power-vs-class'), true,
+     'QRP at x5 on class D is reported (7.2.1 needs non-mains power)');
+  eq(run([qso()], event({ class: '1D', power: 'QRP_MAINS' }), {})
+       .find(x => x.id === 'power-vs-class'), undefined, 'QRP on mains for class D is fine');
+  eq(run([qso()], event({ class: '2A', power: 'HIGH' }), {})
+       .find(x => x.id === 'power-vs-class'), undefined, 'HIGH on class A is fine');
+  const mob = run([qso()], event({ class: '1C', power: 'QRP' }), {})
+    .find(x => x.id === 'qrp-mobile');
+  eq(mob && mob.severity, 'check', 'QRP x5 on a mobile is a check (rule 4.5), not a fix');
+}
+
 console.log('\n── Winter Field Day objectives multiply ──');
 {
   const wfd = (over = {}) => event({ event_type: 'WFD', class: '1O', ...over });

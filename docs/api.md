@@ -34,7 +34,7 @@ callsign database failed to download.
 | `club_name`, `club_call` | Required |
 | `event_type` | `FD`, `WFD` or `SES`; defaults to `FD` |
 | `class`, `arrl_section` | Required for contests; optional for `SES` |
-| `power` | `HIGH`, `LOW`, `QRP` |
+| `power` | Field Day only: `HIGH`, `LOW`, `QRP` (5 W off the mains, ×5) or `QRP_MAINS` (5 W on the mains or a generator, ×2). Defaults to `HIGH` where the class allows it, else `LOW`. A category the class may not claim, such as `HIGH` on class D, E or F or `QRP` on class D, is a `400`. Winter Field Day and special events always store `LOW` |
 | `event_year` | Defaults to the current year |
 | `location` | |
 | `qrz_username`, `qrz_password` | Password encrypted before storage |

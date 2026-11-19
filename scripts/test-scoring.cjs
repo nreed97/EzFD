@@ -43,8 +43,27 @@ const qso = (over = {}) => ({
 console.log('\n── power multiplier ──');
 eq(powerMultiplier('HIGH'), 1, 'HIGH is x1');
 eq(powerMultiplier('LOW'),  2, 'LOW is x2');
-eq(powerMultiplier('QRP'),  5, 'QRP is x5');
+eq(powerMultiplier('QRP'),  5, 'QRP off the mains is x5 (7.2.1)');
+eq(powerMultiplier('QRP_MAINS'), 2, 'QRP on the mains or a generator is x2 (7.2.2)');
 eq(powerMultiplier('nonsense'), 1, 'an unknown power falls back to x1');
+
+// Which categories a class may claim (rule 4, rule 7.2). D, E and F are capped
+// at 100 W PEP; class D is on commercial power by definition (4.6).
+{
+  const pw = compile(['lib/power.ts']).load('power');
+  const keys = c => pw.fdPowerOptions(c).map(d => d.key).join();
+  eq(keys('3A'), 'HIGH,LOW,QRP,QRP_MAINS', 'class A may claim every category');
+  eq(keys('1D'), 'LOW,QRP_MAINS', 'class D: no high power, and QRP only at x2');
+  eq(keys('1E'), 'LOW,QRP,QRP_MAINS', 'class E: no high power (100 W cap)');
+  eq(keys('2F'), 'LOW,QRP,QRP_MAINS', 'class F: no high power (100 W cap)');
+  eq(pw.powerProblem('FD', '1D', 'HIGH') !== null, true, 'HIGH on class D is a problem');
+  eq(pw.powerProblem('FD', '1D', 'QRP') !== null, true, 'QRP x5 on class D is a problem');
+  eq(pw.powerProblem('FD', '2A', 'HIGH'), null, 'HIGH on class A is fine');
+  eq(pw.powerProblem('WFD', '1H', 'HIGH'), null, 'WFD has no power category to get wrong');
+  eq(pw.cabrilloPower('FD', 'QRP_MAINS', {}), 'QRP', 'QRP on mains is still a QRP entry in Cabrillo');
+  eq(pw.cabrilloPower('WFD', 'HIGH', {}), 'LOW', 'WFD has no HIGH: without the QRP objective it is LOW');
+  eq(pw.cabrilloPower('WFD', 'HIGH', { wfd_qrp: true }), 'QRP', 'and the QRP objective makes it QRP');
+}
 
 // ── QSO points by mode ──────────────────────────────────────────────────
 console.log('\n── QSO points by mode ──');

@@ -35,7 +35,7 @@ One row per event. The join code is what operators type; the UUID is internal.
 | `class` | **Nullable.** NULL for special events |
 | `arrl_section` | **Nullable.** NULL or optional for special events |
 | `gota_call` | **Nullable.** The GOTA station's callsign. NULL turns the feature off, and it is only stored for Field Day |
-| `power` | `HIGH`, `LOW`, `QRP` — scoring multiplier, contests only |
+| `power` | `HIGH`, `LOW`, `QRP`, `QRP_MAINS` — Field Day's power category (`lib/power.ts`). Always `LOW` on new Winter Field Day and special events; WFD's Cabrillo power comes from its QRP objective instead |
 | `location` | Free text |
 | `qrz_username`, `qrz_password` | Password encrypted at rest, never returned by the API |
 | `qrz_session_key`, `qrz_session_expires` | Cached QRZ session |

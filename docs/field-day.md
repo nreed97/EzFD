@@ -18,8 +18,32 @@ letter against the event type — a `3H` on a Field Day event is flagged.
 
 **ARRL section** is your own section, sent as part of the exchange.
 
-**Power category** sets the score multiplier and is one of `HIGH`, `LOW`
-(≤150 W) or `QRP` (≤5 W).
+### Power category
+
+On a Field Day event, **power category** is the highest output any transmitter
+will use during the event (rule 7.2.5). It sets the score multiplier, and the
+setup page only offers the categories your class may claim:
+
+| Category | Output | Multiplier | Rule | Classes |
+|---|---|---|---|---|
+| High | Over 100 W, up to 500 W PEP | ×1 | 7.2.4 | A, B, C |
+| Low | 100 W or less | ×2 | 7.2.3 | All |
+| QRP battery | 5 W or less, on batteries, solar or another source that is not the mains or a generator | ×5 | 7.2.1 | A, B, C, E, F |
+| QRP mains | 5 W or less, on the mains or a generator, or on batteries charged from either during the event | ×2 | 7.2.2 | All |
+
+Classes D, E and F are limited to 100 W PEP (rule 4), so high power is not
+offered to them. Class D runs on commercial power by definition (4.6), so its
+QRP option is the ×2 one. Both QRP options are written to Cabrillo as `QRP`;
+only the multiplier differs. A class C mobile on its vehicle battery or
+alternator is on a motor-driven generator (4.5) and should pick QRP mains.
+
+The category cannot be changed on the setup page after the event is created.
+The admin console's **Edit event settings** changes it, and the
+[pre-submission check](#before-you-submit) flags an event whose category its
+class may not claim.
+
+A Winter Field Day event has no power category to choose; see
+[Winter Field Day](#winter-field-day).
 
 ## The exchange
 
@@ -41,9 +65,10 @@ score = QSO points × power multiplier + bonus points
 | Phone QSO | 1 point |
 | CW QSO | 2 points |
 | Digital QSO | 2 points |
-| `HIGH` power | ×1 |
-| `LOW` power (≤150 W) | ×2 |
-| `QRP` power (≤5 W) | ×5 |
+| High power (over 100 W) | ×1 |
+| Low power (100 W or less) | ×2 |
+| QRP, battery or solar (5 W or less) | ×5 |
+| QRP, mains or generator (5 W or less) | ×2 |
 
 **Sections do not multiply the score, and they are not a bonus either.** Rule
 7.3 lists eighteen bonuses and none of them concerns sections. Working every
@@ -102,7 +127,8 @@ so explicitly for GOTA contacts, and it holds for all of them.
 Open **Summary** on the dashboard and the sheet opens with a short read of the
 log: unrecognised sections, a station that sent two different exchanges, a
 class or callsign that cannot be one, contacts on a band the entry cannot
-score, and any bonus claimed that rule 7.3 does not list for your class.
+score, any bonus claimed that rule 7.3 does not list for your class, and a
+power category your class may not claim.
 
 Two levels, and the difference matters:
 
@@ -162,6 +188,12 @@ score = total QSO points × (Objective Multiplier + 1)
 Objectives are ticked in the same dashboard panel, which switches to an
 **Objectives** list showing the OM each one contributes. See
 [the rules reference](rules-reference.md#winter-field-day) for the full table.
+
+There is no power category to set up. Every Winter Field Day station is limited
+to 100 W PEP and there is no high-power category, so the setup page does not
+ask. Running QRP (10 W or less on phone, 5 W or less on CW and digital) is an
+objective worth OM 4: tick **Operate the event QRP** and the Cabrillo header
+says `CATEGORY-POWER: QRP`; leave it unticked and it says `LOW`.
 
 ## Submitting
 

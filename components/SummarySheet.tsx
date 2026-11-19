@@ -1,6 +1,7 @@
 'use client';
 
 import { preflight, NOT_CHECKED } from '@/lib/preflight';
+import { powerLabel } from '@/lib/power';
 import type { Event, Score, Bonuses, QSO } from '@/lib/types';
 import { bonusDefs, bonusPoints, transmittersFromClass, WFD_OBJECTIVES } from '@/lib/bonuses';
 
@@ -150,7 +151,7 @@ export default function SummarySheet({ event, score, bonuses, operators, qsos, o
                   <Row label="Club name"    value={event.club_name} />
                   <Row label="Callsign"     value={event.club_call} />
                   <Row label="Class"        value={event.class ?? '—'} />
-                  <Row label="Power"        value={event.power ?? 'HIGH'} />
+                  <Row label="Power"        value={powerLabel(event.event_type, event.power, bonuses)} />
                   <Row label="ARRL section" value={event.arrl_section ?? '—'} />
                   {event.location && <Row label="Location" value={event.location} className="col-span-2" />}
                 </div>

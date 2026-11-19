@@ -178,6 +178,10 @@ $$;
 -- ---------------------------------------------------------------------------
 ALTER TABLE events ADD COLUMN IF NOT EXISTS bonuses    JSONB NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS event_type TEXT  NOT NULL DEFAULT 'FD';
+-- power: Field Day's category — HIGH, LOW, QRP (5 W off the mains, x5) or
+-- QRP_MAINS (5 W on the mains or a generator, x2, rule 7.2.2). Which a class
+-- may claim is lib/power.ts's to decide. WFD has no power category; its
+-- Cabrillo power comes from the QRP objective.
 ALTER TABLE events ADD COLUMN IF NOT EXISTS power      TEXT  NOT NULL DEFAULT 'HIGH';
 ALTER TABLE events ADD COLUMN IF NOT EXISTS use_call_history         BOOLEAN NOT NULL DEFAULT FALSE;
 ALTER TABLE events ADD COLUMN IF NOT EXISTS use_master_callsign_file BOOLEAN NOT NULL DEFAULT FALSE;

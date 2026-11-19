@@ -208,7 +208,7 @@ air.
 | Export QSOs to CSV | `/tmp/qsos_CODE.csv` |
 | Export full backup | `/tmp/ezfd_CODE_backup.json`, including SES roster and checkouts |
 | Change join code | 4–8 alphanumeric characters, must be unique |
-| Edit event settings | Contest events: power, class, section. Special events: enforcement, slot length, dupe rule, approval |
+| Edit event settings | Contest events: power (`HIGH`, `LOW`, `QRP`, `QRP_MAINS`; Field Day only), class, section. Special events: enforcement, slot length, dupe rule, approval |
 | Manage operator roster | Special events only — approve, revoke, fix grid or state, remove |
 | Clear all dupes | Marks every live duplicate as non-duplicate |
 | Delete ALL QSOs | Keeps the event, empties the log — including deleted contacts |

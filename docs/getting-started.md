@@ -37,7 +37,7 @@ you pick, because the three types genuinely differ:
 | Type | Use it for | Key fields |
 |---|---|---|
 | **ARRL Field Day** | The June contest | Class (e.g. `3A`), ARRL section, power category |
-| **Winter Field Day** | The January contest | Class with the WFD letters (`H`/`O`/`I`), section, power |
+| **Winter Field Day** | The January contest | Class with the WFD letters (`H`/`I`/`O`/`M`), section |
 | **Special Event** | A callsign activated over a date range, often by operators in different places | Date range, checkout rules, optional section |
 
 Fill in the club or event name and the callsign that will be signed on the

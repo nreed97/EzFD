@@ -5,6 +5,7 @@ import { refreshCallHistory } from '@/lib/callHistory';
 import { refreshMasterCallsignsIfStale } from '@/lib/masterCallsigns';
 import { adminKeyOk, generateJoinCode } from '@/lib/adminKey';
 import { DUPE_RULES } from '@/lib/events';
+import { isPowerCategory, powerProblem, type PowerCategory } from '@/lib/power';
 import { badRequest, callsign, jsonBody, text } from '@/lib/validate';
 
 export async function POST(request: Request) {
@@ -69,6 +70,24 @@ export async function POST(request: Request) {
   // MASTER.SCP is evergreen and still useful for callsign validation.
   const wantCallHistory = !isSesEvent && !!use_call_history;
 
+  // Power category (lib/power.ts). Field Day checks it against the class:
+  // D, E and F are capped at 100 W (rule 4), and class D's commercial power
+  // cannot earn the ×5 (7.2.1). Winter Field Day has no power category to
+  // choose — its QRP objective decides the Cabrillo header — and a special
+  // event has no score, so both store LOW.
+  let resolvedPower: PowerCategory = 'LOW';
+  if (resolvedEventType === 'FD') {
+    if (power === undefined || power === null || power === '') {
+      resolvedPower = powerProblem('FD', fdClass, 'HIGH') ? 'LOW' : 'HIGH';
+    } else if (!isPowerCategory(power)) {
+      return badRequest('Power must be HIGH, LOW, QRP or QRP_MAINS');
+    } else {
+      const problem = powerProblem('FD', fdClass, power);
+      if (problem) return badRequest(problem);
+      resolvedPower = power;
+    }
+  }
+
   function parseDate(value: unknown): Date | null {
     if (!value) return null;
     const d = new Date(value as string);
@@ -98,7 +117,7 @@ export async function POST(request: Request) {
       text(qrz_username, { max: 60 }),
       encryptedPassword,
       resolvedEventType,
-      ['HIGH','LOW','QRP'].includes(power) ? power : 'HIGH',
+      resolvedPower,
       wantCallHistory,
       !!use_master_callsign_file,
       isSesEvent ? parseDate(starts_at) : null,

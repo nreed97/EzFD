@@ -23,6 +23,25 @@ only run events.
 
 ---
 
+## 2026-11-19
+
+### Fixed
+
+- **Field Day power categories match rule 7.2** `Scoring` `Exports` `Display`
+  — QRP earned ×5 even on mains power, where rule 7.2.2 gives ×2; it is now two
+  choices, QRP battery (×5) and QRP mains (×2). Classes D, E and F, which are
+  limited to 100 W, are no longer offered high power, and class D is no longer
+  offered QRP at ×5. The pre-submission check flags an existing event whose
+  category its class may not claim. If you entered QRP on mains power, your
+  claimed score was two and a half times too high.
+  Docs: [Field Day and Winter Field Day → Power category](field-day.md#power-category), [HTTP API → POST /api/events](api.md#post-apievents)
+- **Winter Field Day no longer declares high power** `Exports` `Display` —
+  Winter Field Day has no high-power category, but a new WFD event defaulted to
+  HIGH and its Cabrillo said `CATEGORY-POWER: HIGH`. The setup page no longer
+  asks for a power category on WFD, and the Cabrillo header now says `QRP` when
+  the QRP objective is ticked and `LOW` otherwise. The score was never affected.
+  Docs: [Field Day and Winter Field Day → Winter Field Day](field-day.md#winter-field-day)
+
 ## 2026-11-18
 
 ### Fixed

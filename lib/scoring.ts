@@ -1,19 +1,19 @@
 import type { QSO, Score, Band, BandStats, Bonuses, EventType } from './types';
 import { MODE_POINTS, DX_EXCHANGE, MX_EXCHANGE, isARRLSection, transmitterCount } from './types';
+import { powerMultiplier } from './power';
 import { bonusDefs, bonusPoints, objectiveMultiplier, type BonusContext } from './bonuses';
 
 /**
- * ARRL Field Day power multiplier (rule 7.2): QRP ×5, low ×2, high ×1.
+ * ARRL Field Day power multiplier (rule 7.2) lives in `lib/power.ts` with the
+ * rest of the power category table — QRP is ×5 only off the mains (7.2.1),
+ * ×2 on it (7.2.2). Re-exported here because the scorer is where callers
+ * have always found it.
  *
  * Field Day only. Winter Field Day has no power multiplier — every station is
  * capped at 100 W PEP and running QRP is an objective worth ×4 in the OM,
  * so a WFD score never passes through here.
  */
-export function powerMultiplier(power: 'HIGH' | 'LOW' | 'QRP' | string): number {
-  if (power === 'QRP') return 5;
-  if (power === 'LOW') return 2;
-  return 1;
-}
+export { powerMultiplier };
 
 /**
  * Total bonus points claimed, summed from the schedule in `lib/bonuses.ts`.
@@ -47,7 +47,7 @@ export interface EntryDetails {
 export function calculateScore(
   qsos: QSO[],
   bonuses: Bonuses = {},
-  power: 'HIGH' | 'LOW' | 'QRP' | string = 'HIGH',
+  power: string = 'HIGH',
   entry: EntryDetails = {},
 ): Score {
   const validQSOs = qsos.filter(q => !q.is_dupe);
