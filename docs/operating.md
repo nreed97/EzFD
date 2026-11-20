@@ -231,6 +231,7 @@ toggle and persists across sessions.
 
 | Element | Meaning |
 |---|---|
+| `15:26:04Z` | The time in UTC. Not shown on a phone, where the row has no room for it beside your club call |
 | `147 Q` | Non-duplicate QSOs |
 | `31 ×` | Sections worked (contest events only) |
 | Amber number | Score before bonuses (contest events only) |

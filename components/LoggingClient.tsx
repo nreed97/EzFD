@@ -357,12 +357,15 @@ export default function LoggingClient({
 
   return (
     <div data-night={nightMode ? 'true' : undefined} className="night-scope flex h-screen flex-col overflow-hidden bg-zinc-950 light:bg-white">
-      <header className="flex items-center justify-between border-b border-zinc-800 bg-zinc-900 px-4 py-2 flex-shrink-0 light:border-zinc-200 light:bg-zinc-50">
+      <header className="flex items-center justify-between gap-3 border-b border-zinc-800 bg-zinc-900 px-4 py-2 flex-shrink-0 light:border-zinc-200 light:bg-zinc-50">
         <div className="flex items-center gap-3 min-w-0">
           {/* The call actually being signed. A GOTA operator working under a
               different callsign needs that on screen — it is what they say on
               the air, and it is what their contacts export as. */}
-          <span className="font-bold text-amber-400 text-lg shrink-0">
+          {/* Truncates rather than holding its width: the status row to the
+              right does not shrink, and a call that refused to either was
+              drawn underneath the clock on a phone. */}
+          <span className="font-bold text-amber-400 text-lg truncate">
             {isGota && event.gota_call ? event.gota_call : event.club_call}
           </span>
           {isGota && event.gota_call && (
@@ -387,7 +390,12 @@ export default function LoggingClient({
               without acting on. Everything actionable moved into the drawer,
               which is why this row no longer has to choose what to drop at
               each breakpoint. */}
-          <UTCClock />
+          {/* Not on a phone: the call, the rig button, the score and the menu
+              already fill a 360px row, and with the clock as well the call
+              was drawn underneath it. The phone's own clock is in view, every
+              contact is stamped by the server, and the list shows each one in
+              UTC. */}
+          <span className="hidden sm:inline"><UTCClock /></span>
 
           {/* Rig control is a button, and it is here whether or not a radio is
               attached. It used to be a status chip that appeared only once
