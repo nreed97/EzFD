@@ -23,6 +23,22 @@ only run events.
 
 ---
 
+## 2026-11-20
+
+### Fixed
+
+- **The contact list on a wide monitor** `Display` — Band, mode, class and
+  section now sit next to the callsign instead of at the far edge of the
+  screen. On a large monitor the callsign column used to take all the spare
+  width, so each contact read across most of the screen; the spare width
+  now falls after the row. Phones are unchanged.
+  Docs: [Operating → The entry form](operating.md#the-entry-form)
+- **The club call in the logger header on a phone** `Display` — The UTC clock
+  no longer draws on top of the club call on a narrow screen. The clock is not
+  shown below tablet width, where the header had no room for both; every
+  contact is still stamped in UTC by the server and listed in UTC.
+  Docs: [Operating → Reading the header](operating.md#reading-the-header)
+
 ## 2026-11-19
 
 ### Fixed

@@ -247,17 +247,25 @@ function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, eventId, eventType 
       )}
 
       <div className="h-full overflow-auto">
+        {/* Every column but the callsign used to have a width, so on a wide
+            monitor the callsign column took all the slack and the band sat
+            a screen-width away from the call it belongs to. From md up the
+            callsign gets a width of its own and an empty last column takes
+            the slack instead, so a row reads left to right with the space
+            after it. A phone has no slack to give away, so it keeps the
+            old layout: no spacer, and the callsign sized by its content. */}
         <table className="w-full text-sm">
           <thead className="sticky top-0 bg-zinc-950 text-xs text-zinc-500 uppercase light:bg-white light:text-zinc-400">
             <tr>
               <th className="px-3 py-2 text-left w-16">UTC</th>
-              <th className="px-3 py-2 text-left">Callsign</th>
+              <th className="px-3 py-2 text-left md:w-40">Callsign</th>
               <th className="px-3 py-2 text-left w-16">Band</th>
               <th className="px-3 py-2 text-left w-12">Mode</th>
               <th className="px-3 py-2 text-left w-16">Class</th>
               <th className="px-3 py-2 text-left w-16">Sect</th>
               <th className="px-3 py-2 text-left w-12">Op</th>
               <th className="px-2 py-2 w-12"></th>
+              <th aria-hidden="true" className="hidden md:table-cell" />
             </tr>
           </thead>
           <tbody>
@@ -332,11 +340,12 @@ function QSOTable({ qsos, onDelete, onUpdate, currentOpCall, eventId, eventType 
                     </button>
                   </div>
                 </td>
+                <td aria-hidden="true" className="hidden md:table-cell" />
               </tr>
             ))}
             {qsos.length === 0 && (
               <tr>
-                <td colSpan={8} className="px-3 py-8 text-center text-zinc-600 light:text-zinc-400">
+                <td colSpan={9} className="px-3 py-8 text-center text-zinc-600 light:text-zinc-400">
                   No QSOs logged yet. Start logging!
                 </td>
               </tr>
